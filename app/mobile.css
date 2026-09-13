@@ -1,0 +1,98 @@
+/* Responsive working surface: tablet and touch phones */
+@media (max-width: 1024px) {
+  .shell { min-width: 0; overflow-x: hidden; }
+  .topbar { gap: 22px; padding-inline: 24px; }
+  .navrow { padding-inline: 24px; overflow-x: auto; scrollbar-width: none; }
+  .navrow::-webkit-scrollbar { display: none; }
+  .navrow [data-slot=tabs-list] { min-width: max-content; gap: 24px; }
+  .navrow [data-slot=tabs-trigger] { flex: 0 0 auto; }
+  main { padding: 28px 24px 18px; }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .gridscroll, .contentpanel { -webkit-overflow-scrolling: touch; }
+  .weekgrid { min-width: 900px; }
+  .contentpanel { overflow-x: auto; }
+  .contentpanel [data-slot=table] { min-width: 660px; }
+  .teamlink { max-width: 100%; }
+  .timeline { min-width: 900px; }
+  .timeruler, .timerow { grid-template-columns: 145px 1fr; }
+}
+
+@media (max-width: 700px) {
+  .topbar { height: 64px; padding-inline: 16px; gap: 10px; }
+  .brand { font-size: 21px; gap: 3px; }
+  .brandmark { width: 30px; height: 31px; border-radius: 8px; font-size: 27px; margin-right: 2px; }
+  .brandmark span { font-size: 20px; }
+  .account { gap: 5px; }
+  .account .avatar { width: 30px; height: 30px; margin-left: 4px; }
+  .navrow { height: 54px; padding-inline: 16px; }
+  .navrow [data-slot=tabs-list] { height: 54px; gap: 20px; }
+  .navrow [data-slot=tabs-trigger] { font-size: 13px; gap: 7px; }
+  main { padding: 22px 14px 12px; }
+  .pageheading { margin-bottom: 18px; gap: 14px; }
+  .pageheading h1 { font-size: 23px; line-height: 1.25; }
+  .pageheading p { line-height: 1.55; }
+  .pageheading .rain { align-self: stretch; width: 100%; }
+  .demo-banner, .statusbar { align-items: flex-start; font-size: 13px; line-height: 1.45; }
+  .setup { gap: 12px; }
+  .setup .button { width: 100%; }
+  .stats { grid-template-columns: 1fr; gap: 10px; margin-bottom: 18px; }
+  .stats > div { min-height: 0; padding: 17px; }
+  .stats strong { margin-top: 8px; }
+  .toolbar { padding: 15px; gap: 12px; }
+  .weekpicker { width: 100%; display: grid; grid-template-columns: 26px minmax(0, 1fr) 26px; gap: 8px; }
+  .weekpicker h2 { text-align: center; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .weekpicker .button { grid-column: 1 / -1; width: 100%; }
+  .actions { width: 100%; }
+  .actions .button { flex: 1; }
+  .filterbar { padding: 13px 15px; align-items: stretch; }
+  .filterbar .field { min-width: 0; flex: 1 1 145px; }
+  .filterbar [data-slot=tabs-list] { width: 100%; }
+  .filterbar [data-slot=tabs-trigger] { flex: 1; }
+  .weekgrid { min-width: 760px; grid-template-columns: 132px repeat(7, minmax(89px, 1fr)); }
+  .gridhead { padding: 12px 6px; }
+  .staff { padding: 15px 13px; }
+  .daycell { min-height: 78px; padding: 7px 5px; }
+  .shift { min-height: 61px; padding: 8px 6px; gap: 5px; }
+  .shift b, .shift span { font-size: 11px; }
+  .shift small { right: 6px; bottom: 7px; }
+  .schedulefoot { padding: 13px 15px; flex-direction: column; align-items: flex-start; line-height: 1.45; }
+  .below { padding: 20px 3px; align-items: flex-start; flex-direction: column; gap: 13px; }
+  .below > div { align-items: flex-start; line-height: 1.45; }
+  .linkbutton { align-self: flex-end; font-size: 14px; }
+  .contentpanel { padding: 16px; margin-inline: -1px; }
+  .sectionhead { margin-bottom: 18px; gap: 13px; }
+  .sectionhead h2 { font-size: 19px; }
+  .sectionhead .button { width: 100%; }
+  .policy { padding: 13px; font-size: 13px; }
+  .uploadzone { min-height: 170px; padding: 20px; text-align: center; }
+  .uploadzone b { line-height: 1.5; }
+  .importreview { padding: 15px; }
+  .rawpreview { font-size: 12px; margin-inline: -2px; }
+  .paytotal { font-size: 24px; width: 100%; }
+  .requestrow { align-items: flex-start; gap: 10px; padding: 18px 0; }
+  .requestrow > div:first-child { flex: 0 0 100%; }
+  .requestrow .button { flex: 1; }
+  .swapnames { gap: 10px; }
+  .message { padding: 16px; }
+  .message > p { font-size: 15px; }
+  .messagefoot { align-items: flex-start; flex-direction: column; }
+  .messagefoot .button { width: 100%; }
+  .teamlink { min-width: 0; width: 100%; }
+  .shift-dialog { width: calc(100% - 24px)!important; max-width: none!important; padding: 20px!important; }
+  .shift-dialog [data-slot=dialog-title] { font-size: 20px; padding-right: 24px; }
+  .timeline { min-width: 760px; }
+  .timeruler, .timerow { grid-template-columns: 132px 1fr; }
+  .timeruler > span { padding: 14px; }
+  .track { min-height: 66px; }
+  .track button { top: 18px; height: 28px; font-size: 11px; }
+  footer { margin: 0 14px; padding: 18px 0; flex-direction: column; gap: 8px; }
+}
+
+@media (max-width: 390px) {
+  .brandlight { display: none; }
+  .navrow [data-slot=tabs-list] { gap: 16px; }
+  .navrow [data-slot=tabs-trigger] { font-size: 12px; }
+  .navrow [data-slot=tabs-trigger] svg { width: 15px; height: 15px; }
+  .weekpicker h2 span { display: none; }
+  .person { font-size: 13px; }
+}

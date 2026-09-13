@@ -1,0 +1,9 @@
+{
+  "name": "Pelham Shift",
+  "short_name": "Pelham Shift",
+  "description": "직원 스케줄, 대체근무, 출근기록과 예상 급여",
+  "display": "standalone",
+  "background_color": "#f7f9fa",
+  "theme_color": "#087e6d",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

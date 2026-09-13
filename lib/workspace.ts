@@ -1,0 +1,8 @@
+import {env} from 'cloudflare:workers';
+import {getChatGPTUser} from '@/app/chatgpt-auth';
+import type {State} from '@/lib/domain';
+import type {Actor} from '@/lib/operations';
+export const json=(value:unknown,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'no-store'}});
+export const sameOrigin=(req:Request)=>{const origin=req.headers.get('origin');return !origin||origin===new URL(req.url).origin};
+export async function context(req:Request){const user=await getChatGPTUser();if(!user)return null;const team=new URL(req.url).searchParams.get('team')||user.userId;const row=await env.DB.prepare('SELECT * FROM workspaces WHERE id = ?').bind(team).first<{id:string;owner:string;state:string;version:number}>();if(!row)return {user,team,row:null,state:null,actor:{id:'admin',admin:true}};const state=JSON.parse(row.state) as State;const admin=row.owner===user.userId;const employee=state.employees.find(e=>e.email&&e.email.toLowerCase()===user.email.toLowerCase());if(!admin&&!employee)throw new Error('접근 권한이 없습니다. 관리자에게 등록된 이메일을 확인하세요.');return {user,team,row,state,actor:{id:admin?'admin':employee!.id,admin}}}
+export function visible(state:State,actor:Actor){if(actor.admin)return state;return {...state,employees:state.employees.map(e=>e.id===actor.id?e:{...e,email:'',rate:0}),shifts:state.published?state.shifts:[],attendance:state.attendance.filter(a=>a.employeeId===actor.id),swaps:state.swaps.filter(r=>r.from===actor.id||r.to===actor.id),messages:state.messages.filter(m=>m.to==='all'||m.to===actor.id||m.sender===actor.id)}}
