@@ -1329,7 +1329,7 @@ export default function ShiftApp() {
               <div className="sectionhead">
                 <div>
                   <h2>직원 관리</h2>
-                  <p>이름 앞 컬러 상자 · 직원 ID · 시급 · 로그인 이메일</p>
+                  <p>이름 앞 컬러 상자 · 직원 ID · 개인별 시급 · 로그인 설정</p>
                 </div>
                 <button
                   className="button primary"
@@ -1397,7 +1397,7 @@ export default function ShiftApp() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    {['직원', '직원 ID', '업무', '생년월일', '이메일', '시급', '설정'].map(
+                    {['직원', '직원 ID', '업무', '생년월일', '이메일', '개인별 시급', '설정'].map(
                       (h) => (
                         <TableHead key={h}>{h}</TableHead>
                       ),
@@ -1505,7 +1505,7 @@ export default function ShiftApp() {
                 {input('email', '로그인 이메일', 'email', false)}
                 <div className="formgrid">
                   {input('color', '직원 색상', 'color')}
-                  {input('rate', '시급 (' + data.currency + ')', 'number')}
+                  {input('rate', '개인별 시급 (' + data.currency + ')', 'number')}
                 </div>
                 {input('role', '업무')}
               </>
