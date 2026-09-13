@@ -102,6 +102,7 @@ const nav = [
   { key: 'messages', label: '메시지', Icon: MessageSquare },
   { key: 'team', label: '직원 관리', Icon: Users },
 ];
+const employeeNav = new Set(['schedule', 'attendance', 'payroll']);
 export default function ShiftApp() {
   const [data, setData] = useState<State>(seed);
   const [week, setWeek] = useState(weekStart(localDate(new Date())));
@@ -128,6 +129,7 @@ export default function ShiftApp() {
   const [push, setPush] = useState<{ on: boolean; tickUrl?: string }>({
     on: false,
   });
+  const staffReadOnly = !actor.admin;
   const put = (key: string, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
   const query = () =>
@@ -164,6 +166,13 @@ export default function ShiftApp() {
     }, 30000);
     return () => clearInterval(timer);
   }, []);
+  useEffect(() => {
+    if (!actor.admin) {
+      setFilter('all');
+      setView('month');
+      if (!employeeNav.has(tab)) setTab('schedule');
+    }
+  }, [actor.admin, tab]);
   async function command(type: string, payload: any = {}) {
     if (setup && type !== 'initialize') {
       setStatus(
@@ -319,6 +328,9 @@ export default function ShiftApp() {
     e,
     ...payroll(data, e.id, from, to),
   }));
+  const visibleTotals = totals.filter(
+    (row) => actor.admin || row.e.id === actor.id,
+  );
   const input = (
     key: string,
     label: string,
@@ -457,13 +469,15 @@ export default function ShiftApp() {
           <MapPin size={16} /> Pelham Hills <span> / </span> 팀 워크스페이스
         </div>
         <div className="account">
-          <button
-            aria-label="메시지 보기"
-            className="iconbutton"
-            onClick={() => setTab('messages')}
-          >
-            <Bell size={19} />
-          </button>
+          {actor.admin && (
+            <button
+              aria-label="메시지 보기"
+              className="iconbutton"
+              onClick={() => setTab('messages')}
+            >
+              <Bell size={19} />
+            </button>
+          )}
           <span className="avatar">
             {actor.admin ? 'P' : name(actor.id).slice(0, 1)}
           </span>
@@ -474,7 +488,7 @@ export default function ShiftApp() {
         <div className="navrow">
           <TabsList variant="line">
             {nav
-              .filter((n) => actor.admin || n.key !== 'team')
+              .filter((n) => actor.admin || employeeNav.has(n.key))
               .map(({ key, label, Icon }) => (
                 <TabsTrigger key={key} value={key}>
                   <Icon size={17} />
@@ -500,7 +514,7 @@ export default function ShiftApp() {
               </p>
             </div>
             <div className="headactions">
-              <InstallQr team={setup ? '' : team} />
+              {actor.admin && <InstallQr team={setup ? '' : team} />}
               {actor.admin && (
                 <button
                   className="button rain"
@@ -582,38 +596,50 @@ export default function ShiftApp() {
                 </strong>
                 <p>등록된 스케줄 기준</p>
               </div>
-              <div>
-                <span>대체근무 요청</span>
-                <strong>
-                  {pending.length}
-                  <small>건</small>
-                </strong>
-                <p className="green">
-                  {pending.length
-                    ? '확인이 필요한 요청이 있습니다'
-                    : '모든 요청을 확인했습니다'}{' '}
-                  <Check size={14} />
-                </p>
-              </div>
-              <div className="reminder">
-                <Bell size={23} />
-                <span>출근 준비, 잊지 않도록</span>
-                <b>근무 시작 1시간 전 알림</b>
-                <p>
-                  {push.on
-                    ? '이 기기 푸시 알림 켜짐'
-                    : '앱 접속 중 알림 · 이 기기 푸시 꺼짐'}
-                </p>
-                {!setup && (
-                  <button
-                    className="button"
-                    disabled={busy}
-                    onClick={() => void (push.on ? testPush() : enablePush())}
-                  >
-                    {push.on ? '테스트 알림 보내기' : '푸시 알림 켜기'}
-                  </button>
-                )}
-              </div>
+              {actor.admin ? (
+                <>
+                  <div>
+                    <span>대체근무 요청</span>
+                    <strong>
+                      {pending.length}
+                      <small>건</small>
+                    </strong>
+                    <p className="green">
+                      {pending.length
+                        ? '확인이 필요한 요청이 있습니다'
+                        : '모든 요청을 확인했습니다'}{' '}
+                      <Check size={14} />
+                    </p>
+                  </div>
+                  <div className="reminder">
+                    <Bell size={23} />
+                    <span>출근 준비, 잊지 않도록</span>
+                    <b>근무 시작 1시간 전 알림</b>
+                    <p>
+                      {push.on
+                        ? '이 기기 푸시 알림 켜짐'
+                        : '앱 접속 중 알림 · 이 기기 푸시 꺼짐'}
+                    </p>
+                    {!setup && (
+                      <button
+                        className="button"
+                        disabled={busy}
+                        onClick={() =>
+                          void (push.on ? testPush() : enablePush())
+                        }
+                      >
+                        {push.on ? '테스트 알림 보내기' : '푸시 알림 켜기'}
+                      </button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <span>직원 화면</span>
+                  <strong>읽기 전용</strong>
+                  <p className="green">전체 일정과 내 기록만 볼 수 있습니다.</p>
+                </div>
+              )}
             </section>
             <section className="schedule panel">
               <div className="toolbar">
@@ -674,20 +700,32 @@ export default function ShiftApp() {
                 </div>
               </div>
               <div className="filterbar">
-                <Pick
-                  label="직원"
-                  value={filter}
-                  onChange={setFilter}
-                  options={[{ value: 'all', label: '모든 직원' }, ...options]}
-                />
-                <Tabs value={view} onValueChange={(v) => setView(String(v))}>
-                  <TabsList>
-                    <TabsTrigger value="week">주간 보기</TabsTrigger>
-                    <TabsTrigger value="timeline">타임라인</TabsTrigger>
-                    <TabsTrigger value="month">월간 보기</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-                {(view === 'timeline' || view === 'month') && (
+                {staffReadOnly ? (
+                  <strong className="paytotal">전체 월간 일정 · 읽기 전용</strong>
+                ) : (
+                  <>
+                    <Pick
+                      label="직원"
+                      value={filter}
+                      onChange={setFilter}
+                      options={[
+                        { value: 'all', label: '모든 직원' },
+                        ...options,
+                      ]}
+                    />
+                    <Tabs
+                      value={view}
+                      onValueChange={(v) => setView(String(v))}
+                    >
+                      <TabsList>
+                        <TabsTrigger value="week">주간 보기</TabsTrigger>
+                        <TabsTrigger value="timeline">타임라인</TabsTrigger>
+                        <TabsTrigger value="month">월간 보기</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                  </>
+                )}
+                {!staffReadOnly && (view === 'timeline' || view === 'month') && (
                   <>
                     <label className="field">
                       기준 날짜
@@ -777,9 +815,9 @@ export default function ShiftApp() {
               ) : view === 'month' ? (
                 <MonthSchedule
                   date={day}
-                  employees={visibleEmployees}
+                  employees={staffReadOnly ? data.employees : visibleEmployees}
                   shifts={data.shifts.filter((shift) =>
-                    visibleEmployees.some(
+                    (staffReadOnly ? data.employees : visibleEmployees).some(
                       (employee) => employee.id === shift.employeeId,
                     ),
                   )}
@@ -881,9 +919,11 @@ export default function ShiftApp() {
             <div className="panel contentpanel">
               <div className="sectionhead">
                 <div>
-                  <h2>출근기록 가져오기</h2>
+                  <h2>{actor.admin ? '출근기록 가져오기' : '내 출근 기록'}</h2>
                   <p>
-                    직원 ID로 연결합니다. 중복·겹치는 기록은 저장하지 않습니다.
+                    {actor.admin
+                      ? '직원 ID로 연결합니다. 중복·겹치는 기록은 저장하지 않습니다.'
+                      : '출근기계 기록을 읽기 전용으로 확인합니다.'}
                   </p>
                 </div>
                 {actor.admin && (
@@ -987,7 +1027,9 @@ export default function ShiftApp() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.attendance.map((a) => (
+                  {data.attendance
+                    .filter((a) => actor.admin || a.employeeId === actor.id)
+                    .map((a) => (
                     <TableRow key={a.id}>
                       <TableCell>{box(emp(a.employeeId))}</TableCell>
                       <TableCell>{a.date}</TableCell>
@@ -1004,7 +1046,8 @@ export default function ShiftApp() {
                   ))}
                 </TableBody>
               </Table>
-              {!data.attendance.length && (
+              {!data.attendance.filter((a) => actor.admin || a.employeeId === actor.id)
+                .length && (
                 <div className="empty">아직 저장된 출근기록이 없습니다.</div>
               )}
             </div>
@@ -1013,12 +1056,14 @@ export default function ShiftApp() {
             <div className="panel contentpanel">
               <div className="sectionhead">
                 <div>
-                  <h2>예상 급여</h2>
+                  <h2>{actor.admin ? '예상 급여' : '내 예상 급여'}</h2>
                   <p>실근무시간 × 직원별 시급 + 승인된 대체 추가수당</p>
                 </div>
-                <button className="button" onClick={exportPayroll}>
-                  <Download size={16} /> CSV 다운로드
-                </button>
+                {actor.admin && (
+                  <button className="button" onClick={exportPayroll}>
+                    <Download size={16} /> CSV 다운로드
+                  </button>
+                )}
               </div>
               <div className="filterbar">
                 <label className="field">
@@ -1039,7 +1084,7 @@ export default function ShiftApp() {
                   />
                 </label>
                 <strong className="paytotal">
-                  {money(totals.reduce((n, r) => n + r.total, 0))}
+                  {money(visibleTotals.reduce((n, r) => n + r.total, 0))}
                 </strong>
               </div>
               <div className="policy">
@@ -1063,9 +1108,7 @@ export default function ShiftApp() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {totals
-                    .filter((r) => actor.admin || r.e.id === actor.id)
-                    .map((r) => (
+                  {visibleTotals.map((r) => (
                       <TableRow key={r.e.id}>
                         <TableCell>{box(r.e)}</TableCell>
                         <TableCell>{r.hours.toFixed(2)}h</TableCell>
@@ -1536,7 +1579,9 @@ export default function ShiftApp() {
                       </p>
                     )}
                     <p className="hint">
-                      {canSwap(s.date)
+                      {staffReadOnly
+                        ? '직원용 보기 화면입니다. 일정 변경은 관리자에게 문의하세요.'
+                        : canSwap(s.date)
                         ? '대체근무를 신청할 수 있습니다.'
                         : '대체근무 신청 기한이 지났습니다.'}
                     </p>
@@ -1548,28 +1593,35 @@ export default function ShiftApp() {
                 {status}
               </p>
             )}
-            <button
-              className="button primary submit"
-              disabled={
-                busy ||
-                (modal === 'detail' &&
-                  (!canSwap(
-                    data.shifts.find((s) => s.id === form.id)?.date || '',
-                  ) ||
-                    (!actor.admin &&
-                      data.shifts.find((s) => s.id === form.id)?.employeeId !==
-                        actor.id)))
-              }
-              type="submit"
-            >
-              {busy
-                ? '저장 중…'
-                : modal === 'detail'
-                  ? '대체근무 신청'
-                  : modal === 'rain'
-                    ? '전 직원에게 공지 저장'
-                    : '저장'}
-            </button>
+            {staffReadOnly && modal === 'detail' ? (
+              <button
+                className="button primary submit"
+                type="button"
+                onClick={() => setModal('')}
+              >
+                닫기
+              </button>
+            ) : (
+              <button
+                className="button primary submit"
+                disabled={
+                  busy ||
+                  (modal === 'detail' &&
+                    !canSwap(
+                      data.shifts.find((s) => s.id === form.id)?.date || '',
+                    ))
+                }
+                type="submit"
+              >
+                {busy
+                  ? '저장 중…'
+                  : modal === 'detail'
+                    ? '대체근무 신청'
+                    : modal === 'rain'
+                      ? '전 직원에게 공지 저장'
+                      : '저장'}
+              </button>
+            )}
           </form>
         </DialogContent>
       </Dialog>

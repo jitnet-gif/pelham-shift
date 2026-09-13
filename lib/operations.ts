@@ -8,6 +8,7 @@ function time(value:string){if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(value))fail('�
 function number(value:unknown,max=1000000){const n=Number(value);if(!Number.isFinite(n)||n<0||n>max)fail('0 이상의 유효한 금액/시간을 입력하세요.');return n}
 export function applyCommand(current:State,command:Command,actor:Actor,now=new Date()):State{
  const s=structuredClone(current),p=command.payload??{},id=()=>crypto.randomUUID();s.tasks??=[];const admin=()=>{if(!actor.admin)fail('관리자 권한이 필요합니다.')};const employee=(v:string)=>s.employees.find(e=>e.id===v)??fail('등록된 직원을 선택하세요.');
+ if(!actor.admin)fail('직원 계정은 전체 일정, 본인 근태 및 급여를 읽기 전용으로만 볼 수 있습니다.');
  switch(command.type){
  case 'employee': {admin();const e={id:p.id||id(),name:text(p.name,80),color:text(p.color,7),role:text(p.role,60),email:String(p.email||'').trim().toLowerCase(),rate:number(p.rate)};if(!/^#[0-9a-f]{6}$/i.test(e.color))fail('직원 색상을 확인하세요.');if(e.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.email))fail('이메일을 확인하세요.');if(e.email&&s.employees.some(x=>x.id!==e.id&&x.email===e.email))fail('이미 등록된 이메일입니다.');s.employees=s.employees.filter(x=>x.id!==e.id).concat(e);break;}
  case 'shift': {admin();employee(p.employeeId);const shift:Shift={id:id(),employeeId:p.employeeId,date:date(p.date),start:time(p.start),end:time(p.end),area:text(p.area,60)};if(!duration(shift.start,shift.end))fail('출근과 퇴근 시간이 같습니다.');if(s.shifts.some(x=>x.employeeId===shift.employeeId&&overlap(x,shift)))fail('해당 직원의 근무시간이 겹칩니다.');s.shifts.push(shift);s.published=false;break;}
