@@ -1,0 +1,123 @@
+import { env } from 'cloudflare:workers';
+import type { State } from '@/lib/domain';
+
+const SESSION_COOKIE = 'pelham_birth_session';
+const MASTER_BIRTH_DATE = '19760802';
+const SESSION_DAYS = 30;
+
+type WorkspaceRow = { id: string; owner: string; state: string; version: number };
+type StoredSession = {
+  token: string;
+  workspace: string;
+  actor: string;
+  admin: number;
+  expiresAt: string;
+};
+
+export type BirthSession = {
+  team: string;
+  actor: { id: string; admin: boolean };
+  row: WorkspaceRow | null;
+  state: State | null;
+};
+
+const ensureSessions = () =>
+  env.DB.prepare(
+    'CREATE TABLE IF NOT EXISTS birth_sessions (token TEXT PRIMARY KEY, workspace TEXT NOT NULL, actor TEXT NOT NULL, admin INTEGER NOT NULL, expires_at TEXT NOT NULL)',
+  ).run();
+
+const readCookie = (request: Request, name: string) => {
+  const value = request.headers.get('cookie') || '';
+  return value
+    .split(';')
+    .map((part) => part.trim().split('='))
+    .find(([key]) => key === name)?.slice(1).join('=');
+};
+
+export const sessionCookie = (token: string, expiresAt: Date) =>
+  `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${Math.floor((expiresAt.getTime() - Date.now()) / 1000)}`;
+
+export const clearSessionCookie = () =>
+  `${SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
+
+export async function getBirthSession(request: Request): Promise<BirthSession | null> {
+  const token = readCookie(request, SESSION_COOKIE);
+  if (!token || token.length > 100) return null;
+  await ensureSessions();
+  const session = await env.DB.prepare(
+    'SELECT token, workspace, actor, admin, expires_at AS expiresAt FROM birth_sessions WHERE token = ?',
+  )
+    .bind(token)
+    .first<StoredSession>();
+  if (!session) return null;
+  if (Date.parse(session.expiresAt) <= Date.now()) {
+    await env.DB.prepare('DELETE FROM birth_sessions WHERE token = ?').bind(token).run();
+    return null;
+  }
+  const row = await env.DB.prepare(
+    'SELECT id, owner, state, version FROM workspaces WHERE id = ?',
+  )
+    .bind(session.workspace)
+    .first<WorkspaceRow>();
+  const state = row ? (JSON.parse(row.state) as State) : null;
+  if (!session.admin && (!state || !state.employees.some((employee) => employee.id === session.actor))) {
+    return null;
+  }
+  return {
+    team: session.workspace,
+    actor: { id: session.actor, admin: session.admin === 1 },
+    row: row || null,
+    state,
+  };
+}
+
+export async function createBirthSession(birthDate: string, preferredTeam = '') {
+  if (!/^\d{8}$/.test(birthDate)) throw Error('생년월일 8자리를 입력하세요.');
+  await ensureSessions();
+  const rows = preferredTeam
+    ? await env.DB
+        .prepare('SELECT id, owner, state, version FROM workspaces WHERE id = ?')
+        .bind(preferredTeam)
+        .all<WorkspaceRow>()
+    : await env.DB
+        .prepare('SELECT id, owner, state, version FROM workspaces LIMIT 100')
+        .all<WorkspaceRow>();
+  let workspace = '';
+  let actor = '';
+  let admin = false;
+
+  if (birthDate === MASTER_BIRTH_DATE) {
+    workspace = rows.results[0]?.id || 'master';
+    actor = 'admin';
+    admin = true;
+  } else {
+    for (const row of rows.results) {
+      const state = JSON.parse(row.state) as State;
+      const employee = state.employees.find(
+        (candidate) => candidate.birthDate === birthDate,
+      );
+      if (employee) {
+        workspace = row.id;
+        actor = employee.id;
+        break;
+      }
+    }
+    if (!workspace) throw Error('등록된 생년월일을 찾을 수 없습니다. 관리자에게 확인하세요.');
+  }
+
+  const token = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
+  await env.DB.prepare(
+    'INSERT INTO birth_sessions (token, workspace, actor, admin, expires_at) VALUES (?, ?, ?, ?, ?)',
+  )
+    .bind(token, workspace, actor, admin ? 1 : 0, expiresAt.toISOString())
+    .run();
+  return { token, expiresAt, team: workspace, actor: { id: actor, admin } };
+}
+
+export async function deleteBirthSession(request: Request) {
+  const token = readCookie(request, SESSION_COOKIE);
+  if (!token) return;
+  await ensureSessions();
+  await env.DB.prepare('DELETE FROM birth_sessions WHERE token = ?').bind(token).run();
+}

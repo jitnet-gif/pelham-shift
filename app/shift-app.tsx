@@ -61,6 +61,7 @@ import {
 } from '@/lib/importer';
 import InstallQr from './install-qr';
 import MonthSchedule from './month-schedule';
+import BirthLogin from './birth-login';
 function Pick({
   label,
   value,
@@ -345,7 +346,7 @@ export default function ShiftApp() {
         value={form[key] || ''}
         onChange={(e) => put(key, e.target.value)}
         min={type === 'number' ? 0 : undefined}
-        step={type === 'number' ? '0.01' : undefined}
+        step={type === 'number' ? '0.01' : type === 'time' ? 1800 : undefined}
       />
     </label>
   );
@@ -545,16 +546,7 @@ export default function ShiftApp() {
                   내 워크스페이스 생성
                 </button>
               ) : (
-                <a
-                  className="button"
-                  href={
-                    '/signin-with-chatgpt?return_to=' +
-                    encodeURIComponent('/' + query())
-                  }
-                  target="_top"
-                >
-                  로그인하고 시작
-                </a>
+                <BirthLogin />
               )}
             </div>
           )}
@@ -1357,9 +1349,9 @@ export default function ShiftApp() {
                       }
                       onFocus={(e) => e.target.select()}
                     />
-                    <small>
-                      아래에 등록한 이메일로 로그인해야 접근할 수 있습니다.
-                      사이트 공유 권한은 별도 설정이 필요합니다.
+                      <small>
+                      직원의 생년월일 8자리로 로그인합니다. 생년월일은 로그인
+                      설정에서 관리하세요.
                     </small>
                   </div>
                 )}
@@ -1384,7 +1376,7 @@ export default function ShiftApp() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    {['직원', '직원 ID', '업무', '이메일', '시급', '설정'].map(
+                    {['직원', '직원 ID', '업무', '생년월일', '이메일', '시급', '설정'].map(
                       (h) => (
                         <TableHead key={h}>{h}</TableHead>
                       ),
@@ -1397,6 +1389,7 @@ export default function ShiftApp() {
                       <TableCell>{box(e)}</TableCell>
                       <TableCell>{e.id}</TableCell>
                       <TableCell>{e.role}</TableCell>
+                      <TableCell>{e.birthDate || '미등록'}</TableCell>
                       <TableCell>{e.email || '미등록'}</TableCell>
                       <TableCell>{money(e.rate)}</TableCell>
                       <TableCell>
@@ -1487,6 +1480,7 @@ export default function ShiftApp() {
             {modal === 'employee' && (
               <>
                 {input('name', '이름')}
+                {input('birthDate', '생년월일 8자리 (YYYYMMDD)')}
                 {input('email', '로그인 이메일', 'email', false)}
                 <div className="formgrid">
                   {input('color', '직원 색상', 'color')}
