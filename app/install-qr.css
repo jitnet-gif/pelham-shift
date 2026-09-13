@@ -1,0 +1,6 @@
+.headactions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+@media(max-width:700px){.headactions{width:100%}.headactions .button{flex:1}}
+.install-dialog .qr{display:block;width:min(260px,70vw);height:auto;margin:14px auto 18px;border:1px solid var(--border);border-radius:10px}
+.installurl{display:flex;gap:8px;margin-bottom:16px}
+.installurl input{flex:1;min-width:0;padding:8px 10px;border:1px solid #d5e0d9;border-radius:6px;font-size:13px;color:#243e31}
+.installsteps{margin:0 0 6px;padding-left:20px;font-size:14px;line-height:1.9;color:#50685b}

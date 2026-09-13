@@ -12,8 +12,8 @@ self.addEventListener('push', (event) => {
     self.registration.showNotification(data.title || 'Pelham Shift', {
       body: data.body || '',
       tag: data.tag,
-      icon: '/favicon.svg',
-      badge: '/favicon.svg',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
       data: { url: data.url || '/' },
     }),
   );

@@ -3,6 +3,7 @@ import type { State } from '@/lib/domain';
 
 const SESSION_COOKIE = 'pelham_birth_session';
 const MASTER_BIRTH_DATE = '19760802';
+const ADMIN_PASSWORD = '2222';
 const SESSION_DAYS = 30;
 
 type WorkspaceRow = { id: string; owner: string; state: string; version: number };
@@ -60,8 +61,8 @@ const credentialFor = (workspace: string, actor: string) =>
     .prepare('SELECT salt, hash FROM password_credentials WHERE workspace = ? AND actor = ?')
     .bind(workspace, actor)
     .first<Credential>();
-const defaultPassword = (state: State | null, actor: string, admin: boolean) =>
-  admin ? MASTER_BIRTH_DATE : state?.employees.find((employee) => employee.id === actor)?.birthDate || '';
+const defaultPassword = (state: State | null, actor: string) =>
+  state?.employees.find((employee) => employee.id === actor)?.birthDate || '';
 const verifyPassword = async (
   workspace: string,
   actor: string,
@@ -69,12 +70,13 @@ const verifyPassword = async (
   admin: boolean,
   password: string,
 ) => {
+  if (!password) return false;
+  // 관리자 비밀번호는 코드에 고정되며 저장된 자격 증명보다 우선합니다.
+  if (admin) return password === ADMIN_PASSWORD;
   const credential = await credentialFor(workspace, actor);
-  const candidate = password || defaultPassword(state, actor, admin);
-  if (!candidate) return false;
   return credential
-    ? (await passwordHash(candidate, credential.salt)) === credential.hash
-    : candidate === defaultPassword(state, actor, admin);
+    ? (await passwordHash(password, credential.salt)) === credential.hash
+    : password === defaultPassword(state, actor);
 };
 
 const readCookie = (request: Request, name: string) => {
@@ -119,7 +121,8 @@ export async function getBirthSession(request: Request): Promise<BirthSession | 
     actor: { id: session.actor, admin: session.admin === 1 },
     row: row || null,
     state,
-    passwordChanged: Boolean(await credentialFor(session.workspace, session.actor)),
+    passwordChanged:
+      session.admin === 1 || Boolean(await credentialFor(session.workspace, session.actor)),
   };
 }
 
@@ -174,7 +177,7 @@ export async function createBirthSession(birthDate: string, password = '', prefe
     expiresAt,
     team: workspace,
     actor: { id: actor, admin },
-    passwordChanged: Boolean(await credentialFor(workspace, actor)),
+    passwordChanged: admin || Boolean(await credentialFor(workspace, actor)),
   };
 }
 
@@ -191,6 +194,7 @@ export async function updatePassword(request: Request, currentPassword: string, 
   }
   const session = await getBirthSession(request);
   if (!session) throw Error('생년월일로 로그인한 뒤 변경할 수 있습니다.');
+  if (session.actor.admin) throw Error('관리자 비밀번호는 변경할 수 없습니다.');
   if (!(await verifyPassword(session.team, session.actor.id, session.state, session.actor.admin, currentPassword))) {
     throw Error('현재 비밀번호를 확인하세요.');
   }

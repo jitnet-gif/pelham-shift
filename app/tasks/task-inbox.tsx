@@ -15,7 +15,7 @@ export default function TaskInbox(){
  const employees=state?.employees??[];const tasks=useMemo(()=>[...(state?.tasks??[])].sort((a,b)=>a.status==='completed'&&b.status!=='completed'?1:a.date.localeCompare(b.date)),[state]);
  const employee=(id:string)=>employees.find(e=>e.id===id);
  const status=(task:Task)=>task.status==='completed'?['완료','done']:task.status==='seen'?['확인','seen']:['새 작업','sent'];
- if(error&&!state)return <main className="task-shell"><section className="task-card error-card"><ClipboardList size={30}/><h1>작업 수신함</h1><p>{error}</p><a className="task-button" href={'/signin-with-chatgpt?return_to='+encodeURIComponent('/tasks'+query())} target="_top">로그인하고 열기</a></section></main>;
+ if(error&&!state)return <main className="task-shell"><section className="task-card error-card"><ClipboardList size={30}/><h1>작업 수신함</h1><p>{error}</p><a className="task-button" href={root}>로그인하고 열기</a></section></main>;
  return <main className="task-shell"><header className="task-top"><a href={root} className="back"><ArrowLeft size={17}/> 스케줄</a><div><p>PELHAM SHIFT</p><h1>{actor.admin?'작업 지시 관리':'내 작업 수신함'}</h1></div><button className="refresh" onClick={()=>void refresh()} aria-label="새로고침"><RefreshCw size={18}/></button></header>
  {error&&<p role="alert" className="task-alert">{error}</p>}
  {setup?<section className="task-card"><ClipboardList size={32}/><h2>워크스페이스를 먼저 생성하세요</h2><p>관리자 화면에서 ‘내 워크스페이스 생성’을 누르면 작업 지시를 시작할 수 있습니다.</p><a className="task-button" href={root}>스케줄로 이동</a></section>:<>

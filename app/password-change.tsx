@@ -63,9 +63,10 @@ export default function PasswordChange({
             <input
               type="password"
               autoComplete="current-password"
-              placeholder={initial ? '비워두면 생년월일로 확인' : ''}
+              placeholder={initial ? '초기 비밀번호: 생년월일 8자리' : ''}
               value={currentPassword}
               onChange={(event) => setCurrentPassword(event.target.value)}
+              required
             />
           </label>
           <label className="field">

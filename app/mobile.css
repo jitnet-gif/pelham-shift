@@ -6,7 +6,7 @@
   .navrow::-webkit-scrollbar { display: none; }
   .navrow [data-slot=tabs-list] { min-width: max-content; gap: 24px; }
   .navrow [data-slot=tabs-trigger] { flex: 0 0 auto; }
-  main { padding: 28px 24px 18px; }
+  main { width: 100%; padding: 28px 24px 18px; }
   .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .gridscroll, .contentpanel { -webkit-overflow-scrolling: touch; }
   .weekgrid { min-width: 900px; }
@@ -20,8 +20,7 @@
 @media (max-width: 700px) {
   .topbar { height: 64px; padding-inline: 16px; gap: 10px; }
   .brand { font-size: 21px; gap: 3px; }
-  .brandmark { width: 30px; height: 31px; border-radius: 8px; font-size: 27px; margin-right: 2px; }
-  .brandmark span { font-size: 20px; }
+  .brandmark { width: 32px; height: 32px; border-radius: 8px; margin-right: 4px; }
   .account { gap: 5px; }
   .account .avatar { width: 30px; height: 30px; margin-left: 4px; }
   .navrow { height: 54px; padding-inline: 16px; }

@@ -33,8 +33,8 @@ export default function BirthLogin() {
     <section className="birth-login panel">
       <div className="birth-login-icon"><LockKeyhole size={22} /></div>
       <div>
-        <h2>생년월일로 로그인</h2>
-        <p>초기 비밀번호는 생년월일입니다. 변경한 경우 새 비밀번호를 입력하세요.</p>
+        <h2>로그인</h2>
+        <p>생년월일과 비밀번호를 입력하세요. 직원 초기 비밀번호는 생년월일입니다.</p>
       </div>
       <form onSubmit={submit}>
         <label className="field">
@@ -51,13 +51,13 @@ export default function BirthLogin() {
           />
         </label>
         <label className="field">
-          비밀번호 <small>선택</small>
+          비밀번호
           <input
             type="password"
             autoComplete="current-password"
-            placeholder="변경한 비밀번호가 있는 경우"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
+            required
           />
         </label>
         <button className="button primary" disabled={busy}>
