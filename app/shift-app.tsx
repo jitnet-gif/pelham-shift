@@ -60,6 +60,7 @@ import {
   download,
 } from '@/lib/importer';
 import InstallQr from './install-qr';
+import MonthSchedule from './month-schedule';
 function Pick({
   label,
   value,
@@ -683,9 +684,10 @@ export default function ShiftApp() {
                   <TabsList>
                     <TabsTrigger value="week">주간 보기</TabsTrigger>
                     <TabsTrigger value="timeline">타임라인</TabsTrigger>
+                    <TabsTrigger value="month">월간 보기</TabsTrigger>
                   </TabsList>
                 </Tabs>
-                {view === 'timeline' && (
+                {(view === 'timeline' || view === 'month') && (
                   <>
                     <label className="field">
                       기준 날짜
@@ -699,7 +701,7 @@ export default function ShiftApp() {
                       className="button all-schedule"
                       onClick={() => {
                         setFilter('all');
-                        setView('week');
+                        setView('month');
                       }}
                     >
                       전체 일정 보기
@@ -772,6 +774,18 @@ export default function ShiftApp() {
                     ))}
                   </div>
                 </div>
+              ) : view === 'month' ? (
+                <MonthSchedule
+                  date={day}
+                  employees={visibleEmployees}
+                  shifts={data.shifts.filter((shift) =>
+                    visibleEmployees.some(
+                      (employee) => employee.id === shift.employeeId,
+                    ),
+                  )}
+                  onDateChange={setDay}
+                  onShiftSelect={(id) => open('detail', { id })}
+                />
               ) : (
                 <div className="gridscroll timeline-scroll">
                   <div className="timeline">
