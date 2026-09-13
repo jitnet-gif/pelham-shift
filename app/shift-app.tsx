@@ -62,6 +62,7 @@ import {
 import InstallQr from './install-qr';
 import MonthSchedule from './month-schedule';
 import BirthLogin from './birth-login';
+import PasswordChange from './password-change';
 function Pick({
   label,
   value,
@@ -130,6 +131,10 @@ export default function ShiftApp() {
   const [push, setPush] = useState<{ on: boolean; tickUrl?: string }>({
     on: false,
   });
+  const [birthAuth, setBirthAuth] = useState(false);
+  const [passwordChanged, setPasswordChanged] = useState(true);
+  const [passwordDialog, setPasswordDialog] = useState(false);
+  const passwordOfferShown = useRef(false);
   const staffReadOnly = !actor.admin;
   const put = (key: string, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -143,6 +148,14 @@ export default function ShiftApp() {
     } else setSetup(true);
     if (r.actor) setActor(r.actor);
     if (r.team) setTeam(r.team);
+    setBirthAuth(r.authMethod === 'birth');
+    if (r.authMethod === 'birth' && r.passwordChanged === false) {
+      setPasswordChanged(false);
+      if (!passwordOfferShown.current) {
+        passwordOfferShown.current = true;
+        setPasswordDialog(true);
+      }
+    } else if (r.authMethod === 'birth') setPasswordChanged(true);
   };
   async function refresh() {
     try {
@@ -483,6 +496,14 @@ export default function ShiftApp() {
             {actor.admin ? 'P' : name(actor.id).slice(0, 1)}
           </span>
           <span>{actor.admin ? '관리자' : name(actor.id)}</span>
+          {birthAuth && (
+            <button
+              className="linkbutton"
+              onClick={() => setPasswordDialog(true)}
+            >
+              비밀번호
+            </button>
+          )}
         </div>
       </header>
       <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
@@ -1619,6 +1640,12 @@ export default function ShiftApp() {
           </form>
         </DialogContent>
       </Dialog>
+      <PasswordChange
+        open={passwordDialog}
+        initial={!passwordChanged}
+        onClose={() => setPasswordDialog(false)}
+        onChanged={() => setPasswordChanged(true)}
+      />
     </div>
   );
 }

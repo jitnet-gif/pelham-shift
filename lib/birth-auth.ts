@@ -13,18 +13,69 @@ type StoredSession = {
   admin: number;
   expiresAt: string;
 };
+type Credential = { salt: string; hash: string };
 
 export type BirthSession = {
   team: string;
   actor: { id: string; admin: boolean };
   row: WorkspaceRow | null;
   state: State | null;
+  passwordChanged: boolean;
 };
 
-const ensureSessions = () =>
-  env.DB.prepare(
-    'CREATE TABLE IF NOT EXISTS birth_sessions (token TEXT PRIMARY KEY, workspace TEXT NOT NULL, actor TEXT NOT NULL, admin INTEGER NOT NULL, expires_at TEXT NOT NULL)',
-  ).run();
+const ensureAuthTables = () =>
+  Promise.all([
+    env.DB
+      .prepare(
+        'CREATE TABLE IF NOT EXISTS birth_sessions (token TEXT PRIMARY KEY, workspace TEXT NOT NULL, actor TEXT NOT NULL, admin INTEGER NOT NULL, expires_at TEXT NOT NULL)',
+      )
+      .run(),
+    env.DB
+      .prepare(
+        'CREATE TABLE IF NOT EXISTS password_credentials (workspace TEXT NOT NULL, actor TEXT NOT NULL, salt TEXT NOT NULL, hash TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (workspace, actor))',
+      )
+      .run(),
+  ]);
+
+const hex = (bytes: ArrayBuffer) =>
+  [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+const passwordHash = async (password: string, salt: string) => {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits'],
+  );
+  return hex(
+    await crypto.subtle.deriveBits(
+      { name: 'PBKDF2', salt: new TextEncoder().encode(salt), iterations: 120000, hash: 'SHA-256' },
+      key,
+      256,
+    ),
+  );
+};
+const credentialFor = (workspace: string, actor: string) =>
+  env.DB
+    .prepare('SELECT salt, hash FROM password_credentials WHERE workspace = ? AND actor = ?')
+    .bind(workspace, actor)
+    .first<Credential>();
+const defaultPassword = (state: State | null, actor: string, admin: boolean) =>
+  admin ? MASTER_BIRTH_DATE : state?.employees.find((employee) => employee.id === actor)?.birthDate || '';
+const verifyPassword = async (
+  workspace: string,
+  actor: string,
+  state: State | null,
+  admin: boolean,
+  password: string,
+) => {
+  const credential = await credentialFor(workspace, actor);
+  const candidate = password || defaultPassword(state, actor, admin);
+  if (!candidate) return false;
+  return credential
+    ? (await passwordHash(candidate, credential.salt)) === credential.hash
+    : candidate === defaultPassword(state, actor, admin);
+};
 
 const readCookie = (request: Request, name: string) => {
   const value = request.headers.get('cookie') || '';
@@ -43,7 +94,7 @@ export const clearSessionCookie = () =>
 export async function getBirthSession(request: Request): Promise<BirthSession | null> {
   const token = readCookie(request, SESSION_COOKIE);
   if (!token || token.length > 100) return null;
-  await ensureSessions();
+  await ensureAuthTables();
   const session = await env.DB.prepare(
     'SELECT token, workspace, actor, admin, expires_at AS expiresAt FROM birth_sessions WHERE token = ?',
   )
@@ -68,12 +119,13 @@ export async function getBirthSession(request: Request): Promise<BirthSession | 
     actor: { id: session.actor, admin: session.admin === 1 },
     row: row || null,
     state,
+    passwordChanged: Boolean(await credentialFor(session.workspace, session.actor)),
   };
 }
 
-export async function createBirthSession(birthDate: string, preferredTeam = '') {
+export async function createBirthSession(birthDate: string, password = '', preferredTeam = '') {
   if (!/^\d{8}$/.test(birthDate)) throw Error('생년월일 8자리를 입력하세요.');
-  await ensureSessions();
+  await ensureAuthTables();
   const rows = preferredTeam
     ? await env.DB
         .prepare('SELECT id, owner, state, version FROM workspaces WHERE id = ?')
@@ -104,6 +156,11 @@ export async function createBirthSession(birthDate: string, preferredTeam = '') 
     }
     if (!workspace) throw Error('등록된 생년월일을 찾을 수 없습니다. 관리자에게 확인하세요.');
   }
+  const workspaceRow = rows.results.find((row) => row.id === workspace) || null;
+  const state = workspaceRow ? (JSON.parse(workspaceRow.state) as State) : null;
+  if (!(await verifyPassword(workspace, actor, state, admin, password))) {
+    throw Error('생년월일 또는 비밀번호를 확인하세요.');
+  }
 
   const token = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
@@ -112,12 +169,35 @@ export async function createBirthSession(birthDate: string, preferredTeam = '') 
   )
     .bind(token, workspace, actor, admin ? 1 : 0, expiresAt.toISOString())
     .run();
-  return { token, expiresAt, team: workspace, actor: { id: actor, admin } };
+  return {
+    token,
+    expiresAt,
+    team: workspace,
+    actor: { id: actor, admin },
+    passwordChanged: Boolean(await credentialFor(workspace, actor)),
+  };
 }
 
 export async function deleteBirthSession(request: Request) {
   const token = readCookie(request, SESSION_COOKIE);
   if (!token) return;
-  await ensureSessions();
+  await ensureAuthTables();
   await env.DB.prepare('DELETE FROM birth_sessions WHERE token = ?').bind(token).run();
+}
+
+export async function updatePassword(request: Request, currentPassword: string, nextPassword: string) {
+  if (nextPassword.length < 8 || nextPassword.length > 128) {
+    throw Error('새 비밀번호는 8~128자로 입력하세요.');
+  }
+  const session = await getBirthSession(request);
+  if (!session) throw Error('생년월일로 로그인한 뒤 변경할 수 있습니다.');
+  if (!(await verifyPassword(session.team, session.actor.id, session.state, session.actor.admin, currentPassword))) {
+    throw Error('현재 비밀번호를 확인하세요.');
+  }
+  const salt = crypto.randomUUID();
+  const hash = await passwordHash(nextPassword, salt);
+  await env.DB
+    .prepare('INSERT INTO password_credentials (workspace, actor, salt, hash, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(workspace, actor) DO UPDATE SET salt = excluded.salt, hash = excluded.hash, updated_at = excluded.updated_at')
+    .bind(session.team, session.actor.id, salt, hash, new Date().toISOString())
+    .run();
 }
