@@ -1,0 +1,16 @@
+export type Employee = {id:string;name:string;color:string;role:string;rate:number;email:string};
+export type Shift = {id:string;employeeId:string;date:string;start:string;end:string;area:string;originalId?:string};
+export type Swap = {id:string;shiftId:string;from:string;to:string;status:'requested'|'accepted'|'approved'|'rejected';createdAt:string;bonus:number};
+export type Attendance = {id:string;employeeId:string;date:string;start:string;end:string;breakMinutes:number};
+export type Message = {id:string;sender:string;to:string;body:string;createdAt:string;readBy:string[];kind:string};
+export type State = {employees:Employee[];shifts:Shift[];swaps:Swap[];attendance:Attendance[];messages:Message[];currency:string;published:boolean};
+export const days=['일','월','화','수','목','금','토'];
+export const localDate=(d:Date)=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
+export function addDays(date:string,n:number){const d=new Date(date+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)}
+export function weekStart(date:string){return addDays(date,-new Date(date+'T12:00:00Z').getUTCDay())}
+export const minutes=(t:string)=>Number(t.slice(0,2))*60+Number(t.slice(3,5));
+export function duration(start:string,end:string,rest=0){let n=minutes(end)-minutes(start);if(n<0)n+=1440;return Math.max(0,n-rest)/60}
+export function canSwap(date:string,today=localDate(new Date())){return date>=addDays(today,7)}
+export function overlap(a:Shift,b:Shift){const stamp=(s:Shift)=>{const start=Date.parse(s.date+'T00:00:00Z')+minutes(s.start)*60000;return [start,start+duration(s.start,s.end)*3600000]};const [a0,a1]=stamp(a),[b0,b1]=stamp(b);return a0<b1&&b0<a1}
+export function payroll(state:State,employeeId:string,from:string,to:string){const e=state.employees.find(e=>e.id===employeeId)!;const records=state.attendance.filter(a=>a.employeeId===employeeId&&a.date>=from&&a.date<=to);const hours=records.reduce((s,a)=>s+duration(a.start,a.end,a.breakMinutes),0);const bonus=state.swaps.filter(r=>r.status==='approved'&&r.to===employeeId).reduce((s,r)=>{const shift=state.shifts.find(x=>x.id===r.shiftId);return s+(shift&&shift.date>=from&&shift.date<=to&&records.some(a=>a.date===shift.date&&overlap(shift,{...shift,start:a.start,end:a.end}))?r.bonus:0)},0);return {hours,base:Math.round(hours*e.rate*100)/100,bonus,total:Math.round((hours*e.rate+bonus)*100)/100}}
+export function seed():State{const names=['Josh','Grace','Claudio','Francis','James','Karen','Dylan','Dustin','Sam'];const colors=['#5579cf','#c48537','#20a69a','#9864c3','#e17b57','#5c9d61','#d26395','#628597','#a89643'];const employees=names.map((name,i)=>({id:'E'+String(i+1).padStart(3,'0'),name,color:colors[i],role:i%3===0?'Outdoor':i%3===1?'Clubhouse':'Snack Bar',rate:0,email:''}));const week=weekStart(localDate(new Date()));const shifts:Shift[]=[];for(let d=0;d<7;d++) employees.forEach((e,i)=>{if((i+d)%4!==1) shifts.push({id:`s${d}-${i}`,employeeId:e.id,date:addDays(week,d),start:i%3===0?'10:00':i%3===1?'06:00':'12:00',end:i%3===0?'18:00':i%3===1?'14:00':'20:00',area:e.role})});return {employees,shifts,swaps:[],attendance:[],messages:[],currency:'USD',published:false}}
