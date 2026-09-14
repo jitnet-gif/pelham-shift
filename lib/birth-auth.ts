@@ -1,4 +1,4 @@
-import { env } from 'cloudflare:workers';
+import { env } from '@/lib/db';
 import type { State } from '@/lib/domain';
 
 const SESSION_COOKIE = 'pelham_birth_session';
@@ -23,20 +23,6 @@ export type BirthSession = {
   state: State | null;
   passwordChanged: boolean;
 };
-
-const ensureAuthTables = () =>
-  Promise.all([
-    env.DB
-      .prepare(
-        'CREATE TABLE IF NOT EXISTS birth_sessions (token TEXT PRIMARY KEY, workspace TEXT NOT NULL, actor TEXT NOT NULL, admin INTEGER NOT NULL, expires_at TEXT NOT NULL)',
-      )
-      .run(),
-    env.DB
-      .prepare(
-        'CREATE TABLE IF NOT EXISTS password_credentials (workspace TEXT NOT NULL, actor TEXT NOT NULL, salt TEXT NOT NULL, hash TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (workspace, actor))',
-      )
-      .run(),
-  ]);
 
 const hex = (bytes: ArrayBuffer) =>
   [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -96,9 +82,8 @@ export const clearSessionCookie = () =>
 export async function getBirthSession(request: Request): Promise<BirthSession | null> {
   const token = readCookie(request, SESSION_COOKIE);
   if (!token || token.length > 100) return null;
-  await ensureAuthTables();
   const session = await env.DB.prepare(
-    'SELECT token, workspace, actor, admin, expires_at AS expiresAt FROM birth_sessions WHERE token = ?',
+    'SELECT token, workspace, actor, admin, expires_at AS "expiresAt" FROM birth_sessions WHERE token = ?',
   )
     .bind(token)
     .first<StoredSession>();
@@ -128,7 +113,6 @@ export async function getBirthSession(request: Request): Promise<BirthSession | 
 
 export async function createBirthSession(birthDate: string, password = '', preferredTeam = '') {
   if (!/^\d{8}$/.test(birthDate)) throw Error('생년월일 8자리를 입력하세요.');
-  await ensureAuthTables();
   const rows = preferredTeam
     ? await env.DB
         .prepare('SELECT id, owner, state, version FROM workspaces WHERE id = ?')
@@ -184,7 +168,6 @@ export async function createBirthSession(birthDate: string, password = '', prefe
 export async function deleteBirthSession(request: Request) {
   const token = readCookie(request, SESSION_COOKIE);
   if (!token) return;
-  await ensureAuthTables();
   await env.DB.prepare('DELETE FROM birth_sessions WHERE token = ?').bind(token).run();
 }
 
