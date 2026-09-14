@@ -1,2 +1,2 @@
-﻿import ShiftApp from './shift-app';
+import ShiftApp from './shift-app';
 export default function Home() { return <ShiftApp/>; }
