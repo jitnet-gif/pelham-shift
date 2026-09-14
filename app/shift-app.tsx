@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import { useState, useEffect, useRef } from 'react';
 import {
   CalendarDays,
@@ -43,7 +43,6 @@ import {
 } from '@/components/ui/table';
 import {
   seed,
-  days,
   addDays,
   weekStart,
   localDate,
@@ -60,10 +59,13 @@ import {
   downloadTemplate,
   download,
 } from '@/lib/importer';
+import { translate } from '@/lib/i18n';
 import InstallQr from './install-qr';
 import MonthSchedule from './month-schedule';
 import BirthLogin from './birth-login';
 import PasswordChange from './password-change';
+import LangToggle from './lang-toggle';
+import { useLang } from './use-lang';
 function Pick({
   label,
   value,
@@ -75,6 +77,7 @@ function Pick({
   onChange: (s: string) => void;
   options: { value: string; label: string }[];
 }) {
+  const { t } = useLang();
   return (
     <label className="field">
       {label}
@@ -84,7 +87,7 @@ function Pick({
         items={options}
       >
         <SelectTrigger>
-          <SelectValue placeholder="선택하세요" />
+          <SelectValue placeholder={t('선택하세요')} />
         </SelectTrigger>
         <SelectContent>
           {options.map((o) => (
@@ -107,6 +110,7 @@ const nav = [
 ];
 const employeeNav = new Set(['schedule', 'attendance', 'payroll']);
 export default function ShiftApp() {
+  const { t, lang, days, locale } = useLang();
   const [data, setData] = useState<State>(seed);
   const [week, setWeek] = useState(weekStart(localDate(new Date())));
   const [tab, setTab] = useState('schedule');
@@ -246,6 +250,23 @@ export default function ShiftApp() {
       } catch {}
     })();
   }, [setup]);
+  // Push text is chosen per device on the server, so re-register this device whenever its language changes.
+  useEffect(() => {
+    if (!push.on) return;
+    void (async () => {
+      try {
+        const sub = await (
+          await navigator.serviceWorker?.getRegistration()
+        )?.pushManager.getSubscription();
+        if (sub)
+          await post('/api/push', {
+            action: 'subscribe',
+            subscription: sub.toJSON(),
+            lang,
+          });
+      } catch {}
+    })();
+  }, [lang, push.on]);
   async function enablePush() {
     setBusy(true);
     try {
@@ -277,6 +298,7 @@ export default function ShiftApp() {
       await post('/api/push', {
         action: 'subscribe',
         subscription: sub.toJSON(),
+        lang,
       });
       setPush((p) => ({ ...p, on: true }));
       setStatus(
@@ -317,10 +339,10 @@ export default function ShiftApp() {
         {e.name}
       </span>
     ) : (
-      <span>관리자</span>
+      <span>{t('관리자')}</span>
     );
   const emp = (id: string) => data.employees.find((e) => e.id === id);
-  const name = (id: string) => emp(id)?.name || '관리자';
+  const name = (id: string) => emp(id)?.name || t('관리자');
   const options = data.employees.map((e) => ({
     value: e.id,
     label: e.name + ' · ' + e.id,
@@ -339,7 +361,7 @@ export default function ShiftApp() {
     ['requested', 'accepted'].includes(s.status),
   );
   const money = (n: number) =>
-    new Intl.NumberFormat('ko-KR', {
+    new Intl.NumberFormat(locale, {
       style: 'currency',
       currency: data.currency,
     }).format(n);
@@ -438,8 +460,11 @@ export default function ShiftApp() {
       setRows(r);
       setFilename(file.name);
       const m: Record<string, string> = {};
+      // Accept headers from either language's template.
       fields.forEach(([key, label], i) => {
-        const match = r[0].findIndex((h) => h === label || h === key);
+        const match = r[0].findIndex(
+          (h) => h === label || h === key || h === translate('en', label),
+        );
         m[key] =
           match >= 0 ? String(match) : key === 'breakMinutes' ? '' : String(i);
       });
@@ -466,7 +491,7 @@ export default function ShiftApp() {
         '통화',
         '시작일',
         '종료일',
-      ],
+      ].map((h) => t(h)),
       ...totals.map((r) => [
         r.e.id,
         r.e.name,
@@ -484,23 +509,24 @@ export default function ShiftApp() {
       .join('\r\n');
     download(
       new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }),
-      '예상급여_' + from + '.csv',
+      t('예상급여_') + from + '.csv',
     );
   }
   if (auth !== 'in')
     return (
       <div className="login-screen">
+        <LangToggle />
         <span className="brand">
           <span className="brandmark" aria-hidden="true" />
           pelham<span className="brandlight">shift</span>
         </span>
         {auth === 'loading' ? (
-          <p className="login-loading">불러오는 중…</p>
+          <p className="login-loading">{t('불러오는 중…')}</p>
         ) : (
           <>
             {status && (
               <div role="status" className="statusbar">
-                {status}
+                {t(status)}
               </div>
             )}
             <BirthLogin />
@@ -516,12 +542,13 @@ export default function ShiftApp() {
           pelham<span className="brandlight">shift</span>
         </a>
         <div className="location">
-          <MapPin size={16} /> Pelham Hills <span> / </span> 팀 워크스페이스
+          <MapPin size={16} /> Pelham Hills <span> / </span> {t('팀 워크스페이스')}
         </div>
         <div className="account">
+          <LangToggle />
           {actor.admin && (
             <button
-              aria-label="메시지 보기"
+              aria-label={t('메시지 보기')}
               className="iconbutton"
               onClick={() => setTab('messages')}
             >
@@ -531,13 +558,13 @@ export default function ShiftApp() {
           <span className="avatar">
             {actor.admin ? 'P' : name(actor.id).slice(0, 1)}
           </span>
-          <span>{actor.admin ? '관리자' : name(actor.id)}</span>
+          <span>{actor.admin ? t('관리자') : name(actor.id)}</span>
           {birthAuth && !actor.admin && (
             <button
               className="linkbutton"
               onClick={() => setPasswordDialog(true)}
             >
-              비밀번호
+              {t('비밀번호')}
             </button>
           )}
         </div>
@@ -550,7 +577,7 @@ export default function ShiftApp() {
               .map(({ key, label, Icon }) => (
                 <TabsTrigger key={key} value={key}>
                   <Icon size={17} />
-                  {label}
+                  {t(label)}
                 </TabsTrigger>
               ))}
           </TabsList>
@@ -562,13 +589,13 @@ export default function ShiftApp() {
               <div className="eyebrow">TEAM OPERATIONS</div>
               <h1>
                 {tab === 'schedule'
-                  ? '좋은 한 주는, 좋은 스케줄부터.'
-                  : nav.find((n) => n.key === tab)?.label}
+                  ? t('좋은 한 주는, 좋은 스케줄부터.')
+                  : t(nav.find((n) => n.key === tab)?.label || '')}
               </h1>
               <p>
                 {tab === 'schedule'
-                  ? '팀의 근무를 한눈에 확인하고, 함께 계획하세요.'
-                  : '스케줄부터 실제 근무시간까지, 같은 기록으로 연결합니다.'}
+                  ? t('팀의 근무를 한눈에 확인하고, 함께 계획하세요.')
+                  : t('스케줄부터 실제 근무시간까지, 같은 기록으로 연결합니다.')}
               </p>
             </div>
             <div className="headactions">
@@ -580,12 +607,12 @@ export default function ShiftApp() {
                     open('rain', {
                       date: localDate(new Date()),
                       end: '15:00',
-                      body: '안전하게 장비를 정리하고 퇴근 기록을 남겨주세요.',
+                      body: t('안전하게 장비를 정리하고 퇴근 기록을 남겨주세요.'),
                       targets: data.employees.map((e) => e.id).join(','),
                     })
                   }
                 >
-                  <CloudRain size={17} /> 우천 근무 종료
+                  <CloudRain size={17} /> {t('우천 근무 종료')}
                 </button>
               )}
             </div>
@@ -593,24 +620,24 @@ export default function ShiftApp() {
           {setup && (
             <div className="demo-banner setup">
               <span>
-                샘플 미리보기 · 실제 운영을 시작하면 샘플 일정은 비워집니다.
+                {t('샘플 미리보기 · 실제 운영을 시작하면 샘플 일정은 비워집니다.')}
               </span>
               <button
                 className="button"
                 disabled={busy}
                 onClick={() => command('initialize')}
               >
-                내 워크스페이스 생성
+                {t('내 워크스페이스 생성')}
               </button>
             </div>
           )}
           {status && (
             <div role="status" className="statusbar">
-              {status}
+              {t(status)}
               <button
                 className="iconbutton"
                 onClick={() => void refresh()}
-                aria-label="다시 불러오기"
+                aria-label={t('다시 불러오기')}
               >
                 <RefreshCw size={15} />
               </button>
@@ -618,53 +645,60 @@ export default function ShiftApp() {
           )}
           {reminders.map((s) => (
             <div className="demo-banner" key={s.id}>
-              <Bell size={16} /> 출근 알림 · 오늘 {s.start}, {s.area} 근무가
-              1시간 이내에 시작됩니다.
+              <Bell size={16} />{' '}
+              {t('출근 알림 · 오늘 {start}, {area} 근무가 1시간 이내에 시작됩니다.', {
+                start: s.start,
+                area: s.area,
+              })}
             </div>
           ))}
           <TabsContent value="schedule">
             <section className="stats">
               <div>
-                <span>이번 주 근무</span>
+                <span>{t('이번 주 근무')}</span>
                 <strong>
                   {weekShifts.length}
-                  <small>개</small>
+                  <small>{t('개')}</small>
                 </strong>
-                <p>{data.employees.length}명의 직원과 함께하는 한 주</p>
+                <p>
+                  {t('{n}명의 직원과 함께하는 한 주', {
+                    n: data.employees.length,
+                  })}
+                </p>
               </div>
               <div>
-                <span>예정 근무시간</span>
+                <span>{t('예정 근무시간')}</span>
                 <strong>
                   {weekShifts
                     .reduce((n, x) => n + duration(x.start, x.end), 0)
                     .toFixed(0)}
-                  <small>시간</small>
+                  <small>{t('시간')}</small>
                 </strong>
-                <p>등록된 스케줄 기준</p>
+                <p>{t('등록된 스케줄 기준')}</p>
               </div>
               {actor.admin ? (
                 <>
                   <div>
-                    <span>대체근무 요청</span>
+                    <span>{t('대체근무 요청')}</span>
                     <strong>
                       {pending.length}
-                      <small>건</small>
+                      <small>{t('건')}</small>
                     </strong>
                     <p className="green">
                       {pending.length
-                        ? '확인이 필요한 요청이 있습니다'
-                        : '모든 요청을 확인했습니다'}{' '}
+                        ? t('확인이 필요한 요청이 있습니다')
+                        : t('모든 요청을 확인했습니다')}{' '}
                       <Check size={14} />
                     </p>
                   </div>
                   <div className="reminder">
                     <Bell size={23} />
-                    <span>출근 준비, 잊지 않도록</span>
-                    <b>근무 시작 1시간 전 알림</b>
+                    <span>{t('출근 준비, 잊지 않도록')}</span>
+                    <b>{t('근무 시작 1시간 전 알림')}</b>
                     <p>
                       {push.on
-                        ? '이 기기 푸시 알림 켜짐'
-                        : '앱 접속 중 알림 · 이 기기 푸시 꺼짐'}
+                        ? t('이 기기 푸시 알림 켜짐')
+                        : t('앱 접속 중 알림 · 이 기기 푸시 꺼짐')}
                     </p>
                     {!setup && (
                       <button
@@ -674,16 +708,16 @@ export default function ShiftApp() {
                           void (push.on ? testPush() : enablePush())
                         }
                       >
-                        {push.on ? '테스트 알림 보내기' : '푸시 알림 켜기'}
+                        {push.on ? t('테스트 알림 보내기') : t('푸시 알림 켜기')}
                       </button>
                     )}
                   </div>
                 </>
               ) : (
                 <div>
-                  <span>직원 화면</span>
-                  <strong>읽기 전용</strong>
-                  <p className="green">전체 일정과 내 기록만 볼 수 있습니다.</p>
+                  <span>{t('직원 화면')}</span>
+                  <strong>{t('읽기 전용')}</strong>
+                  <p className="green">{t('전체 일정과 내 기록만 볼 수 있습니다.')}</p>
                 </div>
               )}
             </section>
@@ -691,7 +725,7 @@ export default function ShiftApp() {
               <div className="toolbar">
                 <div className="weekpicker">
                   <button
-                    aria-label="이전 주"
+                    aria-label={t('이전 주')}
                     onClick={() => setWeek(addDays(week, -7))}
                   >
                     <ChevronLeft size={18} />
@@ -702,7 +736,7 @@ export default function ShiftApp() {
                     <span>{week.slice(0, 4)}</span>
                   </h2>
                   <button
-                    aria-label="다음 주"
+                    aria-label={t('다음 주')}
                     onClick={() => setWeek(addDays(week, 7))}
                   >
                     <ChevronRight size={18} />
@@ -711,12 +745,12 @@ export default function ShiftApp() {
                     className="button"
                     onClick={() => setWeek(weekStart(localDate(new Date())))}
                   >
-                    이번 주
+                    {t('이번 주')}
                   </button>
                 </div>
                 <div className="actions">
                   <span className="draft">
-                    ● {data.published ? '직원 공개 중' : '작성 중'}
+                    ● {data.published ? t('직원 공개 중') : t('작성 중')}
                   </span>
                   {actor.admin && (
                     <>
@@ -725,7 +759,7 @@ export default function ShiftApp() {
                         className="button"
                         onClick={() => command('publish')}
                       >
-                        직원에게 공개
+                        {t('직원에게 공개')}
                       </button>
                       <button
                         className="button primary"
@@ -739,7 +773,7 @@ export default function ShiftApp() {
                           })
                         }
                       >
-                        <Plus size={16} /> 근무 추가
+                        <Plus size={16} /> {t('근무 추가')}
                       </button>
                     </>
                   )}
@@ -747,15 +781,15 @@ export default function ShiftApp() {
               </div>
               <div className="filterbar">
                 {staffReadOnly ? (
-                  <strong className="paytotal">전체 월간 일정 · 읽기 전용</strong>
+                  <strong className="paytotal">{t('전체 월간 일정 · 읽기 전용')}</strong>
                 ) : (
                   <>
                     <Pick
-                      label="직원"
+                      label={t('직원')}
                       value={filter}
                       onChange={setFilter}
                       options={[
-                        { value: 'all', label: '모든 직원' },
+                        { value: 'all', label: t('모든 직원') },
                         ...options,
                       ]}
                     />
@@ -775,7 +809,7 @@ export default function ShiftApp() {
                   <>
                     {view === 'month' && (
                       <label className="field">
-                        기준 날짜
+                        {t('기준 날짜')}
                         <input
                           type="date"
                           value={day}
@@ -790,7 +824,7 @@ export default function ShiftApp() {
                         setView('month');
                       }}
                     >
-                      전체 일정 보기
+                      {t('전체 일정 보기')}
                     </button>
                   </>
                 )}
@@ -799,7 +833,7 @@ export default function ShiftApp() {
                 <div className="gridscroll">
                   <div className="weekgrid">
                     <div className="gridhead staffhead">
-                      직원 <span>{visibleEmployees.length}명</span>
+                      {t('직원')} <span>{t('{n}명', { n: visibleEmployees.length })}</span>
                     </div>
                     {days.map((d, i) => (
                       <div
@@ -844,7 +878,7 @@ export default function ShiftApp() {
                                       {s.start} – {s.end}
                                     </b>
                                     <span>
-                                      {s.originalId ? '대체 · ' : ''}
+                                      {s.originalId ? t('대체 · ') : ''}
                                       {s.area}
                                     </span>
                                     <small>{duration(s.start, s.end)}h</small>
@@ -876,7 +910,7 @@ export default function ShiftApp() {
                 <div className="gridscroll timeline-scroll">
                   <div className="timeline">
                     <div className="timeruler">
-                      <span>직원</span>
+                      <span>{t('직원')}</span>
                       <div>
                         {Array.from({ length: 13 }, (_, i) => (
                           <span key={i}>
@@ -942,25 +976,25 @@ export default function ShiftApp() {
               )}
               <div className="schedulefoot">
                 <span>
-                  <i className="tiny-dot" /> 직원별 컬러는 모든 화면에서
-                  동일하게 표시됩니다.
+                  <i className="tiny-dot" />{' '}
+                  {t('직원별 컬러는 모든 화면에서 동일하게 표시됩니다.')}
                 </span>
-                <span>대체 신청·승인 · 근무일 7일 전까지</span>
+                <span>{t('대체 신청·승인 · 근무일 7일 전까지')}</span>
               </div>
             </section>
             <div className="below">
               <div>
                 <Clock3 size={18} />
-                <b>실제 출근기록으로 정확하게</b>
+                <b>{t('실제 출근기록으로 정확하게')}</b>
                 <span>
-                  출근기계 엑셀을 업로드하면 근무시간과 예상 급여를 계산합니다.
+                  {t('출근기계 엑셀을 업로드하면 근무시간과 예상 급여를 계산합니다.')}
                 </span>
               </div>
               <button
                 className="linkbutton"
                 onClick={() => setTab('attendance')}
               >
-                출근기록 가져오기 →
+                {t('출근기록 가져오기 →')}
               </button>
             </div>
           </TabsContent>
@@ -968,21 +1002,21 @@ export default function ShiftApp() {
             <div className="panel contentpanel">
               <div className="sectionhead">
                 <div>
-                  <h2>{actor.admin ? '출근기록 가져오기' : '내 출근 기록'}</h2>
+                  <h2>{actor.admin ? t('출근기록 가져오기') : t('내 출근 기록')}</h2>
                   <p>
                     {actor.admin
-                      ? '직원 ID로 연결합니다. 중복·겹치는 기록은 저장하지 않습니다.'
-                      : '출근기계 기록을 읽기 전용으로 확인합니다.'}
+                      ? t('직원 ID로 연결합니다. 중복·겹치는 기록은 저장하지 않습니다.')
+                      : t('출근기계 기록을 읽기 전용으로 확인합니다.')}
                   </p>
                 </div>
                 {actor.admin && (
                   <button
                     className="button"
                     onClick={() =>
-                      downloadTemplate().catch((e) => setStatus(e.message))
+                      downloadTemplate(t).catch((e) => setStatus(e.message))
                     }
                   >
-                    <Download size={16} /> 엑셀 양식
+                    <Download size={16} /> {t('엑셀 양식')}
                   </button>
                 )}
               </div>
@@ -1004,17 +1038,17 @@ export default function ShiftApp() {
                     onClick={() => fileRef.current?.click()}
                   >
                     <Upload size={28} />
-                    <b>{filename || '출근기계에서 내보낸 엑셀을 선택하세요'}</b>
-                    <span>.xlsx · 첫 번째 시트 · 최대 5MB / 3,000행</span>
+                    <b>{filename || t('출근기계에서 내보낸 엑셀을 선택하세요')}</b>
+                    <span>{t('.xlsx · 첫 번째 시트 · 최대 5MB / 3,000행')}</span>
                   </button>
                   {rows.length > 0 && (
                     <div className="importreview">
-                      <h3>1. 엑셀 열 연결</h3>
+                      <h3>{t('1. 엑셀 열 연결')}</h3>
                       <div className="formgrid">
                         {fields.map(([key, label]) => (
                           <Pick
                             key={key}
-                            label={label}
+                            label={t(label)}
                             value={mapping[key] ?? ''}
                             onChange={(v) =>
                               setMapping((m) => ({ ...m, [key]: v }))
@@ -1024,18 +1058,18 @@ export default function ShiftApp() {
                                 value: '',
                                 label:
                                   key === 'breakMinutes'
-                                    ? '없음 · 0분'
-                                    : '선택하세요',
+                                    ? t('없음 · 0분')
+                                    : t('선택하세요'),
                               },
                               ...rows[0].map((h, i) => ({
                                 value: String(i),
-                                label: h || `열 ${i + 1}`,
+                                label: h || t('열 {n}', { n: i + 1 }),
                               })),
                             ]}
                           />
                         ))}
                       </div>
-                      <h3>2. 미리보기 · {rows.length - 1}개 기록</h3>
+                      <h3>{t('2. 미리보기 · {n}개 기록', { n: rows.length - 1 })}</h3>
                       <div className="rawpreview">
                         {rows.slice(0, 6).map((r, i) => (
                           <div key={i}>{r.join('  |  ')}</div>
@@ -1059,7 +1093,7 @@ export default function ShiftApp() {
                           }
                         }}
                       >
-                        검토한 출근기록 저장
+                        {t('검토한 출근기록 저장')}
                       </button>
                     </div>
                   )}
@@ -1070,7 +1104,7 @@ export default function ShiftApp() {
                   <TableRow>
                     {['직원', '근무일', '출근', '퇴근', '휴게', '실근무'].map(
                       (h) => (
-                        <TableHead key={h}>{h}</TableHead>
+                        <TableHead key={h}>{t(h)}</TableHead>
                       ),
                     )}
                   </TableRow>
@@ -1085,9 +1119,9 @@ export default function ShiftApp() {
                       <TableCell>{a.start}</TableCell>
                       <TableCell>
                         {a.end}
-                        {a.end < a.start ? ' (+1일)' : ''}
+                        {a.end < a.start ? t(' (+1일)') : ''}
                       </TableCell>
-                      <TableCell>{a.breakMinutes}분</TableCell>
+                      <TableCell>{t('{n}분', { n: a.breakMinutes })}</TableCell>
                       <TableCell>
                         {duration(a.start, a.end, a.breakMinutes).toFixed(2)}h
                       </TableCell>
@@ -1097,7 +1131,7 @@ export default function ShiftApp() {
               </Table>
               {!data.attendance.filter((a) => actor.admin || a.employeeId === actor.id)
                 .length && (
-                <div className="empty">아직 저장된 출근기록이 없습니다.</div>
+                <div className="empty">{t('아직 저장된 출근기록이 없습니다.')}</div>
               )}
             </div>
           </TabsContent>
@@ -1105,18 +1139,18 @@ export default function ShiftApp() {
             <div className="panel contentpanel">
               <div className="sectionhead">
                 <div>
-                  <h2>{actor.admin ? '예상 급여' : '내 예상 급여'}</h2>
-                  <p>실근무시간 × 직원별 시급 + 승인된 대체 추가수당</p>
+                  <h2>{actor.admin ? t('예상 급여') : t('내 예상 급여')}</h2>
+                  <p>{t('실근무시간 × 직원별 시급 + 승인된 대체 추가수당')}</p>
                 </div>
                 {actor.admin && (
                   <button className="button" onClick={exportPayroll}>
-                    <Download size={16} /> CSV 다운로드
+                    <Download size={16} /> {t('CSV 다운로드')}
                   </button>
                 )}
               </div>
               <div className="filterbar">
                 <label className="field">
-                  시작일
+                  {t('시작일')}
                   <input
                     type="date"
                     value={from}
@@ -1124,7 +1158,7 @@ export default function ShiftApp() {
                   />
                 </label>
                 <label className="field">
-                  종료일
+                  {t('종료일')}
                   <input
                     type="date"
                     min={from}
@@ -1137,9 +1171,9 @@ export default function ShiftApp() {
                 </strong>
               </div>
               <div className="policy">
-                세금·초과근무 가산·유급휴가를 제외한 예상 금액입니다. 시급 0인
-                직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급
-                대상이 아니며 실제 출근기록만 지급합니다.
+                {t(
+                  '세금·초과근무 가산·유급휴가를 제외한 예상 금액입니다. 시급 0인 직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급 대상이 아니며 실제 출근기록만 지급합니다.',
+                )}
               </div>
               <Table>
                 <TableHeader>
@@ -1152,7 +1186,7 @@ export default function ShiftApp() {
                       '대체 추가수당',
                       '예상 급여',
                     ].map((h) => (
-                      <TableHead key={h}>{h}</TableHead>
+                      <TableHead key={h}>{t(h)}</TableHead>
                     ))}
                   </TableRow>
                 </TableHeader>
@@ -1162,7 +1196,7 @@ export default function ShiftApp() {
                         <TableCell>{box(r.e)}</TableCell>
                         <TableCell>{r.hours.toFixed(2)}h</TableCell>
                         <TableCell>
-                          {r.e.rate ? money(r.e.rate) : '설정 필요'}
+                          {r.e.rate ? money(r.e.rate) : t('설정 필요')}
                         </TableCell>
                         <TableCell>{money(r.base)}</TableCell>
                         <TableCell className="green">
@@ -1181,19 +1215,20 @@ export default function ShiftApp() {
             <div className="panel contentpanel">
               <div className="sectionhead">
                 <div>
-                  <h2>대체근무 요청</h2>
-                  <p>신청 → 대체 직원 수락 → 관리자 승인</p>
+                  <h2>{t('대체근무 요청')}</h2>
+                  <p>{t('신청 → 대체 직원 수락 → 관리자 승인')}</p>
                 </div>
                 <button
                   className="button primary"
                   onClick={() => open('swap', { shiftId: '', to: '' })}
                 >
-                  <Plus size={16} /> 대체 신청
+                  <Plus size={16} /> {t('대체 신청')}
                 </button>
               </div>
               <div className="policy">
-                뉴욕 현지 날짜 기준, 근무일 7일 전까지 신청과 승인을 완료하세요.
-                기존 근무와 겹치는 대체는 차단됩니다.
+                {t(
+                  '뉴욕 현지 날짜 기준, 근무일 7일 전까지 신청과 승인을 완료하세요. 기존 근무와 겹치는 대체는 차단됩니다.',
+                )}
               </div>
               {data.swaps.map((r) => {
                 const s = data.shifts.find((s) => s.id === r.shiftId);
@@ -1210,14 +1245,14 @@ export default function ShiftApp() {
                       </p>
                     </div>
                     <span className="badge">
-                      {
+                      {t(
                         {
                           requested: '수락 대기',
                           accepted: '승인 대기',
                           approved: '승인 완료',
-                          rejected: '거절/취소',
-                        }[r.status]
-                      }
+                          rejected: 'badge::거절/취소',
+                        }[r.status],
+                      )}
                     </span>
                     {r.status === 'requested' && actor.id === r.to && (
                       <button
@@ -1230,7 +1265,7 @@ export default function ShiftApp() {
                           })
                         }
                       >
-                        수락
+                        {t('수락')}
                       </button>
                     )}
                     {r.status === 'accepted' && actor.admin && (
@@ -1240,7 +1275,7 @@ export default function ShiftApp() {
                           open('approve', { id: r.id, bonus: '0' })
                         }
                       >
-                        수당 확인 및 승인
+                        {t('수당 확인 및 승인')}
                       </button>
                     )}
                     {['requested', 'accepted'].includes(r.status) &&
@@ -1257,11 +1292,11 @@ export default function ShiftApp() {
                             })
                           }
                         >
-                          거절/취소
+                          {t('거절/취소')}
                         </button>
                       )}
                     {r.status === 'approved' && (
-                      <span>추가수당 {money(r.bonus)}</span>
+                      <span>{t('추가수당 {amount}', { amount: money(r.bonus) })}</span>
                     )}
                   </div>
                 );
@@ -1269,8 +1304,8 @@ export default function ShiftApp() {
               {!data.swaps.length && (
                 <div className="empty">
                   <ArrowLeftRight size={28} />
-                  <h3>대체근무 요청이 없습니다.</h3>
-                  <p>스케줄을 선택하고 대체 직원을 지정하세요.</p>
+                  <h3>{t('대체근무 요청이 없습니다.')}</h3>
+                  <p>{t('스케줄을 선택하고 대체 직원을 지정하세요.')}</p>
                 </div>
               )}
             </div>
@@ -1279,10 +1314,9 @@ export default function ShiftApp() {
             <div className="panel contentpanel">
               <div className="sectionhead">
                 <div>
-                  <h2>팀 메시지</h2>
+                  <h2>{t('팀 메시지')}</h2>
                   <p>
-                    앱 내 메시지 · 30초마다 갱신 · 우천 공지는 푸시 알림으로도
-                    발송
+                    {t('앱 내 메시지 · 30초마다 갱신 · 우천 공지는 푸시 알림으로도 발송')}
                   </p>
                 </div>
                 <button
@@ -1294,7 +1328,7 @@ export default function ShiftApp() {
                     })
                   }
                 >
-                  <Plus size={16} /> 메시지 작성
+                  <Plus size={16} /> {t('메시지 작성')}
                 </button>
               </div>
               {data.messages
@@ -1318,43 +1352,42 @@ export default function ShiftApp() {
                         {m.recipients
                           ? m.recipients.map(name).join(', ')
                           : m.to === 'all'
-                            ? '전 직원'
+                            ? t('전 직원')
                             : name(m.to)}
                       </span>
                       <time>
-                        {new Date(m.createdAt).toLocaleString('ko-KR', {
+                        {new Date(m.createdAt).toLocaleString(locale, {
                           timeZone: 'America/New_York',
                         })}
                       </time>
                     </div>
-                    <p>{m.body}</p>
+                    {/* Rain notices are generated text; regular messages are shown exactly as written. */}
+                    <p>{m.kind === 'rain' ? t(m.body) : m.body}</p>
                     <div className="messagefoot">
                       {actor.admin && m.to === 'all' ? (
                         <span>
-                          확인{' '}
-                          {
-                            m.readBy.filter(
+                          {t('확인 {read} / {total}명 · {names} 미확인', {
+                            read: m.readBy.filter(
                               (id) =>
                                 id !== 'admin' &&
                                 (m.recipients?.includes(id) ?? true),
-                            ).length
-                          }{' '}
-                          / {m.recipients?.length ?? data.employees.length}명 ·{' '}
-                          {data.employees
-                            .filter(
-                              (e) =>
-                                (m.recipients?.includes(e.id) ?? true) &&
-                                !m.readBy.includes(e.id),
-                            )
-                            .map((e) => e.name)
-                            .join(', ')}{' '}
-                          미확인
+                            ).length,
+                            total: m.recipients?.length ?? data.employees.length,
+                            names: data.employees
+                              .filter(
+                                (e) =>
+                                  (m.recipients?.includes(e.id) ?? true) &&
+                                  !m.readBy.includes(e.id),
+                              )
+                              .map((e) => e.name)
+                              .join(', '),
+                          })}
                         </span>
                       ) : (
                         <span>
                           {m.readBy.includes(m.to)
-                            ? '상대방 확인'
-                            : '확인 대기'}
+                            ? t('상대방 확인')
+                            : t('확인 대기')}
                         </span>
                       )}
                       {!m.readBy.includes(actor.id) && (
@@ -1363,7 +1396,7 @@ export default function ShiftApp() {
                           className="button"
                           onClick={() => command('read', { id: m.id })}
                         >
-                          <Check size={14} /> 확인했습니다
+                          <Check size={14} /> {t('확인했습니다')}
                         </button>
                       )}
                     </div>
@@ -1372,8 +1405,8 @@ export default function ShiftApp() {
               {!data.messages.length && (
                 <div className="empty">
                   <MessageSquare size={28} />
-                  <h3>팀의 대화를 시작하세요.</h3>
-                  <p>우천 종료 공지도 이곳에 모입니다.</p>
+                  <h3>{t('팀의 대화를 시작하세요.')}</h3>
+                  <p>{t('우천 종료 공지도 이곳에 모입니다.')}</p>
                 </div>
               )}
             </div>
@@ -1382,8 +1415,8 @@ export default function ShiftApp() {
             <div className="panel contentpanel">
               <div className="sectionhead">
                 <div>
-                  <h2>직원 관리</h2>
-                  <p>이름 앞 컬러 상자 · 직원 ID · 연락처 · 개인별 시급 · 로그인 설정</p>
+                  <h2>{t('직원 관리')}</h2>
+                  <p>{t('이름 앞 컬러 상자 · 직원 ID · 연락처 · 개인별 시급 · 로그인 설정')}</p>
                 </div>
                 <button
                   className="button primary"
@@ -1398,12 +1431,12 @@ export default function ShiftApp() {
                     })
                   }
                 >
-                  <Plus size={16} /> 직원 추가
+                  <Plus size={16} /> {t('직원 추가')}
                 </button>
               </div>
               <div className="filterbar">
                 <Pick
-                  label="급여 통화"
+                  label={t('급여 통화')}
                   value={data.currency}
                   onChange={(v) => void command('currency', { currency: v })}
                   options={['USD', 'CAD', 'KRW', 'PHP'].map((v) => ({
@@ -1413,7 +1446,7 @@ export default function ShiftApp() {
                 />
                 {!setup && (
                   <div className="teamlink">
-                    <b>직원 접속 주소</b>
+                    <b>{t('직원 접속 주소')}</b>
                     <input
                       readOnly
                       value={
@@ -1426,25 +1459,22 @@ export default function ShiftApp() {
                       onFocus={(e) => e.target.select()}
                     />
                       <small>
-                      직원의 생년월일 8자리로 로그인합니다. 생년월일은 로그인
-                      설정에서 관리하세요.
+                      {t('직원의 생년월일 8자리로 로그인합니다. 생년월일은 로그인 설정에서 관리하세요.')}
                     </small>
                   </div>
                 )}
                 {push.tickUrl && (
                   <div className="teamlink">
-                    <b>출근 알림 자동 점검 주소</b>
+                    <b>{t('출근 알림 자동 점검 주소')}</b>
                     <input
                       readOnly
                       value={push.tickUrl}
                       onFocus={(e) => e.target.select()}
                     />
                     <small>
-                      앱이 열려 있으면 30초마다 자동 점검합니다. 아무도 앱을
-                      열지 않을 때도 1시간 전 알림을 보내려면 외부 cron(예:
-                      cron-job.org)에 이 주소를 5분 간격으로 등록하세요. 비공개
-                      사이트는 외부 호출이 차단될 수 있습니다. 이 주소는
-                      비밀번호처럼 보관하세요.
+                      {t(
+                        '앱이 열려 있으면 30초마다 자동 점검합니다. 아무도 앱을 열지 않을 때도 1시간 전 알림을 보내려면 외부 cron(예: cron-job.org)에 이 주소를 5분 간격으로 등록하세요. 비공개 사이트는 외부 호출이 차단될 수 있습니다. 이 주소는 비밀번호처럼 보관하세요.',
+                      )}
                     </small>
                   </div>
                 )}
@@ -1454,7 +1484,7 @@ export default function ShiftApp() {
                   <TableRow>
                     {['직원', '직원 ID', '업무', '생년월일', '연락처', '이메일', '개인별 시급', '설정'].map(
                       (h) => (
-                        <TableHead key={h}>{h}</TableHead>
+                        <TableHead key={h}>{t(h)}</TableHead>
                       ),
                     )}
                   </TableRow>
@@ -1465,9 +1495,9 @@ export default function ShiftApp() {
                       <TableCell>{box(e)}</TableCell>
                       <TableCell>{e.id}</TableCell>
                       <TableCell>{e.role}</TableCell>
-                      <TableCell>{e.birthDate || '미등록'}</TableCell>
-                      <TableCell>{e.phone || '미등록'}</TableCell>
-                      <TableCell>{e.email || '미등록'}</TableCell>
+                      <TableCell>{e.birthDate || t('미등록')}</TableCell>
+                      <TableCell>{e.phone || t('미등록')}</TableCell>
+                      <TableCell>{e.email || t('미등록')}</TableCell>
                       <TableCell>{money(e.rate)}</TableCell>
                       <TableCell>
                         <button
@@ -1476,7 +1506,7 @@ export default function ShiftApp() {
                             open('employee', { ...e, rate: String(e.rate) })
                           }
                         >
-                          수정
+                          {t('수정')}
                         </button>
                       </TableCell>
                     </TableRow>
@@ -1488,7 +1518,7 @@ export default function ShiftApp() {
         </main>
       </Tabs>
       <footer>
-        PELHAM SHIFT <span>팀의 시간, 더 간편하게.</span>
+        PELHAM SHIFT <span>{t('팀의 시간, 더 간편하게.')}</span>
       </footer>
       <Dialog
         open={!!modal}
@@ -1498,24 +1528,26 @@ export default function ShiftApp() {
       >
         <DialogContent className="shift-dialog">
           <DialogTitle>
-            {
-              {
-                rain: '우천 근무 종료 공지',
-                shift: '근무 추가',
-                employee: '직원 설정',
-                swap: '대체근무 신청',
-                approve: '대체근무 승인',
-                message: '메시지 작성',
-                detail: '근무 상세',
-              }[modal]
-            }
+            {t(
+              (
+                {
+                  rain: '우천 근무 종료 공지',
+                  shift: '근무 추가',
+                  employee: '직원 설정',
+                  swap: '대체근무 신청',
+                  approve: '대체근무 승인',
+                  message: '메시지 작성',
+                  detail: '근무 상세',
+                } as Record<string, string>
+              )[modal] || '',
+            )}
           </DialogTitle>
           <DialogDescription>
             {modal === 'rain'
-              ? '선택한 직원에게 앱 내 공지를 저장하고, 푸시 알림을 켠 직원에게 바로 보냅니다. 기본으로 전 직원이 선택되어 있습니다. 실제 퇴근기록과 급여는 자동 변경하지 않습니다.'
+              ? t('선택한 직원에게 앱 내 공지를 저장하고, 푸시 알림을 켠 직원에게 바로 보냅니다. 기본으로 전 직원이 선택되어 있습니다. 실제 퇴근기록과 급여는 자동 변경하지 않습니다.')
               : modal === 'approve'
-                ? '수락한 대체 직원에게 근무를 이전합니다. 추가수당은 실제 출근기록이 있을 때 반영합니다.'
-                : '내용을 확인한 후 저장하세요.'}
+                ? t('수락한 대체 직원에게 근무를 이전합니다. 추가수당은 실제 출근기록이 있을 때 반영합니다.')
+                : t('내용을 확인한 후 저장하세요.')}
           </DialogDescription>
           <form
             onSubmit={(e) => {
@@ -1530,11 +1562,14 @@ export default function ShiftApp() {
           >
             {modal === 'rain' && (
               <>
-                {input('date', '종료 날짜', 'date')}
-                {input('end', '종료 시각 (뉴욕)', 'time')}
+                {input('date', t('종료 날짜'), 'date')}
+                {input('end', t('종료 시각 (뉴욕)'), 'time')}
                 <fieldset className="recipients">
                   <legend>
-                    받는 직원 ({rainTargets.length}/{data.employees.length}명)
+                    {t('받는 직원 ({n}/{total}명)', {
+                      n: rainTargets.length,
+                      total: data.employees.length,
+                    })}
                   </legend>
                   <label className="recipient all">
                     <Checkbox
@@ -1546,7 +1581,7 @@ export default function ShiftApp() {
                         )
                       }
                     />
-                    전 직원
+                    {t('전 직원')}
                   </label>
                   <div className="recipientlist">
                     {data.employees.map((e) => (
@@ -1560,49 +1595,53 @@ export default function ShiftApp() {
                     ))}
                   </div>
                 </fieldset>
-                {input('body', '안내 내용')}
+                {input('body', t('안내 내용'))}
               </>
             )}
             {modal === 'shift' && (
               <>
                 <Pick
-                  label="직원"
+                  label={t('직원')}
                   value={form.employeeId || ''}
                   onChange={(v) => put('employeeId', v)}
                   options={options}
                 />
-                {input('date', '근무일', 'date')}
+                {input('date', t('근무일'), 'date')}
                 <div className="formgrid">
-                  {input('start', '출근', 'time')}
-                  {input('end', '퇴근', 'time')}
+                  {input('start', t('출근'), 'time')}
+                  {input('end', t('퇴근'), 'time')}
                 </div>
                 <p className="hint">
-                  퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.
+                  {t('퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.')}
                 </p>
-                {input('area', '업무 / 장소')}
+                {input('area', t('업무 / 장소'))}
               </>
             )}
             {modal === 'employee' && (
               <>
-                {input('name', '이름')}
-                {input('birthDate', '생년월일 8자리 (YYYYMMDD)')}
-                {input('phone', '연락처 (예: 914-555-0123)', 'tel', false)}
-                {input('email', '로그인 이메일', 'email', false)}
+                {input('name', t('이름'))}
+                {input('birthDate', t('생년월일 8자리 (YYYYMMDD)'))}
+                {input('phone', t('연락처 (예: 914-555-0123)'), 'tel', false)}
+                {input('email', t('로그인 이메일'), 'email', false)}
                 <div className="formgrid">
-                  {input('color', '직원 색상', 'color')}
-                  {input('rate', '개인별 시급 (' + data.currency + ')', 'number')}
+                  {input('color', t('직원 색상'), 'color')}
+                  {input(
+                    'rate',
+                    t('개인별 시급 ({currency})', { currency: data.currency }),
+                    'number',
+                  )}
                 </div>
-                {input('role', '업무')}
+                {input('role', t('업무'))}
               </>
             )}
             {modal === 'swap' && (
               <>
                 <Pick
-                  label="대체할 근무"
+                  label={t('대체할 근무')}
                   value={form.shiftId || ''}
                   onChange={(v) => put('shiftId', v)}
                   options={[
-                    { value: '', label: '근무 선택' },
+                    { value: '', label: t('근무 선택') },
                     ...data.shifts
                       .filter(
                         (s) =>
@@ -1617,39 +1656,39 @@ export default function ShiftApp() {
                   ]}
                 />
                 <Pick
-                  label="대체 직원"
+                  label={t('대체 직원')}
                   value={form.to || ''}
                   onChange={(v) => put('to', v)}
-                  options={[{ value: '', label: '직원 선택' }, ...options]}
+                  options={[{ value: '', label: t('직원 선택') }, ...options]}
                 />
                 <p className="hint">
-                  근무일 7일 이내인 일정은 선택 목록에 표시되지 않습니다.
+                  {t('근무일 7일 이내인 일정은 선택 목록에 표시되지 않습니다.')}
                 </p>
               </>
             )}
             {modal === 'approve' &&
               input(
                 'bonus',
-                '대체 직원 추가수당 (' + data.currency + ')',
+                t('대체 직원 추가수당 ({currency})', { currency: data.currency }),
                 'number',
               )}
             {modal === 'message' && (
               <>
                 <Pick
-                  label="받는 사람"
+                  label={t('받는 사람')}
                   value={form.to || ''}
                   onChange={(v) => put('to', v)}
                   options={
                     actor.admin
-                      ? [{ value: 'all', label: '전 직원' }, ...options]
+                      ? [{ value: 'all', label: t('전 직원') }, ...options]
                       : [
-                          { value: 'admin', label: '관리자' },
+                          { value: 'admin', label: t('관리자') },
                           ...options.filter((e) => e.value !== actor.id),
                         ]
                   }
                 />
                 <label className="field">
-                  메시지
+                  {t('field::메시지')}
                   <textarea
                     required
                     maxLength={2000}
@@ -1670,27 +1709,29 @@ export default function ShiftApp() {
                       {s.start} – {s.end}
                     </strong>
                     <p>
-                      {s.area} · {duration(s.start, s.end)}시간
+                      {s.area} · {t('{n}시간', { n: duration(s.start, s.end) })}
                     </p>
                     {s.originalId && (
                       <p>
-                        원근무자 {name(s.originalId)} → 대체자{' '}
-                        {name(s.employeeId)}
+                        {t('원근무자 {from} → 대체자 {to}', {
+                          from: name(s.originalId),
+                          to: name(s.employeeId),
+                        })}
                       </p>
                     )}
                     <p className="hint">
                       {staffReadOnly
-                        ? '직원용 보기 화면입니다. 일정 변경은 관리자에게 문의하세요.'
+                        ? t('직원용 보기 화면입니다. 일정 변경은 관리자에게 문의하세요.')
                         : canSwap(s.date)
-                        ? '대체근무를 신청할 수 있습니다.'
-                        : '대체근무 신청 기한이 지났습니다.'}
+                        ? t('대체근무를 신청할 수 있습니다.')
+                        : t('대체근무 신청 기한이 지났습니다.')}
                     </p>
                   </div>
                 ) : null;
               })()}
             {status && (
               <p role="alert" className="formerror">
-                {status}
+                {t(status)}
               </p>
             )}
             {staffReadOnly && modal === 'detail' ? (
@@ -1699,7 +1740,7 @@ export default function ShiftApp() {
                 type="button"
                 onClick={() => setModal('')}
               >
-                닫기
+                {t('닫기')}
               </button>
             ) : (
               <button
@@ -1715,14 +1756,14 @@ export default function ShiftApp() {
                 type="submit"
               >
                 {busy
-                  ? '저장 중…'
+                  ? t('저장 중…')
                   : modal === 'detail'
-                    ? '대체근무 신청'
+                    ? t('대체근무 신청')
                     : modal === 'rain'
                       ? rainAll
-                        ? '전 직원에게 공지 저장'
-                        : `선택한 ${rainTargets.length}명에게 공지 저장`
-                      : '저장'}
+                        ? t('전 직원에게 공지 저장')
+                        : t('선택한 {n}명에게 공지 저장', { n: rainTargets.length })
+                      : t('저장')}
               </button>
             )}
           </form>

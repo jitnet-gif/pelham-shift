@@ -55,6 +55,9 @@ create table if not exists public.push_subscriptions (
   created_at text not null
 );
 
+-- 기기마다 구독할 때 고른 언어('ko' | 'en')로 푸시 알림을 보냅니다.
+alter table public.push_subscriptions add column if not exists lang text not null default 'ko';
+
 alter table public.workspaces           enable row level security;
 alter table public.birth_sessions       enable row level security;
 alter table public.password_credentials enable row level security;

@@ -1,8 +1,10 @@
 'use client';
 import { FormEvent, useState } from 'react';
 import { LockKeyhole } from 'lucide-react';
+import { useLang } from './use-lang';
 
 export default function BirthLogin() {
+  const { t } = useLang();
   const [birthDate, setBirthDate] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -33,25 +35,25 @@ export default function BirthLogin() {
     <section className="birth-login panel">
       <div className="birth-login-icon"><LockKeyhole size={22} /></div>
       <div>
-        <h2>로그인</h2>
-        <p>생년월일과 비밀번호를 입력하세요. 직원 초기 비밀번호는 생년월일입니다.</p>
+        <h2>{t('로그인')}</h2>
+        <p>{t('생년월일과 비밀번호를 입력하세요. 직원 초기 비밀번호는 생년월일입니다.')}</p>
       </div>
       <form onSubmit={submit}>
         <label className="field">
-          생년월일
+          {t('생년월일')}
           <input
             inputMode="numeric"
             autoComplete="bday"
             maxLength={8}
             pattern="[0-9]{8}"
-            placeholder="예: 19900115"
+            placeholder={t('예: 19900115')}
             value={birthDate}
             onChange={(event) => setBirthDate(event.target.value.replace(/\D/g, ''))}
             required
           />
         </label>
         <label className="field">
-          비밀번호
+          {t('비밀번호')}
           <input
             type="password"
             autoComplete="current-password"
@@ -61,10 +63,10 @@ export default function BirthLogin() {
           />
         </label>
         <button className="button primary" disabled={busy}>
-          {busy ? '확인 중…' : '로그인'}
+          {busy ? t('확인 중…') : t('로그인')}
         </button>
       </form>
-      {error && <p role="alert" className="formerror">{error}</p>}
+      {error && <p role="alert" className="formerror">{t(error)}</p>}
     </section>
   );
 }

@@ -2,6 +2,7 @@
 import { FormEvent, useState } from 'react';
 import { KeyRound } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { useLang } from './use-lang';
 
 export default function PasswordChange({
   open,
@@ -14,6 +15,7 @@ export default function PasswordChange({
   onClose: () => void;
   onChanged: () => void;
 }) {
+  const { t } = useLang();
   const [currentPassword, setCurrentPassword] = useState('');
   const [nextPassword, setNextPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -51,26 +53,26 @@ export default function PasswordChange({
   return (
     <Dialog open={open} onOpenChange={(value) => !value && onClose()}>
       <DialogContent className="shift-dialog password-dialog">
-        <DialogTitle><KeyRound size={20} /> 비밀번호 변경</DialogTitle>
+        <DialogTitle><KeyRound size={20} /> {t('비밀번호 변경')}</DialogTitle>
         <DialogDescription>
           {initial
-            ? '초기 비밀번호는 생년월일입니다. 지금 새 비밀번호로 변경하거나 나중에 변경할 수 있습니다.'
-            : '새 비밀번호를 입력하면 다음 로그인부터 적용됩니다.'}
+            ? t('초기 비밀번호는 생년월일입니다. 지금 새 비밀번호로 변경하거나 나중에 변경할 수 있습니다.')
+            : t('새 비밀번호를 입력하면 다음 로그인부터 적용됩니다.')}
         </DialogDescription>
         <form onSubmit={submit}>
           <label className="field">
-            현재 비밀번호
+            {t('현재 비밀번호')}
             <input
               type="password"
               autoComplete="current-password"
-              placeholder={initial ? '초기 비밀번호: 생년월일 8자리' : ''}
+              placeholder={initial ? t('초기 비밀번호: 생년월일 8자리') : ''}
               value={currentPassword}
               onChange={(event) => setCurrentPassword(event.target.value)}
               required
             />
           </label>
           <label className="field">
-            새 비밀번호
+            {t('새 비밀번호')}
             <input
               type="password"
               minLength={8}
@@ -82,7 +84,7 @@ export default function PasswordChange({
             />
           </label>
           <label className="field">
-            새 비밀번호 확인
+            {t('새 비밀번호 확인')}
             <input
               type="password"
               minLength={8}
@@ -93,14 +95,14 @@ export default function PasswordChange({
               required
             />
           </label>
-          {error && <p role="alert" className="formerror">{error}</p>}
+          {error && <p role="alert" className="formerror">{t(error)}</p>}
           <div className="password-actions">
             <button className="button primary" disabled={busy}>
-              {busy ? '변경 중…' : '비밀번호 변경'}
+              {busy ? t('변경 중…') : t('비밀번호 변경')}
             </button>
             {initial && (
               <button className="button" type="button" onClick={onClose}>
-                나중에
+                {t('나중에')}
               </button>
             )}
           </div>

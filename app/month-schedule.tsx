@@ -1,4 +1,5 @@
-import { addDays, days, localDate, type Employee, type Shift } from '@/lib/domain';
+import { addDays, localDate, type Employee, type Shift } from '@/lib/domain';
+import { useLang } from './use-lang';
 
 type Props = {
   date: string;
@@ -17,6 +18,7 @@ export default function MonthSchedule({
   onDateChange,
   onShiftSelect,
 }: Props) {
+  const { t, days, locale } = useLang();
   const first = new Date(`${date.slice(0, 7)}-01T12:00:00Z`);
   const gridStart = addDays(iso(first), -first.getUTCDay());
   const month = date.slice(0, 7);
@@ -40,23 +42,23 @@ export default function MonthSchedule({
   };
 
   return (
-    <section className="month-schedule" aria-label="월간 근무 일정">
+    <section className="month-schedule" aria-label={t('월간 근무 일정')}>
       <header className="month-toolbar">
-        <button className="month-nav" onClick={() => moveMonth(-1)} aria-label="이전 달">
+        <button className="month-nav" onClick={() => moveMonth(-1)} aria-label={t('이전 달')}>
           ‹
         </button>
         <strong>
-          {new Intl.DateTimeFormat('ko-KR', {
+          {new Intl.DateTimeFormat(locale, {
             year: 'numeric',
             month: 'long',
             timeZone: 'UTC',
           }).format(first)}
         </strong>
-        <button className="month-nav" onClick={() => moveMonth(1)} aria-label="다음 달">
+        <button className="month-nav" onClick={() => moveMonth(1)} aria-label={t('다음 달')}>
           ›
         </button>
         <button className="button month-today" onClick={() => onDateChange(today)}>
-          오늘
+          {t('오늘')}
         </button>
       </header>
       <div className="month-scroll">
@@ -78,7 +80,7 @@ export default function MonthSchedule({
                 <button
                   className="month-date"
                   onClick={() => onDateChange(cellDate)}
-                  aria-label={`${cellDate} 일정 보기`}
+                  aria-label={t('{date} 일정 보기', { date: cellDate })}
                 >
                   {Number(cellDate.slice(8))}
                 </button>

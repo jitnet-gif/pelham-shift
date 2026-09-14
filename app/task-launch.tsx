@@ -1,8 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { ClipboardList } from 'lucide-react';
+import { useLang } from './use-lang';
 
 export default function TaskLaunch() {
+  const { t } = useLang();
   const [href, setHref] = useState('/tasks');
   const [show, setShow] = useState(false);
 
@@ -18,7 +20,7 @@ export default function TaskLaunch() {
   if (!show) return null;
   return (
     <a className="task-launch" href={href}>
-      <ClipboardList size={18} /> 작업 수신함
+      <ClipboardList size={18} /> {t('작업 수신함')}
     </a>
   );
 }

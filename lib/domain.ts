@@ -5,7 +5,6 @@ export type Attendance = {id:string;employeeId:string;date:string;start:string;e
 export type Message = {id:string;sender:string;to:string;body:string;createdAt:string;readBy:string[];kind:string;recipients?:string[]};
 export type Task = {id:string;assignedTo:string;title:string;notes:string;date:string;status:'sent'|'seen'|'completed';createdAt:string;completedAt?:string};
 export type State = {employees:Employee[];shifts:Shift[];swaps:Swap[];attendance:Attendance[];messages:Message[];tasks:Task[];currency:string;published:boolean};
-export const days=['일','월','화','수','목','금','토'];
 export const localDate=(d:Date)=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
 export function addDays(date:string,n:number){const d=new Date(date+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)}
 export function weekStart(date:string){return addDays(date,-new Date(date+'T12:00:00Z').getUTCDay())}
