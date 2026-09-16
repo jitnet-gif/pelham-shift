@@ -487,7 +487,8 @@ const en: Record<string, string> = {
   '생년월일로 로그인한 뒤 변경할 수 있습니다.': 'Sign in with your birth date to change it.',
   '관리자 비밀번호는 변경할 수 없습니다.': 'The manager password cannot be changed.',
   '현재 비밀번호를 확인하세요.': 'Check your current password.',
-  'DATABASE_URL 환경변수가 설정되지 않았습니다.': 'The DATABASE_URL environment variable is not set.',
+  '데이터베이스 연결 정보가 없습니다. Vercel 환경변수 DATABASE_URL 또는 Supabase 연동(POSTGRES_URL)을 설정하세요.':
+    'No database connection is configured. Set the DATABASE_URL environment variable on Vercel or connect Supabase (POSTGRES_URL).',
   '필수 입력값을 확인하세요.': 'Check the required fields.',
   '날짜를 확인하세요.': 'Check the date.',
   '근무시간은 30분 단위로 입력하세요.': 'Enter shift times in 30-minute steps.',

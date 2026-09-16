@@ -4,12 +4,25 @@ import postgres from 'postgres';
 type Param = string | number | null;
 
 const cache = globalThis as unknown as { pelhamSql?: postgres.Sql };
+
+// DATABASE_URL is set by hand; POSTGRES_URL is what Vercel's Supabase integration (Storage → Connect) adds.
+const connectionUrl = () => {
+  const raw = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+  if (!raw)
+    throw new Error(
+      '데이터베이스 연결 정보가 없습니다. Vercel 환경변수 DATABASE_URL 또는 Supabase 연동(POSTGRES_URL)을 설정하세요.',
+    );
+  // postgres.js forwards unknown query params (e.g. Supabase's `supa=base-pooler.x`) as server settings,
+  // which the server rejects, so keep only the TLS mode.
+  const url = new URL(raw);
+  for (const key of [...url.searchParams.keys()]) if (key !== 'sslmode') url.searchParams.delete(key);
+  return url.toString();
+};
+
 const sql = () => {
   if (!cache.pelhamSql) {
-    const url = process.env.DATABASE_URL;
-    if (!url) throw new Error('DATABASE_URL 환경변수가 설정되지 않았습니다.');
     // The Supabase transaction pooler cannot keep prepared statements across requests.
-    cache.pelhamSql = postgres(url, { prepare: false, max: 3, idle_timeout: 20 });
+    cache.pelhamSql = postgres(connectionUrl(), { prepare: false, max: 3, idle_timeout: 20 });
   }
   return cache.pelhamSql;
 };
