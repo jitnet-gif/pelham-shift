@@ -7,7 +7,10 @@ const cache = globalThis as unknown as { pelhamSql?: postgres.Sql };
 
 // DATABASE_URL is set by hand; POSTGRES_URL is what Vercel's Supabase integration (Storage → Connect) adds.
 const connectionUrl = () => {
-  const raw = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+  // The integration may add a custom prefix (e.g. STORAGE_POSTGRES_URL), so accept any *_POSTGRES_URL too.
+  const prefixed = Object.keys(process.env).find((key) => key.endsWith('_POSTGRES_URL'));
+  const raw =
+    process.env.DATABASE_URL || process.env.POSTGRES_URL || (prefixed && process.env[prefixed]);
   if (!raw)
     throw new Error(
       '데이터베이스 연결 정보가 없습니다. Vercel 환경변수 DATABASE_URL 또는 Supabase 연동(POSTGRES_URL)을 설정하세요.',
