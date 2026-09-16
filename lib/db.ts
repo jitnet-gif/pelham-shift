@@ -36,6 +36,19 @@ const positional = (query: string) => {
   return query.replace(/\?/g, () => `$${++index}`);
 };
 
+// Network failures surface as an AggregateError with an empty message; name the error codes instead
+// (never the address or password) so a wrong or unreachable DATABASE_URL can be told apart.
+const describe = (error: unknown) => {
+  if (!(error instanceof Error) || error.message) return error;
+  const parts = error instanceof AggregateError ? error.errors : [error];
+  const codes = [
+    ...new Set(parts.map((part) => (part as { code?: string }).code || (part as Error).message).filter(Boolean)),
+  ];
+  return new Error(
+    `데이터베이스에 접속하지 못했습니다 (${codes.join(', ') || error.name}). DATABASE_URL이 Supabase Transaction pooler(포트 6543) 주소인지 확인하세요.`,
+  );
+};
+
 class Statement {
   constructor(
     private readonly query: string,
@@ -47,8 +60,12 @@ class Statement {
     return new Statement(this.query, params as Param[]);
   }
 
-  private execute() {
-    return sql().unsafe(positional(this.query), this.params);
+  private async execute() {
+    try {
+      return await sql().unsafe(positional(this.query), this.params);
+    } catch (error) {
+      throw describe(error);
+    }
   }
 
   async first<T>(): Promise<T | null> {
