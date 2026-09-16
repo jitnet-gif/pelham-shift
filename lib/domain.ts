@@ -1,9 +1,9 @@
-export type Employee = {id:string;name:string;color:string;role:string;rate:number;email:string;birthDate:string;phone?:string};
+export type Employee = {id:string;name:string;color:string;role:string;rate:number;email:string;birthDate:string;phone?:string;taskManager?:boolean};
 export type Shift = {id:string;employeeId:string;date:string;start:string;end:string;area:string;originalId?:string};
 export type Swap = {id:string;shiftId:string;from:string;to:string;status:'requested'|'accepted'|'approved'|'rejected';createdAt:string;bonus:number};
 export type Attendance = {id:string;employeeId:string;date:string;start:string;end:string;breakMinutes:number};
 export type Message = {id:string;sender:string;to:string;body:string;createdAt:string;readBy:string[];kind:string;recipients?:string[]};
-export type Task = {id:string;assignedTo:string;title:string;notes:string;date:string;status:'sent'|'seen'|'completed';createdAt:string;completedAt?:string};
+export type Task = {id:string;assignedTo:string;title:string;notes:string;date:string;status:'sent'|'seen'|'completed';createdAt:string;completedAt?:string;createdBy?:string};
 export type State = {employees:Employee[];shifts:Shift[];swaps:Swap[];attendance:Attendance[];messages:Message[];tasks:Task[];currency:string;published:boolean};
 export const localDate=(d:Date)=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
 export function addDays(date:string,n:number){const d=new Date(date+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)}

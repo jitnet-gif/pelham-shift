@@ -13,7 +13,7 @@ export default function TaskLaunch() {
     setHref('/tasks' + window.location.search);
     void fetch('/api/workspace' + window.location.search)
       .then((response) => response.json())
-      .then((workspace) => setShow(workspace.actor?.admin === true))
+      .then((workspace) => setShow(Boolean(workspace.actor)))
       .catch(() => setShow(false));
   }, []);
 

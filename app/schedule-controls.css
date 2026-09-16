@@ -1,1 +1,3 @@
 .filterbar .all-schedule{align-self:flex-end;margin-bottom:0;color:#087e6d;border-color:#b9d8cd}.filterbar .all-schedule:hover{background:#eaf5f0}@media(max-width:700px){.filterbar .all-schedule{width:100%;min-height:39px;align-self:auto}}
+.shiftpick .recipientlist{grid-template-columns:1fr;max-height:260px;overflow-y:auto}.shiftpick .recipient{flex-wrap:wrap;row-gap:4px}.shiftpick .recipient small{color:#83958a}.shiftpick .recipient.locked{opacity:.55;cursor:not-allowed}.detailactions{display:flex;gap:10px;margin-top:12px}.detailactions .button{flex:1}
+.taskbadge{margin-left:8px;padding:3px 8px;white-space:nowrap}

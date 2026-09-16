@@ -97,6 +97,25 @@ const en: Record<string, string> = {
   '작성 중': 'Draft',
   '직원에게 공개': 'Publish to staff',
   '근무 추가': 'Add shift',
+  '근무 시간 수정': 'Edit shift',
+  '시간 수정': 'Edit time',
+  '여러 날 한번에 수정': 'Edit several days',
+  '수정할 근무 ({n}/{total}개)': 'Shifts to edit ({n}/{total})',
+  '전체 선택': 'Select all',
+  '대체 요청 진행 중': 'swap in progress',
+  '이 기간에 등록된 근무가 없습니다.': 'No shifts in this date range.',
+  '새 출근': 'New start',
+  '새 퇴근': 'New end',
+  '새 업무 / 장소': 'New role / location',
+  '비워 둔 항목은 기존 값을 그대로 유지합니다. 퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.':
+    'Blank fields keep their current values. An end time earlier than the start counts as the next day.',
+  '선택한 {n}개 근무 수정': 'Update {n} selected shifts',
+  '저장하면 스케줄이 작성 중 상태로 바뀝니다. 수정 후 직원에게 공개를 다시 누르세요.':
+    'Saving puts the schedule back into draft. Press Publish to staff again after editing.',
+  '수정할 근무를 선택하세요.': 'Choose the shifts to edit.',
+  '한 번에 최대 1,000개 근무를 수정할 수 있습니다.': 'You can edit up to 1,000 shifts at once.',
+  '변경할 내용을 입력하세요.': 'Enter what to change.',
+  '근무를 찾을 수 없습니다. 새로고침 후 다시 시도하세요.': 'Shift not found. Reload and try again.',
   '전체 월간 일정 · 읽기 전용': 'Full monthly schedule · read-only',
   직원: 'Employee',
   '모든 직원': 'All staff',
@@ -183,6 +202,12 @@ const en: Record<string, string> = {
   '앱 내 메시지 · 30초마다 갱신 · 우천 공지는 푸시 알림으로도 발송':
     'In-app messages · refreshed every 30 seconds · rain notices are also sent as push notifications',
   '메시지 작성': 'New message',
+  '출근·메시지 알림': 'Shift and message alerts',
+  '나에게 온 메시지와 전체 공지 · 관리자에게 답장할 수 있습니다': 'Messages to you and team notices · you can reply to the manager',
+  '확인 완료': 'Read',
+  '직원은 관리자에게만 메시지를 보낼 수 있습니다.': 'Staff can only send messages to the manager.',
+  '관리자 메시지': 'Message from the manager',
+  '직원 메시지': 'Message from staff',
   '전 직원': 'All staff',
   '확인 {read} / {total}명 · {names} 미확인': 'Read {read} / {total} · Unread: {names}',
   '상대방 확인': 'Read by recipient',
@@ -212,6 +237,12 @@ const en: Record<string, string> = {
   // Dialogs
   '우천 근무 종료 공지': 'Rain closure notice',
   '직원 설정': 'Employee settings',
+  '작업 지시': 'Assigns tasks',
+  '작업 지시 권한': 'Can assign tasks',
+  '켜면 이 직원이 작업 수신함에서 다른 직원에게 작업을 보내고 전체 작업 진행 상황을 볼 수 있습니다. 스케줄·급여·직원 정보는 계속 읽기 전용입니다.':
+    'When on, this employee can send tasks to other staff from the task inbox and see the progress of every task. Schedules, payroll and staff details stay read-only.',
+  '· {name} 지시': '· assigned by {name}',
+  '작업 지시 권한이 필요합니다.': 'You need permission to assign tasks.',
   '대체근무 신청': 'Request a swap',
   '대체근무 승인': 'Approve swap',
   '근무 상세': 'Shift details',
@@ -419,7 +450,19 @@ const patterns: [RegExp, (match: RegExpMatchArray) => string][] = [
     ([, date, employee]) => `${date} ${employee}: duplicate or overlapping attendance record.`,
   ],
   [
-    /^(\d+)행: 직원 ID, 날짜\(YYYY-MM-DD\), 시간\(HH:mm\)을 확인하세요\.$/,
+    /^(\S+): 진행 중인 대체근무 요청이 있어 수정할 수 없습니다\.$/,
+    ([, date]) => `${date}: a swap request is in progress, so this shift can't be edited.`,
+  ],
+  [
+    /^(\S+): 출근과 퇴근 시간이 같습니다\.$/,
+    ([, date]) => `${date}: start and end times are the same.`,
+  ],
+  [
+    /^(\S+) (.+): 근무시간이 겹칩니다\.$/,
+    ([, date, employee]) => `${date} ${employee}: shifts overlap.`,
+  ],
+  [
+    /^(\d+)행:직원 ID, 날짜\(YYYY-MM-DD\), 시간\(HH:mm\)을 확인하세요\.$/,
     ([, row]) => `Row ${row}: check the employee ID, date (YYYY-MM-DD) and time (HH:mm).`,
   ],
 ];
