@@ -12,11 +12,20 @@ import {
   Plus,
   CloudRain,
   Bell,
-  MapPin,
   Upload,
   Download,
   Check,
   RefreshCw,
+  MapPin,
+  ArrowRight,
+  BellRing,
+  ClipboardList,
+  LogOut,
+  Menu,
+  Search,
+  Send,
+  TriangleAlert,
+  UserRound,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
@@ -66,6 +75,7 @@ import BirthLogin from './birth-login';
 import PasswordChange from './password-change';
 import LangToggle from './lang-toggle';
 import { useLang } from './use-lang';
+import { LAYOUT_KEY, readLayout, type Layout } from './layout-choice';
 function Pick({
   label,
   value,
@@ -132,6 +142,22 @@ export default function ShiftApp() {
   const [from, setFrom] = useState(week);
   const [to, setTo] = useState(addDays(week, 6));
   const [tick, setTick] = useState(Date.now());
+  const [dept, setDept] = useState('all');
+  const [sort, setSort] = useState('name');
+  const [search, setSearch] = useState('');
+  const [navCollapsed, setNavCollapsed] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
+  const [ui, setUi] = useState<Layout>('pelham');
+  const chooseLayout = (next: Layout) => {
+    setUi(next);
+    try {
+      window.localStorage.setItem(LAYOUT_KEY, next);
+    } catch {}
+  };
+  const logout = async () => {
+    await fetch('/api/birth-login', { method: 'DELETE' }).catch(() => 0);
+    window.location.assign('/' + query());
+  };
   const fileRef = useRef<HTMLInputElement>(null);
   const [push, setPush] = useState<{ on: boolean; tickUrl?: string }>({
     on: false,
@@ -179,6 +205,7 @@ export default function ShiftApp() {
     }
   }
   useEffect(() => {
+    setUi(readLayout());
     void refresh();
     const timer = setInterval(() => {
       setTick(Date.now());
@@ -347,9 +374,40 @@ export default function ShiftApp() {
     value: e.id,
     label: e.name + ' · ' + e.id,
   }));
-  const visibleEmployees = data.employees.filter(
-    (e) => filter === 'all' || e.id === filter,
+  const roles = [...new Set(data.employees.map((e) => e.role))].sort((a, b) =>
+    a.localeCompare(b),
   );
+  const visibleEmployees = data.employees
+    .filter(
+      (e) =>
+        (filter === 'all' || e.id === filter) &&
+        (dept === 'all' || e.role === dept) &&
+        e.name.toLowerCase().includes(search.trim().toLowerCase()),
+    )
+    .sort((a, b) =>
+      ui === 'pelham'
+        ? 0
+        : sort === 'id'
+          ? a.id.localeCompare(b.id)
+          : a.name.localeCompare(b.name, locale),
+    );
+  const longDate = (date: string) =>
+    new Intl.DateTimeFormat(locale, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    }).format(new Date(date + 'T12:00:00Z'));
+  const weekDates = Array.from({ length: 7 }, (_, i) => addDays(week, i));
+  const rosterShifts = data.shifts.filter(
+    (s) =>
+      s.date >= week &&
+      s.date <= addDays(week, 6) &&
+      visibleEmployees.some((e) => e.id === s.employeeId),
+  );
+  // Scheduled cost is an estimate from planned hours; payroll itself pays actual attendance.
+  const rosterCost = (list: typeof data.shifts) =>
+    list.reduce((n, s) => n + duration(s.start, s.end) * (emp(s.employeeId)?.rate || 0), 0);
   const timelineDate = addDays(
     localDate(new Date()),
     view === 'tomorrow' ? 1 : 0,
@@ -360,6 +418,12 @@ export default function ShiftApp() {
   const pending = data.swaps.filter((s) =>
     ['requested', 'accepted'].includes(s.status),
   );
+  const warnings = [
+    ...pending.map(() => ({ text: t('확인이 필요한 대체근무 요청'), tab: 'swaps' })),
+    ...data.employees
+      .filter((e) => !e.rate)
+      .map((e) => ({ text: t('{name} 시급 미설정', { name: e.name }), tab: 'team' })),
+  ];
   const money = (n: number) =>
     new Intl.NumberFormat(locale, {
       style: 'currency',
@@ -586,505 +650,36 @@ export default function ShiftApp() {
                 {t(status)}
               </div>
             )}
+            <div className="layout-pick" role="radiogroup" aria-label={t('화면 버전')}>
+              {(
+                [
+                  ['pelham', '1', 'pelham-shifts', t('기본 화면 · 위쪽 탭 메뉴')],
+                  ['seven', '2', 'seven-shifts', t('7shifts 스타일 · 왼쪽 메뉴')],
+                ] as const
+              ).map(([value, num, label, hint]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={ui === value}
+                  className={'layout-option' + (ui === value ? ' on' : '')}
+                  onClick={() => chooseLayout(value)}
+                >
+                  <em>{num}</em>
+                  <span>
+                    <b>{label}</b>
+                    <small>{hint}</small>
+                  </span>
+                </button>
+              ))}
+            </div>
             <BirthLogin />
           </>
         )}
       </div>
     );
-  return (
-    <div className="shell">
-      <header className="topbar">
-        <a className="brand" href="/">
-          <span className="brandmark" aria-hidden="true" />
-          pelham<span className="brandlight">shift</span>
-        </a>
-        <div className="location">
-          <MapPin size={16} /> Pelham Hills <span> / </span> {t('팀 워크스페이스')}
-        </div>
-        <div className="account">
-          <LangToggle />
-          {!setup && (
-            <button
-              aria-label={t('메시지 보기')}
-              className="iconbutton"
-              onClick={() => setTab('messages')}
-            >
-              <Bell size={19} />
-            </button>
-          )}
-          <span className="avatar">
-            {actor.admin ? 'P' : name(actor.id).slice(0, 1)}
-          </span>
-          <span>{actor.admin ? t('관리자') : name(actor.id)}</span>
-          {birthAuth && !actor.admin && (
-            <button
-              className="linkbutton"
-              onClick={() => setPasswordDialog(true)}
-            >
-              {t('비밀번호')}
-            </button>
-          )}
-        </div>
-      </header>
-      <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
-        <div className="navrow">
-          <TabsList variant="line">
-            {nav
-              .filter((n) => actor.admin || employeeNav.has(n.key))
-              .map(({ key, label, Icon }) => (
-                <TabsTrigger key={key} value={key}>
-                  <Icon size={17} />
-                  {t(label)}
-                </TabsTrigger>
-              ))}
-          </TabsList>
-          <span className="tz">America / New York</span>
-        </div>
-        <main>
-          <div className="pageheading">
-            <div>
-              <div className="eyebrow">TEAM OPERATIONS</div>
-              <h1>
-                {tab === 'schedule'
-                  ? t('좋은 한 주는, 좋은 스케줄부터.')
-                  : t(nav.find((n) => n.key === tab)?.label || '')}
-              </h1>
-              <p>
-                {tab === 'schedule'
-                  ? t('팀의 근무를 한눈에 확인하고, 함께 계획하세요.')
-                  : t('스케줄부터 실제 근무시간까지, 같은 기록으로 연결합니다.')}
-              </p>
-            </div>
-            <div className="headactions">
-              {actor.admin && <InstallQr team={setup ? '' : team} />}
-              {actor.admin && (
-                <button
-                  className="button rain"
-                  onClick={() =>
-                    open('rain', {
-                      date: localDate(new Date()),
-                      end: '15:00',
-                      body: t('안전하게 장비를 정리하고 퇴근 기록을 남겨주세요.'),
-                      targets: data.employees.map((e) => e.id).join(','),
-                    })
-                  }
-                >
-                  <CloudRain size={17} /> {t('우천 근무 종료')}
-                </button>
-              )}
-            </div>
-          </div>
-          {setup && (
-            <div className="demo-banner setup">
-              <span>
-                {t('샘플 미리보기 · 실제 운영을 시작하면 샘플 일정은 비워집니다.')}
-              </span>
-              <button
-                className="button"
-                disabled={busy}
-                onClick={() => command('initialize')}
-              >
-                {t('내 워크스페이스 생성')}
-              </button>
-            </div>
-          )}
-          {status && (
-            <div role="status" className="statusbar">
-              {t(status)}
-              <button
-                className="iconbutton"
-                onClick={() => void refresh()}
-                aria-label={t('다시 불러오기')}
-              >
-                <RefreshCw size={15} />
-              </button>
-            </div>
-          )}
-          {reminders.map((s) => (
-            <div className="demo-banner" key={s.id}>
-              <Bell size={16} />{' '}
-              {t('출근 알림 · 오늘 {start}, {area} 근무가 1시간 이내에 시작됩니다.', {
-                start: s.start,
-                area: s.area,
-              })}
-            </div>
-          ))}
-          <TabsContent value="schedule">
-            <section className="stats">
-              <div>
-                <span>{t('이번 주 근무')}</span>
-                <strong>
-                  {weekShifts.length}
-                  <small>{t('개')}</small>
-                </strong>
-                <p>
-                  {t('{n}명의 직원과 함께하는 한 주', {
-                    n: data.employees.length,
-                  })}
-                </p>
-              </div>
-              <div>
-                <span>{t('예정 근무시간')}</span>
-                <strong>
-                  {weekShifts
-                    .reduce((n, x) => n + duration(x.start, x.end), 0)
-                    .toFixed(0)}
-                  <small>{t('시간')}</small>
-                </strong>
-                <p>{t('등록된 스케줄 기준')}</p>
-              </div>
-              {actor.admin ? (
-                <>
-                  <div>
-                    <span>{t('대체근무 요청')}</span>
-                    <strong>
-                      {pending.length}
-                      <small>{t('건')}</small>
-                    </strong>
-                    <p className="green">
-                      {pending.length
-                        ? t('확인이 필요한 요청이 있습니다')
-                        : t('모든 요청을 확인했습니다')}{' '}
-                      <Check size={14} />
-                    </p>
-                  </div>
-                  <div className="reminder">
-                    <Bell size={23} />
-                    <span>{t('출근 준비, 잊지 않도록')}</span>
-                    <b>{t('근무 시작 1시간 전 알림')}</b>
-                    <p>
-                      {push.on
-                        ? t('이 기기 푸시 알림 켜짐')
-                        : t('앱 접속 중 알림 · 이 기기 푸시 꺼짐')}
-                    </p>
-                    {!setup && (
-                      <button
-                        className="button"
-                        disabled={busy}
-                        onClick={() =>
-                          void (push.on ? testPush() : enablePush())
-                        }
-                      >
-                        {push.on ? t('테스트 알림 보내기') : t('푸시 알림 켜기')}
-                      </button>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div>
-                    <span>{t('직원 화면')}</span>
-                    <strong>{t('읽기 전용')}</strong>
-                    <p className="green">{t('전체 일정과 내 기록만 볼 수 있습니다.')}</p>
-                  </div>
-                  <div className="reminder">
-                    <Bell size={23} />
-                    <span>{t('출근·메시지 알림')}</span>
-                    <b>{t('근무 시작 1시간 전 알림')}</b>
-                    <p>
-                      {push.on
-                        ? t('이 기기 푸시 알림 켜짐')
-                        : t('앱 접속 중 알림 · 이 기기 푸시 꺼짐')}
-                    </p>
-                    {!setup && (
-                      <button
-                        className="button"
-                        disabled={busy}
-                        onClick={() =>
-                          void (push.on ? testPush() : enablePush())
-                        }
-                      >
-                        {push.on ? t('테스트 알림 보내기') : t('푸시 알림 켜기')}
-                      </button>
-                    )}
-                  </div>
-                </>
-              )}
-            </section>
-            <section className="schedule panel">
-              <div className="toolbar">
-                <div className="weekpicker">
-                  <button
-                    aria-label={t('이전 주')}
-                    onClick={() => setWeek(addDays(week, -7))}
-                  >
-                    <ChevronLeft size={18} />
-                  </button>
-                  <h2>
-                    {week.slice(5).replace('-', '.')} –{' '}
-                    {addDays(week, 6).slice(5).replace('-', '.')}{' '}
-                    <span>{week.slice(0, 4)}</span>
-                  </h2>
-                  <button
-                    aria-label={t('다음 주')}
-                    onClick={() => setWeek(addDays(week, 7))}
-                  >
-                    <ChevronRight size={18} />
-                  </button>
-                  <button
-                    className="button"
-                    onClick={() => setWeek(weekStart(localDate(new Date())))}
-                  >
-                    {t('이번 주')}
-                  </button>
-                </div>
-                <div className="actions">
-                  <span className="draft">
-                    ● {data.published ? t('직원 공개 중') : t('작성 중')}
-                  </span>
-                  {actor.admin && (
-                    <>
-                      <button
-                        disabled={busy || setup}
-                        className="button"
-                        onClick={() => command('publish')}
-                      >
-                        {t('직원에게 공개')}
-                      </button>
-                      <button
-                        disabled={busy || setup}
-                        className="button"
-                        onClick={openBulk}
-                      >
-                        {t('여러 날 한번에 수정')}
-                      </button>
-                      <button
-                        className="button primary"
-                        onClick={() =>
-                          open('shift', {
-                            employeeId: data.employees[0]?.id || '',
-                            date: week,
-                            start: '09:00',
-                            end: '17:00',
-                            area: 'Outdoor',
-                          })
-                        }
-                      >
-                        <Plus size={16} /> {t('근무 추가')}
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className="filterbar">
-                {staffReadOnly ? (
-                  <strong className="paytotal">{t('전체 월간 일정 · 읽기 전용')}</strong>
-                ) : (
-                  <>
-                    <Pick
-                      label={t('직원')}
-                      value={filter}
-                      onChange={setFilter}
-                      options={[
-                        { value: 'all', label: t('모든 직원') },
-                        ...options,
-                      ]}
-                    />
-                    <Tabs
-                      value={view}
-                      onValueChange={(v) => setView(String(v))}
-                    >
-                      <TabsList>
-                        <TabsTrigger value="today">TODAY</TabsTrigger>
-                        <TabsTrigger value="tomorrow">TOMORROW</TabsTrigger>
-                        <TabsTrigger value="week">WEEKLY</TabsTrigger>
-                      </TabsList>
-                    </Tabs>
-                  </>
-                )}
-                {!staffReadOnly && (
-                  <>
-                    {view === 'month' && (
-                      <label className="field">
-                        {t('기준 날짜')}
-                        <input
-                          type="date"
-                          value={day}
-                          onChange={(e) => setDay(e.target.value)}
-                        />
-                      </label>
-                    )}
-                    <button
-                      className="button all-schedule"
-                      onClick={() => {
-                        setFilter('all');
-                        setView('month');
-                      }}
-                    >
-                      {t('전체 일정 보기')}
-                    </button>
-                  </>
-                )}
-              </div>
-              {view === 'week' ? (
-                <div className="gridscroll">
-                  <div className="weekgrid">
-                    <div className="gridhead staffhead">
-                      {t('직원')} <span>{t('{n}명', { n: visibleEmployees.length })}</span>
-                    </div>
-                    {days.map((d, i) => (
-                      <div
-                        className={
-                          'gridhead ' +
-                          (addDays(week, i) === localDate(new Date())
-                            ? 'today'
-                            : '')
-                        }
-                        key={d}
-                      >
-                        {d}
-                        <strong>{Number(addDays(week, i).slice(8))}</strong>
-                      </div>
-                    ))}
-                    {visibleEmployees.map((e) => (
-                      <div className="gridrow" key={e.id}>
-                        <div className="staff">
-                          {box(e)}
-                          <small>{e.role}</small>
-                        </div>
-                        {days.map((_, d) => {
-                          const shifts = data.shifts.filter(
-                            (s) =>
-                              s.employeeId === e.id &&
-                              s.date === addDays(week, d),
-                          );
-                          return (
-                            <div className="daycell" key={d}>
-                              {shifts.length ? (
-                                shifts.map((s) => (
-                                  <button
-                                    key={s.id}
-                                    className="shift"
-                                    onClick={() => open('detail', { id: s.id })}
-                                    style={{
-                                      background: e.color + '13',
-                                      borderLeftColor: e.color,
-                                    }}
-                                  >
-                                    <b>
-                                      {s.start} – {s.end}
-                                    </b>
-                                    <span>
-                                      {s.originalId ? t('대체 · ') : ''}
-                                      {s.area}
-                                    </span>
-                                    <small>{duration(s.start, s.end)}h</small>
-                                  </button>
-                                ))
-                              ) : (
-                                <span className="off">—</span>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : view === 'month' ? (
-                <MonthSchedule
-                  date={day}
-                  employees={staffReadOnly ? data.employees : visibleEmployees}
-                  shifts={data.shifts.filter((shift) =>
-                    (staffReadOnly ? data.employees : visibleEmployees).some(
-                      (employee) => employee.id === shift.employeeId,
-                    ),
-                  )}
-                  onDateChange={setDay}
-                  onShiftSelect={(id) => open('detail', { id })}
-                />
-              ) : (
-                <div className="gridscroll timeline-scroll">
-                  <div className="timeline">
-                    <div className="timeruler">
-                      <span>{t('직원')}</span>
-                      <div>
-                        {Array.from({ length: 13 }, (_, i) => (
-                          <span key={i}>
-                            {String(i * 2).padStart(2, '0')}:00
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    {[timelineDate].map((date) => {
-                      const weekday =
-                        days[new Date(date + 'T12:00:00Z').getUTCDay()];
-                      return (
-                        <section className="timeline-day" key={date}>
-                          <div className="timeline-day-label">
-                            <span>{weekday}</span>
-                            <strong>{date.slice(5).replace('-', '.')}</strong>
-                          </div>
-                          {visibleEmployees.map((e) => (
-                            <div className="timerow" key={`${date}-${e.id}`}>
-                              <div className="staff">{box(e)}</div>
-                              <div className="track">
-                                {data.shifts
-                                  .filter(
-                                    (s) =>
-                                      s.employeeId === e.id &&
-                                      s.date === date,
-                                  )
-                                  .map((s) => (
-                                    <button
-                                      key={s.id}
-                                      onClick={() => open('detail', { id: s.id })}
-                                      style={{
-                                        left:
-                                          ((Number(s.start.slice(0, 2)) +
-                                            Number(s.start.slice(3)) / 60) /
-                                            24) *
-                                            100 +
-                                          '%',
-                                        width:
-                                          (Math.min(
-                                            duration(s.start, s.end),
-                                            24 -
-                                              Number(s.start.slice(0, 2)) -
-                                              Number(s.start.slice(3)) / 60,
-                                          ) /
-                                            24) *
-                                            100 +
-                                          '%',
-                                        background: e.color,
-                                      }}
-                                    >
-                                      {s.start}–{s.end} · {s.area}
-                                    </button>
-                                  ))}
-                              </div>
-                            </div>
-                          ))}
-                        </section>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              <div className="schedulefoot">
-                <span>
-                  <i className="tiny-dot" />{' '}
-                  {t('직원별 컬러는 모든 화면에서 동일하게 표시됩니다.')}
-                </span>
-                <span>{t('대체 신청·승인 · 근무일 7일 전까지')}</span>
-              </div>
-            </section>
-            <div className="below">
-              <div>
-                <Clock3 size={18} />
-                <b>{t('실제 출근기록으로 정확하게')}</b>
-                <span>
-                  {t('출근기계 엑셀을 업로드하면 근무시간과 예상 급여를 계산합니다.')}
-                </span>
-              </div>
-              <button
-                className="linkbutton"
-                onClick={() => setTab('attendance')}
-              >
-                {t('출근기록 가져오기 →')}
-              </button>
-            </div>
-          </TabsContent>
+  const otherTabs = (
+    <>
           <TabsContent value="attendance">
             <div className="panel contentpanel">
               <div className="sectionhead">
@@ -1619,11 +1214,10 @@ export default function ShiftApp() {
               </Table>
             </div>
           </TabsContent>
-        </main>
-      </Tabs>
-      <footer>
-        PELHAM SHIFT <span>{t('팀의 시간, 더 간편하게.')}</span>
-      </footer>
+    </>
+  );
+  const dialogs = (
+    <>
       <Dialog
         open={!!modal}
         onOpenChange={(o) => {
@@ -2044,6 +1638,1085 @@ export default function ShiftApp() {
         onClose={() => setPasswordDialog(false)}
         onChanged={() => setPasswordChanged(true)}
       />
+    </>
+  );
+  // Version 1 (pelham-shifts): top bar and tab row.
+  if (ui === 'pelham')
+    return (
+    <div className="shell">
+      <header className="topbar">
+        <a className="brand" href="/">
+          <span className="brandmark" aria-hidden="true" />
+          pelham<span className="brandlight">shift</span>
+        </a>
+        <div className="location">
+          <MapPin size={16} /> Pelham Hills <span> / </span> {t('팀 워크스페이스')}
+        </div>
+        <div className="account">
+          <LangToggle />
+          {!setup && (
+            <button
+              aria-label={t('메시지 보기')}
+              className="iconbutton"
+              onClick={() => setTab('messages')}
+            >
+              <Bell size={19} />
+            </button>
+          )}
+          <span className="avatar">
+            {actor.admin ? 'P' : name(actor.id).slice(0, 1)}
+          </span>
+          <span>{actor.admin ? t('관리자') : name(actor.id)}</span>
+          {birthAuth && !actor.admin && (
+            <button
+              className="linkbutton"
+              onClick={() => setPasswordDialog(true)}
+            >
+              {t('비밀번호')}
+            </button>
+          )}
+          <button
+            className="iconbutton"
+            aria-label={t('로그아웃')}
+            title={t('로그아웃')}
+            onClick={() => void logout()}
+          >
+            <LogOut size={17} />
+          </button>
+        </div>
+      </header>
+      <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
+        <div className="navrow">
+          <TabsList variant="line">
+            {nav
+              .filter((n) => actor.admin || employeeNav.has(n.key))
+              .map(({ key, label, Icon }) => (
+                <TabsTrigger key={key} value={key}>
+                  <Icon size={17} />
+                  {t(label)}
+                </TabsTrigger>
+              ))}
+          </TabsList>
+          <span className="tz">America / New York</span>
+        </div>
+        <main>
+          <div className="pageheading">
+            <div>
+              <div className="eyebrow">TEAM OPERATIONS</div>
+              <h1>
+                {tab === 'schedule'
+                  ? t('좋은 한 주는, 좋은 스케줄부터.')
+                  : t(nav.find((n) => n.key === tab)?.label || '')}
+              </h1>
+              <p>
+                {tab === 'schedule'
+                  ? t('팀의 근무를 한눈에 확인하고, 함께 계획하세요.')
+                  : t('스케줄부터 실제 근무시간까지, 같은 기록으로 연결합니다.')}
+              </p>
+            </div>
+            <div className="headactions">
+              {actor.admin && <InstallQr team={setup ? '' : team} />}
+              {actor.admin && (
+                <button
+                  className="button rain"
+                  onClick={() =>
+                    open('rain', {
+                      date: localDate(new Date()),
+                      end: '15:00',
+                      body: t('안전하게 장비를 정리하고 퇴근 기록을 남겨주세요.'),
+                      targets: data.employees.map((e) => e.id).join(','),
+                    })
+                  }
+                >
+                  <CloudRain size={17} /> {t('우천 근무 종료')}
+                </button>
+              )}
+            </div>
+          </div>
+          {setup && (
+            <div className="demo-banner setup">
+              <span>
+                {t('샘플 미리보기 · 실제 운영을 시작하면 샘플 일정은 비워집니다.')}
+              </span>
+              <button
+                className="button"
+                disabled={busy}
+                onClick={() => command('initialize')}
+              >
+                {t('내 워크스페이스 생성')}
+              </button>
+            </div>
+          )}
+          {status && (
+            <div role="status" className="statusbar">
+              {t(status)}
+              <button
+                className="iconbutton"
+                onClick={() => void refresh()}
+                aria-label={t('다시 불러오기')}
+              >
+                <RefreshCw size={15} />
+              </button>
+            </div>
+          )}
+          {reminders.map((s) => (
+            <div className="demo-banner" key={s.id}>
+              <Bell size={16} />{' '}
+              {t('출근 알림 · 오늘 {start}, {area} 근무가 1시간 이내에 시작됩니다.', {
+                start: s.start,
+                area: s.area,
+              })}
+            </div>
+          ))}
+          <TabsContent value="schedule">
+            <section className="stats">
+              <div>
+                <span>{t('이번 주 근무')}</span>
+                <strong>
+                  {weekShifts.length}
+                  <small>{t('개')}</small>
+                </strong>
+                <p>
+                  {t('{n}명의 직원과 함께하는 한 주', {
+                    n: data.employees.length,
+                  })}
+                </p>
+              </div>
+              <div>
+                <span>{t('예정 근무시간')}</span>
+                <strong>
+                  {weekShifts
+                    .reduce((n, x) => n + duration(x.start, x.end), 0)
+                    .toFixed(0)}
+                  <small>{t('시간')}</small>
+                </strong>
+                <p>{t('등록된 스케줄 기준')}</p>
+              </div>
+              {actor.admin ? (
+                <>
+                  <div>
+                    <span>{t('대체근무 요청')}</span>
+                    <strong>
+                      {pending.length}
+                      <small>{t('건')}</small>
+                    </strong>
+                    <p className="green">
+                      {pending.length
+                        ? t('확인이 필요한 요청이 있습니다')
+                        : t('모든 요청을 확인했습니다')}{' '}
+                      <Check size={14} />
+                    </p>
+                  </div>
+                  <div className="reminder">
+                    <Bell size={23} />
+                    <span>{t('출근 준비, 잊지 않도록')}</span>
+                    <b>{t('근무 시작 1시간 전 알림')}</b>
+                    <p>
+                      {push.on
+                        ? t('이 기기 푸시 알림 켜짐')
+                        : t('앱 접속 중 알림 · 이 기기 푸시 꺼짐')}
+                    </p>
+                    {!setup && (
+                      <button
+                        className="button"
+                        disabled={busy}
+                        onClick={() =>
+                          void (push.on ? testPush() : enablePush())
+                        }
+                      >
+                        {push.on ? t('테스트 알림 보내기') : t('푸시 알림 켜기')}
+                      </button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <span>{t('직원 화면')}</span>
+                    <strong>{t('읽기 전용')}</strong>
+                    <p className="green">{t('전체 일정과 내 기록만 볼 수 있습니다.')}</p>
+                  </div>
+                  <div className="reminder">
+                    <Bell size={23} />
+                    <span>{t('출근·메시지 알림')}</span>
+                    <b>{t('근무 시작 1시간 전 알림')}</b>
+                    <p>
+                      {push.on
+                        ? t('이 기기 푸시 알림 켜짐')
+                        : t('앱 접속 중 알림 · 이 기기 푸시 꺼짐')}
+                    </p>
+                    {!setup && (
+                      <button
+                        className="button"
+                        disabled={busy}
+                        onClick={() =>
+                          void (push.on ? testPush() : enablePush())
+                        }
+                      >
+                        {push.on ? t('테스트 알림 보내기') : t('푸시 알림 켜기')}
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+            </section>
+            <section className="schedule panel">
+              <div className="toolbar">
+                <div className="weekpicker">
+                  <button
+                    aria-label={t('이전 주')}
+                    onClick={() => setWeek(addDays(week, -7))}
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <h2>
+                    {week.slice(5).replace('-', '.')} –{' '}
+                    {addDays(week, 6).slice(5).replace('-', '.')}{' '}
+                    <span>{week.slice(0, 4)}</span>
+                  </h2>
+                  <button
+                    aria-label={t('다음 주')}
+                    onClick={() => setWeek(addDays(week, 7))}
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                  <button
+                    className="button"
+                    onClick={() => setWeek(weekStart(localDate(new Date())))}
+                  >
+                    {t('이번 주')}
+                  </button>
+                </div>
+                <div className="actions">
+                  <span className="draft">
+                    ● {data.published ? t('직원 공개 중') : t('작성 중')}
+                  </span>
+                  {actor.admin && (
+                    <>
+                      <button
+                        disabled={busy || setup}
+                        className="button"
+                        onClick={() => command('publish')}
+                      >
+                        {t('직원에게 공개')}
+                      </button>
+                      <button
+                        disabled={busy || setup}
+                        className="button"
+                        onClick={openBulk}
+                      >
+                        {t('여러 날 한번에 수정')}
+                      </button>
+                      <button
+                        className="button primary"
+                        onClick={() =>
+                          open('shift', {
+                            employeeId: data.employees[0]?.id || '',
+                            date: week,
+                            start: '09:00',
+                            end: '17:00',
+                            area: 'Outdoor',
+                          })
+                        }
+                      >
+                        <Plus size={16} /> {t('근무 추가')}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className="filterbar">
+                {staffReadOnly ? (
+                  <strong className="paytotal">{t('전체 월간 일정 · 읽기 전용')}</strong>
+                ) : (
+                  <>
+                    <Pick
+                      label={t('직원')}
+                      value={filter}
+                      onChange={setFilter}
+                      options={[
+                        { value: 'all', label: t('모든 직원') },
+                        ...options,
+                      ]}
+                    />
+                    <Tabs
+                      value={view}
+                      onValueChange={(v) => setView(String(v))}
+                    >
+                      <TabsList>
+                        <TabsTrigger value="today">TODAY</TabsTrigger>
+                        <TabsTrigger value="tomorrow">TOMORROW</TabsTrigger>
+                        <TabsTrigger value="week">WEEKLY</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                  </>
+                )}
+                {!staffReadOnly && (
+                  <>
+                    {view === 'month' && (
+                      <label className="field">
+                        {t('기준 날짜')}
+                        <input
+                          type="date"
+                          value={day}
+                          onChange={(e) => setDay(e.target.value)}
+                        />
+                      </label>
+                    )}
+                    <button
+                      className="button all-schedule"
+                      onClick={() => {
+                        setFilter('all');
+                        setView('month');
+                      }}
+                    >
+                      {t('전체 일정 보기')}
+                    </button>
+                  </>
+                )}
+              </div>
+              {view === 'week' ? (
+                <div className="gridscroll">
+                  <div className="weekgrid">
+                    <div className="gridhead staffhead">
+                      {t('직원')} <span>{t('{n}명', { n: visibleEmployees.length })}</span>
+                    </div>
+                    {days.map((d, i) => (
+                      <div
+                        className={
+                          'gridhead ' +
+                          (addDays(week, i) === localDate(new Date())
+                            ? 'today'
+                            : '')
+                        }
+                        key={d}
+                      >
+                        {d}
+                        <strong>{Number(addDays(week, i).slice(8))}</strong>
+                      </div>
+                    ))}
+                    {visibleEmployees.map((e) => (
+                      <div className="gridrow" key={e.id}>
+                        <div className="staff">
+                          {box(e)}
+                          <small>{e.role}</small>
+                        </div>
+                        {days.map((_, d) => {
+                          const shifts = data.shifts.filter(
+                            (s) =>
+                              s.employeeId === e.id &&
+                              s.date === addDays(week, d),
+                          );
+                          return (
+                            <div className="daycell" key={d}>
+                              {shifts.length ? (
+                                shifts.map((s) => (
+                                  <button
+                                    key={s.id}
+                                    className="shift"
+                                    onClick={() => open('detail', { id: s.id })}
+                                    style={{
+                                      background: e.color + '13',
+                                      borderLeftColor: e.color,
+                                    }}
+                                  >
+                                    <b>
+                                      {s.start} – {s.end}
+                                    </b>
+                                    <span>
+                                      {s.originalId ? t('대체 · ') : ''}
+                                      {s.area}
+                                    </span>
+                                    <small>{duration(s.start, s.end)}h</small>
+                                  </button>
+                                ))
+                              ) : (
+                                <span className="off">—</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : view === 'month' ? (
+                <MonthSchedule
+                  date={day}
+                  employees={staffReadOnly ? data.employees : visibleEmployees}
+                  shifts={data.shifts.filter((shift) =>
+                    (staffReadOnly ? data.employees : visibleEmployees).some(
+                      (employee) => employee.id === shift.employeeId,
+                    ),
+                  )}
+                  onDateChange={setDay}
+                  onShiftSelect={(id) => open('detail', { id })}
+                />
+              ) : (
+                <div className="gridscroll timeline-scroll">
+                  <div className="timeline">
+                    <div className="timeruler">
+                      <span>{t('직원')}</span>
+                      <div>
+                        {Array.from({ length: 13 }, (_, i) => (
+                          <span key={i}>
+                            {String(i * 2).padStart(2, '0')}:00
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    {[timelineDate].map((date) => {
+                      const weekday =
+                        days[new Date(date + 'T12:00:00Z').getUTCDay()];
+                      return (
+                        <section className="timeline-day" key={date}>
+                          <div className="timeline-day-label">
+                            <span>{weekday}</span>
+                            <strong>{date.slice(5).replace('-', '.')}</strong>
+                          </div>
+                          {visibleEmployees.map((e) => (
+                            <div className="timerow" key={`${date}-${e.id}`}>
+                              <div className="staff">{box(e)}</div>
+                              <div className="track">
+                                {data.shifts
+                                  .filter(
+                                    (s) =>
+                                      s.employeeId === e.id &&
+                                      s.date === date,
+                                  )
+                                  .map((s) => (
+                                    <button
+                                      key={s.id}
+                                      onClick={() => open('detail', { id: s.id })}
+                                      style={{
+                                        left:
+                                          ((Number(s.start.slice(0, 2)) +
+                                            Number(s.start.slice(3)) / 60) /
+                                            24) *
+                                            100 +
+                                          '%',
+                                        width:
+                                          (Math.min(
+                                            duration(s.start, s.end),
+                                            24 -
+                                              Number(s.start.slice(0, 2)) -
+                                              Number(s.start.slice(3)) / 60,
+                                          ) /
+                                            24) *
+                                            100 +
+                                          '%',
+                                        background: e.color,
+                                      }}
+                                    >
+                                      {s.start}–{s.end} · {s.area}
+                                    </button>
+                                  ))}
+                              </div>
+                            </div>
+                          ))}
+                        </section>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              <div className="schedulefoot">
+                <span>
+                  <i className="tiny-dot" />{' '}
+                  {t('직원별 컬러는 모든 화면에서 동일하게 표시됩니다.')}
+                </span>
+                <span>{t('대체 신청·승인 · 근무일 7일 전까지')}</span>
+              </div>
+            </section>
+            <div className="below">
+              <div>
+                <Clock3 size={18} />
+                <b>{t('실제 출근기록으로 정확하게')}</b>
+                <span>
+                  {t('출근기계 엑셀을 업로드하면 근무시간과 예상 급여를 계산합니다.')}
+                </span>
+              </div>
+              <button
+                className="linkbutton"
+                onClick={() => setTab('attendance')}
+              >
+                {t('출근기록 가져오기 →')}
+              </button>
+            </div>
+          </TabsContent>
+{otherTabs}
+        </main>
+      </Tabs>
+      <footer>
+        PELHAM SHIFT <span>{t('팀의 시간, 더 간편하게.')}</span>
+      </footer>
+      {dialogs}
+    </div>
+    );
+  // Version 2 (seven-shifts): 7shifts-style sidebar layout on the same data.
+  const navItem = (key: string, label: string, Icon: typeof CalendarDays, sub = false) => (
+    <TabsTrigger
+      key={key}
+      value={key}
+      className={'sidenav-item' + (sub ? ' sub' : '')}
+      onClick={() => setNavOpen(false)}
+    >
+      <Icon size={19} />
+      <span>{t(label)}</span>
+      {key === 'swaps' && pending.length > 0 && (
+        <em className="sidenav-count">{pending.length}</em>
+      )}
+    </TabsTrigger>
+  );
+  return (
+    <div
+      className={
+        'app-shell' + (navCollapsed ? ' collapsed' : '') + (navOpen ? ' nav-open' : '')
+      }
+    >
+      <Tabs
+        value={tab}
+        onValueChange={(v) => setTab(String(v))}
+        className="app-tabs"
+      >
+        <aside className="sidebar" aria-label={t('메뉴')}>
+          <div className="sidebar-brand">
+            <a className="brand" href={'/' + query()}>
+              <span className="brandmark" aria-hidden="true" />
+              <span className="brandtext">
+                pelham<span className="brandlight">shift</span>
+              </span>
+            </a>
+            <button
+              className="iconbutton sidebar-toggle"
+              aria-label={navCollapsed ? t('메뉴 펼치기') : t('메뉴 접기')}
+              onClick={() => {
+                setNavCollapsed((c) => !c);
+                setNavOpen(false);
+              }}
+            >
+              <ChevronLeft size={20} />
+            </button>
+          </div>
+          <TabsList className="sidenav">
+            <div className="sidenav-group">
+              <span className="sidenav-heading">
+                <CalendarDays size={19} />
+                <span>{t('스케줄')}</span>
+              </span>
+              {navItem('schedule', '근무 스케줄', CalendarDays, true)}
+              {actor.admin && navItem('swaps', '대체 근무', ArrowLeftRight, true)}
+            </div>
+            {actor.admin && navItem('team', '직원 관리', Users)}
+            <a
+              className="sidenav-item"
+              href={'/tasks' + query()}
+            >
+              <ClipboardList size={19} />
+              <span>{t('작업')}</span>
+            </a>
+            {navItem('messages', '메시지', MessageSquare)}
+            <hr />
+            {navItem('attendance', '출근 기록', Clock3)}
+            {navItem('payroll', '급여 관리', Wallet)}
+          </TabsList>
+          <div className="sidebar-foot">
+            {!setup && (
+              <button
+                className="sidenav-item"
+                disabled={busy}
+                onClick={() => void (push.on ? testPush() : enablePush())}
+                title={push.on ? t('이 기기 푸시 알림 켜짐') : t('앱 접속 중 알림 · 이 기기 푸시 꺼짐')}
+              >
+                {push.on ? <BellRing size={19} /> : <Bell size={19} />}
+                <span>{push.on ? t('테스트 알림 보내기') : t('푸시 알림 켜기')}</span>
+              </button>
+            )}
+            <div className="sidebar-account">
+              <span className="avatar">
+                {actor.admin ? 'P' : name(actor.id).slice(0, 1)}
+              </span>
+              <span className="sidebar-name">
+                <b>{actor.admin ? t('관리자') : name(actor.id)}</b>
+                <small>Pelham Hills · New York</small>
+              </span>
+            </div>
+            <div className="sidebar-tools">
+              <LangToggle />
+              {birthAuth && !actor.admin && (
+                <button className="linkbutton" onClick={() => setPasswordDialog(true)}>
+                  {t('비밀번호')}
+                </button>
+              )}
+              <button
+                className="iconbutton"
+                aria-label={t('로그아웃')}
+                title={t('로그아웃')}
+                onClick={() => void logout()}
+              >
+                <LogOut size={17} />
+              </button>
+            </div>
+          </div>
+        </aside>
+        <button
+          className="sidebar-scrim"
+          aria-label={t('메뉴 닫기')}
+          onClick={() => setNavOpen(false)}
+        />
+        <div className="workarea">
+          <header className="mobilebar">
+            <button
+              className="iconbutton"
+              aria-label={t('메뉴 열기')}
+              onClick={() => setNavOpen(true)}
+            >
+              <Menu size={22} />
+            </button>
+            <a className="brand" href={'/' + query()}>
+              <span className="brandmark" aria-hidden="true" />
+              pelham<span className="brandlight">shift</span>
+            </a>
+            <button
+              aria-label={t('메시지 보기')}
+              className="iconbutton"
+              onClick={() => setTab('messages')}
+            >
+              <Bell size={20} />
+            </button>
+          </header>
+          <main>
+            {setup && (
+              <div className="demo-banner setup">
+                <span>
+                  {t('샘플 미리보기 · 실제 운영을 시작하면 샘플 일정은 비워집니다.')}
+                </span>
+                <button
+                  className="button"
+                  disabled={busy}
+                  onClick={() => command('initialize')}
+                >
+                  {t('내 워크스페이스 생성')}
+                </button>
+              </div>
+            )}
+            {status && (
+              <div role="status" className="statusbar">
+                {t(status)}
+                <button
+                  className="iconbutton"
+                  onClick={() => void refresh()}
+                  aria-label={t('다시 불러오기')}
+                >
+                  <RefreshCw size={15} />
+                </button>
+              </div>
+            )}
+            {reminders.map((s) => (
+              <div className="demo-banner" key={s.id}>
+                <Bell size={16} />{' '}
+                {t('출근 알림 · 오늘 {start}, {area} 근무가 1시간 이내에 시작됩니다.', {
+                  start: s.start,
+                  area: s.area,
+                })}
+              </div>
+            ))}
+            <TabsContent value="schedule">
+              <section className="sched">
+                <div className="sched-top">
+                  {staffReadOnly ? (
+                    <h1 className="sched-title">{t('전체 월간 일정 · 읽기 전용')}</h1>
+                  ) : view === 'week' ? (
+                    <>
+                      <div className="daterange">
+                        <button
+                          aria-label={t('이전 주')}
+                          onClick={() => setWeek(addDays(week, -7))}
+                        >
+                          <ChevronLeft size={18} />
+                        </button>
+                        <span className="daterange-label">
+                          <CalendarDays size={18} />
+                          {longDate(week)}
+                          <ArrowRight size={15} />
+                          {longDate(addDays(week, 6))}
+                        </span>
+                        <button
+                          aria-label={t('다음 주')}
+                          onClick={() => setWeek(addDays(week, 7))}
+                        >
+                          <ChevronRight size={18} />
+                        </button>
+                      </div>
+                      <button
+                        className="button"
+                        onClick={() => setWeek(weekStart(localDate(new Date())))}
+                      >
+                        {t('오늘')}
+                      </button>
+                    </>
+                  ) : view === 'month' ? (
+                    <label className="field daterange-field">
+                      <span className="sr-only">{t('기준 날짜')}</span>
+                      <input
+                        type="date"
+                        value={day}
+                        onChange={(e) => setDay(e.target.value)}
+                      />
+                    </label>
+                  ) : (
+                    <span className="daterange-label solo">
+                      <CalendarDays size={18} />
+                      {longDate(timelineDate)}
+                    </span>
+                  )}
+                  {actor.admin && (
+                    <div className="sched-actions">
+                      {warnings.length > 0 && (
+                        <button
+                          className="warnpill"
+                          title={warnings.map((w) => w.text).join('\n')}
+                          onClick={() => setTab(warnings[0].tab)}
+                        >
+                          <TriangleAlert size={16} />
+                          {t('경고 {n}건', { n: warnings.length })}
+                        </button>
+                      )}
+                      <span className={'draft' + (data.published ? ' live' : '')}>
+                        ● {data.published ? t('직원 공개 중') : t('작성 중')}
+                      </span>
+                      <button
+                        className="button publish"
+                        disabled={busy || setup || data.published}
+                        onClick={() => command('publish')}
+                      >
+                        <Send size={16} />
+                        {data.published ? t('공개됨') : t('직원에게 공개')}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {!staffReadOnly && (
+                  <div className="sched-filters">
+                    <Pick
+                      label={t('직원')}
+                      value={filter}
+                      onChange={setFilter}
+                      options={[{ value: 'all', label: t('모든 직원') }, ...options]}
+                    />
+                    <Pick
+                      label={t('업무')}
+                      value={dept}
+                      onChange={setDept}
+                      options={[
+                        { value: 'all', label: t('모든 업무') },
+                        ...roles.map((r) => ({ value: r, label: r })),
+                      ]}
+                    />
+                    <Pick
+                      label={t('정렬')}
+                      value={sort}
+                      onChange={setSort}
+                      options={[
+                        { value: 'name', label: t('이름순') },
+                        { value: 'id', label: t('직원 ID순') },
+                      ]}
+                    />
+                    <Pick
+                      label={t('보기')}
+                      value={view}
+                      onChange={setView}
+                      options={[
+                        { value: 'week', label: t('주간') },
+                        { value: 'today', label: t('오늘') },
+                        { value: 'tomorrow', label: t('내일') },
+                        { value: 'month', label: t('월간') },
+                      ]}
+                    />
+                    <span className="sched-filters-gap" />
+                    <InstallQr team={setup ? '' : team} />
+                    <button
+                      className="button rain"
+                      onClick={() =>
+                        open('rain', {
+                          date: localDate(new Date()),
+                          end: '15:00',
+                          body: t('안전하게 장비를 정리하고 퇴근 기록을 남겨주세요.'),
+                          targets: data.employees.map((e) => e.id).join(','),
+                        })
+                      }
+                    >
+                      <CloudRain size={17} /> {t('우천 근무 종료')}
+                    </button>
+                    <button
+                      disabled={busy || setup}
+                      className="button"
+                      onClick={openBulk}
+                    >
+                      {t('여러 날 한번에 수정')}
+                    </button>
+                  </div>
+                )}
+                {!staffReadOnly && view === 'week' ? (
+                  <div className="roster-scroll">
+                    <div className="roster">
+                      <div className="roster-corner">
+                        <label className="roster-search">
+                          <Search size={16} />
+                          <input
+                            type="search"
+                            placeholder={t('직원 검색')}
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                          />
+                        </label>
+                        <button
+                          className="roster-add"
+                          aria-label={t('근무 추가')}
+                          title={t('근무 추가')}
+                          onClick={() =>
+                            open('shift', {
+                              employeeId: visibleEmployees[0]?.id || data.employees[0]?.id || '',
+                              date: week,
+                              start: '09:00',
+                              end: '17:00',
+                              area: visibleEmployees[0]?.role || 'Outdoor',
+                            })
+                          }
+                        >
+                          <Plus size={18} />
+                        </button>
+                      </div>
+                      {weekDates.map((date, i) => (
+                        <div
+                          className={
+                            'roster-day' + (date === localDate(new Date()) ? ' today' : '')
+                          }
+                          key={date}
+                        >
+                          <span>
+                            <b>{days[i]}</b>
+                            {Number(date.slice(8))}
+                          </span>
+                          <small title={t('근무 인원')}>
+                            <UserRound size={13} />
+                            {
+                              new Set(
+                                rosterShifts
+                                  .filter((s) => s.date === date)
+                                  .map((s) => s.employeeId),
+                              ).size
+                            }
+                          </small>
+                        </div>
+                      ))}
+                      {roles
+                        .filter((role) => visibleEmployees.some((e) => e.role === role))
+                        .map((role) => {
+                          const members = visibleEmployees.filter((e) => e.role === role);
+                          return (
+                            <div className="roster-group" key={role}>
+                              <div className="roster-band">
+                                {role}
+                                <small>{t('{n}명', { n: members.length })}</small>
+                              </div>
+                              {members.map((e) => {
+                                const mine = rosterShifts.filter((s) => s.employeeId === e.id);
+                                const hours = mine.reduce(
+                                  (n, s) => n + duration(s.start, s.end),
+                                  0,
+                                );
+                                return (
+                                  <div className="roster-row" key={e.id}>
+                                    <div className="roster-staff">
+                                      <span
+                                        className="roster-avatar"
+                                        style={{ background: e.color }}
+                                      >
+                                        {e.name.slice(0, 1)}
+                                      </span>
+                                      <span>
+                                        <button
+                                          className="roster-name"
+                                          onClick={() => setFilter(filter === e.id ? 'all' : e.id)}
+                                        >
+                                          {e.name}
+                                        </button>
+                                        <small>
+                                          {t('{h}시간', { h: hours.toFixed(2) })} ·{' '}
+                                          {money(hours * e.rate)}
+                                        </small>
+                                      </span>
+                                    </div>
+                                    {weekDates.map((date) => {
+                                      const shifts = mine.filter((s) => s.date === date);
+                                      return (
+                                        <div className="roster-cell" key={date}>
+                                          {shifts.map((s) => (
+                                            <button
+                                              key={s.id}
+                                              className="roster-shift"
+                                              onClick={() => open('detail', { id: s.id })}
+                                              style={{
+                                                background: e.color + '1f',
+                                                borderLeftColor: e.color,
+                                              }}
+                                            >
+                                              <b>
+                                                {s.start}–{s.end}
+                                              </b>
+                                              <span>
+                                                {s.originalId ? t('대체 · ') : ''}
+                                                {s.area}
+                                              </span>
+                                            </button>
+                                          ))}
+                                          <button
+                                            className="roster-celladd"
+                                            aria-label={t('{name} {date} 근무 추가', {
+                                              name: e.name,
+                                              date,
+                                            })}
+                                            onClick={() =>
+                                              open('shift', {
+                                                employeeId: e.id,
+                                                date,
+                                                start: '09:00',
+                                                end: '17:00',
+                                                area: e.role,
+                                              })
+                                            }
+                                          >
+                                            <Plus size={15} />
+                                          </button>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })}
+                      {!visibleEmployees.length && (
+                        <div className="roster-empty">{t('조건에 맞는 직원이 없습니다.')}</div>
+                      )}
+                      <div className="roster-total">
+                        <b>{t('예정 합계')}</b>
+                        <span>
+                          {t('{h}시간', {
+                            h: rosterShifts
+                              .reduce((n, s) => n + duration(s.start, s.end), 0)
+                              .toFixed(2),
+                          })}
+                          <small>{money(rosterCost(rosterShifts))}</small>
+                        </span>
+                      </div>
+                      {weekDates.map((date) => {
+                        const list = rosterShifts.filter((s) => s.date === date);
+                        return (
+                          <div className="roster-daytotal" key={date}>
+                            <b>
+                              {t('{h}시간', {
+                                h: list.reduce((n, s) => n + duration(s.start, s.end), 0).toFixed(2),
+                              })}
+                            </b>
+                            <small>{money(rosterCost(list))}</small>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : staffReadOnly || view === 'month' ? (
+                  <MonthSchedule
+                    date={day}
+                    employees={staffReadOnly ? data.employees : visibleEmployees}
+                    shifts={data.shifts.filter((shift) =>
+                      (staffReadOnly ? data.employees : visibleEmployees).some(
+                        (employee) => employee.id === shift.employeeId,
+                      ),
+                    )}
+                    onDateChange={setDay}
+                    onShiftSelect={(id) => open('detail', { id })}
+                  />
+                ) : (
+                  <div className="gridscroll timeline-scroll">
+                    <div className="timeline">
+                      <div className="timeruler">
+                        <span>{t('직원')}</span>
+                        <div>
+                          {Array.from({ length: 13 }, (_, i) => (
+                            <span key={i}>{String(i * 2).padStart(2, '0')}:00</span>
+                          ))}
+                        </div>
+                      </div>
+                      {[timelineDate].map((date) => {
+                        const weekday = days[new Date(date + 'T12:00:00Z').getUTCDay()];
+                        return (
+                          <section className="timeline-day" key={date}>
+                            <div className="timeline-day-label">
+                              <span>{weekday}</span>
+                              <strong>{date.slice(5).replace('-', '.')}</strong>
+                            </div>
+                            {visibleEmployees.map((e) => (
+                              <div className="timerow" key={`${date}-${e.id}`}>
+                                <div className="staff">{box(e)}</div>
+                                <div className="track">
+                                  {data.shifts
+                                    .filter((s) => s.employeeId === e.id && s.date === date)
+                                    .map((s) => (
+                                      <button
+                                        key={s.id}
+                                        onClick={() => open('detail', { id: s.id })}
+                                        style={{
+                                          left:
+                                            ((Number(s.start.slice(0, 2)) +
+                                              Number(s.start.slice(3)) / 60) /
+                                              24) *
+                                              100 +
+                                            '%',
+                                          width:
+                                            (Math.min(
+                                              duration(s.start, s.end),
+                                              24 -
+                                                Number(s.start.slice(0, 2)) -
+                                                Number(s.start.slice(3)) / 60,
+                                            ) /
+                                              24) *
+                                              100 +
+                                            '%',
+                                          background: e.color,
+                                        }}
+                                      >
+                                        {s.start}–{s.end} · {s.area}
+                                      </button>
+                                    ))}
+                                </div>
+                              </div>
+                            ))}
+                          </section>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                <div className="schedulefoot">
+                  <span>
+                    <i className="tiny-dot" />{' '}
+                    {t('직원별 컬러는 모든 화면에서 동일하게 표시됩니다.')}
+                  </span>
+                  <span>{t('대체 신청·승인 · 근무일 7일 전까지')}</span>
+                </div>
+              </section>
+            </TabsContent>
+{otherTabs}
+            <footer>
+              PELHAM SHIFT <span>{t('팀의 시간, 더 간편하게.')}</span>
+            </footer>
+          </main>
+        </div>
+      </Tabs>
+      {dialogs}
     </div>
   );
 }
