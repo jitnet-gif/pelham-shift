@@ -26,6 +26,21 @@ import {
   Send,
   TriangleAlert,
   UserRound,
+  LayoutDashboard,
+  GraduationCap,
+  BriefcaseBusiness,
+  BookOpen,
+  CircleQuestionMark,
+  Timer,
+  CalendarX,
+  CalendarClock,
+  Network,
+  ArrowUpDown,
+  LayoutGrid,
+  UserPlus,
+  ChevronDown,
+  X,
+  CalendarRange,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
@@ -58,6 +73,8 @@ import {
   duration,
   payroll,
   canSwap,
+  blockedBy,
+  weekdayOf,
   type Employee,
   type State,
 } from '@/lib/domain';
@@ -118,7 +135,15 @@ const nav = [
   { key: 'messages', label: '메시지', Icon: MessageSquare },
   { key: 'team', label: '직원 관리', Icon: Users },
 ];
-const employeeNav = new Set(['schedule', 'attendance', 'payroll', 'messages']);
+const employeeNav = new Set([
+  'schedule',
+  'attendance',
+  'payroll',
+  'messages',
+  'timeoff',
+  'availability',
+  'help',
+]);
 export default function ShiftApp() {
   const { t, lang, days, locale } = useLang();
   const [data, setData] = useState<State>(seed);
@@ -148,6 +173,7 @@ export default function ShiftApp() {
   const [navCollapsed, setNavCollapsed] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [ui, setUi] = useState<Layout>('pelham');
+  const [offFilter, setOffFilter] = useState('pending');
   const chooseLayout = (next: Layout) => {
     setUi(next);
     try {
@@ -418,8 +444,19 @@ export default function ShiftApp() {
   const pending = data.swaps.filter((s) =>
     ['requested', 'accepted'].includes(s.status),
   );
+  const timeOff = data.timeOff ?? [];
+  const availability = data.availability ?? [];
+  const pendingOff = timeOff.filter((r) => r.status === 'pending');
+  const pendingAvail = availability.filter((r) => r.status === 'pending');
+  const conflicts = data.shifts.filter((s) => s.date >= localDate(new Date()) && blockedBy(data, s));
   const warnings = [
     ...pending.map(() => ({ text: t('확인이 필요한 대체근무 요청'), tab: 'swaps' })),
+    ...pendingOff.map(() => ({ text: t('확인이 필요한 휴무 요청'), tab: 'timeoff' })),
+    ...pendingAvail.map(() => ({ text: t('확인이 필요한 근무 불가 시간'), tab: 'availability' })),
+    ...conflicts.map((c) => ({
+      text: t('{name} {date} 근무가 휴무·불가 시간과 겹칩니다', { name: name(c.employeeId), date: c.date }),
+      tab: 'schedule',
+    })),
     ...data.employees
       .filter((e) => !e.rate)
       .map((e) => ({ text: t('{name} 시급 미설정', { name: e.name }), tab: 'team' })),
@@ -428,7 +465,22 @@ export default function ShiftApp() {
     new Intl.NumberFormat(locale, {
       style: 'currency',
       currency: data.currency,
+      currencyDisplay: 'narrowSymbol',
     }).format(n);
+  // 7shifts-style clock times: 14:00 → 2pm, 08:30 → 8:30am.
+  const ampm = (v: string) => {
+    const h = Number(v.slice(0, 2));
+    const m = v.slice(3, 5);
+    return (h % 12 || 12) + (m === '00' ? '' : ':' + m) + (h < 12 ? 'am' : 'pm');
+  };
+  const span = (r: { allDay: boolean; start?: string; end?: string }) =>
+    r.allDay || !r.start || !r.end ? t('종일') : ampm(r.start) + ' - ' + ampm(r.end);
+  const monthDay = (date: string) =>
+    new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(
+      new Date(date + 'T12:00:00Z'),
+    );
+  const statusLabel = (v: string) =>
+    t(({ pending: '대기 중', approved: '승인됨', declined: '거절됨' } as Record<string, string>)[v] || v);
   const totals = data.employees.map((e) => ({
     e,
     ...payroll(data, e.id, from, to),
@@ -1232,6 +1284,8 @@ export default function ShiftApp() {
                   rain: '우천 근무 종료 공지',
                   shift: '근무 추가',
                   shiftUpdate: isBulk ? '여러 날 한번에 수정' : '근무 시간 수정',
+                  timeOffRequest: actor.admin ? '휴무 추가' : '휴무 신청',
+                  availabilitySet: '근무 불가 시간 추가',
                   employee: '직원 설정',
                   swap: '대체근무 신청',
                   approve: '대체근무 승인',
@@ -1425,6 +1479,104 @@ export default function ShiftApp() {
                 {input('area', t('새 업무 / 장소'), 'text', false)}
                 <p className="hint">
                   {t('비워 둔 항목은 기존 값을 그대로 유지합니다. 퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.')}
+                </p>
+              </>
+            )}
+            {modal === 'timeOffRequest' && (
+              <>
+                {actor.admin && (
+                  <Pick
+                    label={t('직원')}
+                    value={form.employeeId || ''}
+                    onChange={(v) => put('employeeId', v)}
+                    options={options}
+                  />
+                )}
+                <div className="formgrid">
+                  <label className="field">
+                    {t('시작일')}
+                    <input
+                      type="date"
+                      required
+                      value={form.from || ''}
+                      onChange={(e) => {
+                        const from = e.target.value;
+                        // A partial day is a single date, and an end date never trails the start.
+                        setForm((f) => ({
+                          ...f,
+                          from,
+                          to: f.allDay !== '1' || (f.to || '') < from ? from : f.to,
+                        }));
+                      }}
+                    />
+                  </label>
+                  <label className="field">
+                    {t('종료일')}
+                    <input
+                      type="date"
+                      required
+                      min={form.from}
+                      disabled={form.allDay !== '1'}
+                      value={form.allDay === '1' ? form.to || '' : form.from || ''}
+                      onChange={(e) => put('to', e.target.value)}
+                    />
+                  </label>
+                </div>
+                <label className="recipient all">
+                  <Checkbox
+                    checked={form.allDay === '1'}
+                    onCheckedChange={(on) =>
+                      setForm((f) => ({ ...f, allDay: on ? '1' : '', to: on ? f.to : f.from }))
+                    }
+                  />
+                  {t('하루 종일')}
+                </label>
+                {form.allDay !== '1' && (
+                  <>
+                    <div className="formgrid">
+                      {input('start', t('시작 시간'), 'time')}
+                      {input('end', t('종료 시간'), 'time')}
+                    </div>
+                    <p className="hint">{t('시간 단위 휴무는 하루만 신청할 수 있습니다.')}</p>
+                  </>
+                )}
+                {input('reason', t('사유 (선택)'), 'text', false)}
+              </>
+            )}
+            {modal === 'availabilitySet' && (
+              <>
+                {actor.admin && (
+                  <Pick
+                    label={t('직원')}
+                    value={form.employeeId || ''}
+                    onChange={(v) => put('employeeId', v)}
+                    options={options}
+                  />
+                )}
+                <Pick
+                  label={t('요일')}
+                  value={form.weekday || ''}
+                  onChange={(v) => put('weekday', v)}
+                  options={days.map((d, i) => ({ value: String(i), label: d }))}
+                />
+                <label className="recipient all">
+                  <Checkbox
+                    checked={form.allDay === '1'}
+                    onCheckedChange={(on) => put('allDay', on ? '1' : '')}
+                  />
+                  {t('종일 근무 불가')}
+                </label>
+                {form.allDay !== '1' && (
+                  <div className="formgrid">
+                    {input('start', t('불가 시작'), 'time')}
+                    {input('end', t('불가 종료'), 'time')}
+                  </div>
+                )}
+                {input('note', t('메모 (선택)'), 'text', false)}
+                <p className="hint">
+                  {actor.admin
+                    ? t('관리자가 등록하면 바로 승인됩니다. 매주 같은 요일에 반복 적용됩니다.')
+                    : t('관리자가 승인하면 매주 같은 요일에 반복 적용됩니다.')}
                 </p>
               </>
             )}
@@ -2154,7 +2306,12 @@ export default function ShiftApp() {
     </div>
     );
   // Version 2 (seven-shifts): 7shifts-style sidebar layout on the same data.
-  const navItem = (key: string, label: string, Icon: typeof CalendarDays, sub = false) => (
+  const navItem = (
+    key: string,
+    label: string,
+    Icon: typeof CalendarDays,
+    { sub = false, count = 0 }: { sub?: boolean; count?: number } = {},
+  ) => (
     <TabsTrigger
       key={key}
       value={key}
@@ -2163,11 +2320,68 @@ export default function ShiftApp() {
     >
       <Icon size={19} />
       <span>{t(label)}</span>
-      {key === 'swaps' && pending.length > 0 && (
-        <em className="sidenav-count">{pending.length}</em>
-      )}
+      {count > 0 && <em className="sidenav-count">{count}</em>}
     </TabsTrigger>
   );
+  const scheduleTabs = ['schedule', 'timeoff', 'availability', 'swaps'];
+  const iconPick = (
+    Icon: typeof CalendarDays,
+    label: string,
+    value: string,
+    onChange: (v: string) => void,
+    items: { value: string; label: string }[],
+  ) => (
+    <Select value={value} onValueChange={(v) => onChange(String(v))} items={items}>
+      <SelectTrigger className="filterpick" aria-label={label}>
+        <Icon size={17} />
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {items.map((o) => (
+          <SelectItem key={o.value} value={o.value}>
+            {o.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+  const comingSoon = (key: string, Icon: typeof CalendarDays, title: string, desc: string) => (
+    <TabsContent value={key}>
+      <div className="panel contentpanel soon">
+        <Icon size={34} />
+        <h2>{t(title)}</h2>
+        <span className="badge">{t('준비 중')}</span>
+        <p>{t(desc)}</p>
+      </div>
+    </TabsContent>
+  );
+  // Shifts this request would block if approved (or already blocks).
+  const offShifts = (r: (typeof timeOff)[number]) =>
+    data.shifts.filter(
+      (s) =>
+        s.employeeId === r.employeeId &&
+        blockedBy({ ...data, timeOff: [{ ...r, status: 'approved' }], availability: [] }, s),
+    );
+  const staffList = actor.admin ? data.employees : data.employees.filter((e) => e.id === actor.id);
+  const openTimeOff = () =>
+    open('timeOffRequest', {
+      employeeId: actor.admin ? data.employees[0]?.id || '' : actor.id,
+      from: addDays(localDate(new Date()), 7),
+      to: addDays(localDate(new Date()), 7),
+      allDay: '1',
+      start: '09:00',
+      end: '13:00',
+      reason: '',
+    });
+  const openAvailability = (weekday = '1', employeeId = '') =>
+    open('availabilitySet', {
+      employeeId: employeeId || (actor.admin ? data.employees[0]?.id || '' : actor.id),
+      weekday,
+      allDay: '1',
+      start: '09:00',
+      end: '13:00',
+      note: '',
+    });
   return (
     <div
       className={
@@ -2199,39 +2413,41 @@ export default function ShiftApp() {
             </button>
           </div>
           <TabsList className="sidenav">
-            <div className="sidenav-group">
+            {actor.admin && navItem('dashboard', '대시보드', LayoutDashboard)}
+            <div className={'sidenav-group' + (scheduleTabs.includes(tab) ? ' current' : '')}>
               <span className="sidenav-heading">
                 <CalendarDays size={19} />
                 <span>{t('스케줄')}</span>
               </span>
-              {navItem('schedule', '근무 스케줄', CalendarDays, true)}
-              {actor.admin && navItem('swaps', '대체 근무', ArrowLeftRight, true)}
+              {navItem('schedule', '스케줄', CalendarDays, { sub: true })}
+              {navItem('timeoff', '휴무', CalendarX, {
+                sub: true,
+                count: actor.admin ? pendingOff.length : 0,
+              })}
+              {navItem('availability', '근무 가능 시간', CalendarClock, {
+                sub: true,
+                count: actor.admin ? pendingAvail.length : 0,
+              })}
+              {actor.admin &&
+                navItem('swaps', '대체 근무', ArrowLeftRight, { sub: true, count: pending.length })}
             </div>
-            {actor.admin && navItem('team', '직원 관리', Users)}
-            <a
-              className="sidenav-item"
-              href={'/tasks' + query()}
-            >
+            {actor.admin && navItem('team', '팀', Users)}
+            {actor.admin && navItem('training', '교육', GraduationCap)}
+            {actor.admin && navItem('hiring', '채용', BriefcaseBusiness)}
+            <hr />
+            <a className="sidenav-item" href={'/tasks' + query()}>
               <ClipboardList size={19} />
               <span>{t('작업')}</span>
             </a>
+            {actor.admin && navItem('logbook', '업무일지', BookOpen)}
             {navItem('messages', '메시지', MessageSquare)}
             <hr />
-            {navItem('attendance', '출근 기록', Clock3)}
+            {navItem('attendance', '출근 기록', Timer)}
             {navItem('payroll', '급여 관리', Wallet)}
+            <hr />
+            {navItem('help', '도움말', CircleQuestionMark)}
           </TabsList>
           <div className="sidebar-foot">
-            {!setup && (
-              <button
-                className="sidenav-item"
-                disabled={busy}
-                onClick={() => void (push.on ? testPush() : enablePush())}
-                title={push.on ? t('이 기기 푸시 알림 켜짐') : t('앱 접속 중 알림 · 이 기기 푸시 꺼짐')}
-              >
-                {push.on ? <BellRing size={19} /> : <Bell size={19} />}
-                <span>{push.on ? t('테스트 알림 보내기') : t('푸시 알림 켜기')}</span>
-              </button>
-            )}
             <div className="sidebar-account">
               <span className="avatar">
                 {actor.admin ? 'P' : name(actor.id).slice(0, 1)}
@@ -2246,6 +2462,17 @@ export default function ShiftApp() {
               {birthAuth && !actor.admin && (
                 <button className="linkbutton" onClick={() => setPasswordDialog(true)}>
                   {t('비밀번호')}
+                </button>
+              )}
+              {!setup && (
+                <button
+                  className={'iconbutton' + (push.on ? ' on' : '')}
+                  disabled={busy}
+                  onClick={() => void (push.on ? testPush() : enablePush())}
+                  aria-label={push.on ? t('테스트 알림 보내기') : t('푸시 알림 켜기')}
+                  title={push.on ? t('이 기기 푸시 알림 켜짐') : t('푸시 알림 켜기')}
+                >
+                  {push.on ? <BellRing size={17} /> : <Bell size={17} />}
                 </button>
               )}
               <button
@@ -2382,61 +2609,51 @@ export default function ShiftApp() {
                           {t('경고 {n}건', { n: warnings.length })}
                         </button>
                       )}
-                      <span className={'draft' + (data.published ? ' live' : '')}>
-                        ● {data.published ? t('직원 공개 중') : t('작성 중')}
-                      </span>
+                      <span className="sched-actions-rule" />
                       <button
                         className="button publish"
                         disabled={busy || setup || data.published}
                         onClick={() => command('publish')}
+                        title={data.published ? t('직원 공개 중') : t('작성 중')}
                       >
                         <Send size={16} />
-                        {data.published ? t('공개됨') : t('직원에게 공개')}
+                        {data.published ? t('공개됨') : t('스케줄 공개')}
                       </button>
                     </div>
                   )}
                 </div>
                 {!staffReadOnly && (
                   <div className="sched-filters">
-                    <Pick
-                      label={t('직원')}
-                      value={filter}
-                      onChange={setFilter}
-                      options={[{ value: 'all', label: t('모든 직원') }, ...options]}
-                    />
-                    <Pick
-                      label={t('업무')}
-                      value={dept}
-                      onChange={setDept}
-                      options={[
-                        { value: 'all', label: t('모든 업무') },
-                        ...roles.map((r) => ({ value: r, label: r })),
-                      ]}
-                    />
-                    <Pick
-                      label={t('정렬')}
-                      value={sort}
-                      onChange={setSort}
-                      options={[
-                        { value: 'name', label: t('이름순') },
-                        { value: 'id', label: t('직원 ID순') },
-                      ]}
-                    />
-                    <Pick
-                      label={t('보기')}
-                      value={view}
-                      onChange={setView}
-                      options={[
-                        { value: 'week', label: t('주간') },
-                        { value: 'today', label: t('오늘') },
-                        { value: 'tomorrow', label: t('내일') },
-                        { value: 'month', label: t('월간') },
-                      ]}
-                    />
+                    <span className="filterpick static" title="Pelham Hills">
+                      <MapPin size={17} />
+                      <span>Pelham Hills</span>
+                      <ChevronDown size={16} />
+                    </span>
+                    {iconPick(Network, t('업무'), dept, setDept, [
+                      { value: 'all', label: t('모든 업무') },
+                      ...roles.map((r) => ({ value: r, label: r })),
+                    ])}
+                    {iconPick(ArrowUpDown, t('정렬'), sort, setSort, [
+                      { value: 'name', label: t('이름순') },
+                      { value: 'id', label: t('직원 ID순') },
+                    ])}
+                    {iconPick(LayoutGrid, t('보기'), view, setView, [
+                      { value: 'week', label: t('주간') },
+                      { value: 'today', label: t('오늘') },
+                      { value: 'tomorrow', label: t('내일') },
+                      { value: 'month', label: t('월간') },
+                    ])}
+                    {filter !== 'all' && (
+                      <button className="filterchip" onClick={() => setFilter('all')}>
+                        {name(filter)} <X size={14} />
+                      </button>
+                    )}
                     <span className="sched-filters-gap" />
-                    <InstallQr team={setup ? '' : team} />
+                    <InstallQr team={setup ? '' : team} compact />
                     <button
-                      className="button rain"
+                      className="button toolbutton"
+                      title={t('우천 근무 종료')}
+                      aria-label={t('우천 근무 종료')}
                       onClick={() =>
                         open('rain', {
                           date: localDate(new Date()),
@@ -2446,185 +2663,256 @@ export default function ShiftApp() {
                         })
                       }
                     >
-                      <CloudRain size={17} /> {t('우천 근무 종료')}
+                      <CloudRain size={18} />
                     </button>
                     <button
                       disabled={busy || setup}
-                      className="button"
+                      className="button toolbutton"
+                      title={t('여러 날 한번에 수정')}
+                      aria-label={t('여러 날 한번에 수정')}
                       onClick={openBulk}
                     >
-                      {t('여러 날 한번에 수정')}
+                      <CalendarRange size={18} />
                     </button>
                   </div>
                 )}
                 {!staffReadOnly && view === 'week' ? (
-                  <div className="roster-scroll">
-                    <div className="roster">
-                      <div className="roster-corner">
-                        <label className="roster-search">
-                          <Search size={16} />
-                          <input
-                            type="search"
-                            placeholder={t('직원 검색')}
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                          />
-                        </label>
-                        <button
-                          className="roster-add"
-                          aria-label={t('근무 추가')}
-                          title={t('근무 추가')}
-                          onClick={() =>
-                            open('shift', {
-                              employeeId: visibleEmployees[0]?.id || data.employees[0]?.id || '',
-                              date: week,
-                              start: '09:00',
-                              end: '17:00',
-                              area: visibleEmployees[0]?.role || 'Outdoor',
-                            })
-                          }
-                        >
-                          <Plus size={18} />
-                        </button>
-                      </div>
-                      {weekDates.map((date, i) => (
-                        <div
-                          className={
-                            'roster-day' + (date === localDate(new Date()) ? ' today' : '')
-                          }
-                          key={date}
-                        >
-                          <span>
-                            <b>{days[i]}</b>
-                            {Number(date.slice(8))}
-                          </span>
-                          <small title={t('근무 인원')}>
-                            <UserRound size={13} />
-                            {
-                              new Set(
-                                rosterShifts
-                                  .filter((s) => s.date === date)
-                                  .map((s) => s.employeeId),
-                              ).size
+                  <div className="roster-wrap">
+                    <div className="roster-scroll">
+                      <div className="roster">
+                        <div className="roster-corner">
+                          <label className="roster-search">
+                            <Search size={16} />
+                            <input
+                              type="search"
+                              placeholder={t('직원 검색')}
+                              value={search}
+                              onChange={(e) => setSearch(e.target.value)}
+                            />
+                          </label>
+                          <button
+                            className="roster-add"
+                            aria-label={t('직원 추가')}
+                            title={t('직원 추가')}
+                            onClick={() =>
+                              open('employee', {
+                                name: '',
+                                phone: '',
+                                email: '',
+                                rate: '0',
+                                color: '#087e6d',
+                                role: dept === 'all' ? 'Outdoor' : dept,
+                              })
                             }
-                          </small>
+                          >
+                            <UserPlus size={18} />
+                          </button>
                         </div>
-                      ))}
-                      {roles
-                        .filter((role) => visibleEmployees.some((e) => e.role === role))
-                        .map((role) => {
-                          const members = visibleEmployees.filter((e) => e.role === role);
-                          return (
-                            <div className="roster-group" key={role}>
-                              <div className="roster-band">
-                                {role}
-                                <small>{t('{n}명', { n: members.length })}</small>
-                              </div>
-                              {members.map((e) => {
-                                const mine = rosterShifts.filter((s) => s.employeeId === e.id);
-                                const hours = mine.reduce(
-                                  (n, s) => n + duration(s.start, s.end),
-                                  0,
-                                );
-                                return (
-                                  <div className="roster-row" key={e.id}>
-                                    <div className="roster-staff">
-                                      <span
-                                        className="roster-avatar"
-                                        style={{ background: e.color }}
-                                      >
-                                        {e.name.slice(0, 1)}
-                                      </span>
-                                      <span>
-                                        <button
-                                          className="roster-name"
-                                          onClick={() => setFilter(filter === e.id ? 'all' : e.id)}
+                        {weekDates.map((date, i) => (
+                          <div
+                            className={
+                              'roster-day' + (date === localDate(new Date()) ? ' today' : '')
+                            }
+                            key={date}
+                          >
+                            <span>
+                              <b>{days[i]}</b>
+                              {monthDay(date)}
+                            </span>
+                            <small title={t('근무 인원')}>
+                              <UserRound size={13} />
+                              {
+                                new Set(
+                                  rosterShifts
+                                    .filter((s) => s.date === date)
+                                    .map((s) => s.employeeId),
+                                ).size
+                              }
+                            </small>
+                          </div>
+                        ))}
+                        <div className="roster-location">Pelham Hills</div>
+                        {roles
+                          .filter((role) => visibleEmployees.some((e) => e.role === role))
+                          .map((role) => {
+                            const members = visibleEmployees.filter((e) => e.role === role);
+                            return (
+                              <div className="roster-group" key={role}>
+                                <div className="roster-band">
+                                  {role}
+                                  <small>{t('{n}명', { n: members.length })}</small>
+                                </div>
+                                {members.map((e) => {
+                                  const mine = rosterShifts.filter((s) => s.employeeId === e.id);
+                                  const hours = mine.reduce(
+                                    (n, s) => n + duration(s.start, s.end),
+                                    0,
+                                  );
+                                  return (
+                                    <div className="roster-row" key={e.id}>
+                                      <div className="roster-staff">
+                                        <span
+                                          className="roster-avatar"
+                                          style={{ background: e.color }}
                                         >
-                                          {e.name}
-                                        </button>
-                                        <small>
-                                          {t('{h}시간', { h: hours.toFixed(2) })} ·{' '}
-                                          {money(hours * e.rate)}
-                                        </small>
-                                      </span>
-                                    </div>
-                                    {weekDates.map((date) => {
-                                      const shifts = mine.filter((s) => s.date === date);
-                                      return (
-                                        <div className="roster-cell" key={date}>
-                                          {shifts.map((s) => (
-                                            <button
-                                              key={s.id}
-                                              className="roster-shift"
-                                              onClick={() => open('detail', { id: s.id })}
-                                              style={{
-                                                background: e.color + '1f',
-                                                borderLeftColor: e.color,
-                                              }}
-                                            >
-                                              <b>
-                                                {s.start}–{s.end}
-                                              </b>
-                                              <span>
-                                                {s.originalId ? t('대체 · ') : ''}
-                                                {s.area}
-                                              </span>
-                                            </button>
-                                          ))}
+                                          {e.name.slice(0, 1)}
+                                        </span>
+                                        <span>
                                           <button
-                                            className="roster-celladd"
-                                            aria-label={t('{name} {date} 근무 추가', {
-                                              name: e.name,
-                                              date,
-                                            })}
+                                            className="roster-name"
                                             onClick={() =>
-                                              open('shift', {
-                                                employeeId: e.id,
-                                                date,
-                                                start: '09:00',
-                                                end: '17:00',
-                                                area: e.role,
-                                              })
+                                              setFilter(filter === e.id ? 'all' : e.id)
                                             }
                                           >
-                                            <Plus size={15} />
+                                            {e.name}
                                           </button>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                );
-                              })}
+                                          <small>
+                                            {t('{h}시간', { h: hours.toFixed(2) })} -{' '}
+                                            {money(hours * e.rate)}
+                                          </small>
+                                        </span>
+                                      </div>
+                                      {weekDates.map((date) => {
+                                        const shifts = mine.filter((s) => s.date === date);
+                                        const offs = timeOff.filter(
+                                          (r) =>
+                                            r.employeeId === e.id &&
+                                            r.status !== 'declined' &&
+                                            date >= r.from &&
+                                            date <= r.to,
+                                        );
+                                        const unavailable = availability.filter(
+                                          (r) =>
+                                            r.employeeId === e.id &&
+                                            r.status !== 'declined' &&
+                                            r.weekday === weekdayOf(date),
+                                        );
+                                        return (
+                                          <div className="roster-cell" key={date}>
+                                            {offs.map((r) => (
+                                              <button
+                                                key={r.id}
+                                                className={'roster-note off ' + r.status}
+                                                onClick={() => setTab('timeoff')}
+                                              >
+                                                <b>
+                                                  {r.status === 'pending'
+                                                    ? t('휴무 신청')
+                                                    : t('휴무')}
+                                                </b>
+                                                <span>{span(r)}</span>
+                                              </button>
+                                            ))}
+                                            {unavailable.map((r) => (
+                                              <button
+                                                key={r.id}
+                                                className={'roster-note unavailable ' + r.status}
+                                                onClick={() => setTab('availability')}
+                                              >
+                                                <b>
+                                                  {r.status === 'pending'
+                                                    ? t('불가 신청')
+                                                    : t('근무 불가')}
+                                                </b>
+                                                <span>{span(r)}</span>
+                                              </button>
+                                            ))}
+                                            {shifts.map((s) => {
+                                              const blocked = blockedBy(data, s);
+                                              return (
+                                                <button
+                                                  key={s.id}
+                                                  className={
+                                                    'roster-shift' + (blocked ? ' conflict' : '')
+                                                  }
+                                                  onClick={() => open('detail', { id: s.id })}
+                                                  title={
+                                                    blocked
+                                                      ? t('휴무·불가 시간과 겹치는 근무입니다')
+                                                      : undefined
+                                                  }
+                                                >
+                                                  <i style={{ background: e.color }}>
+                                                    {s.area.slice(0, 1).toUpperCase()}
+                                                  </i>
+                                                  <span>
+                                                    <b>
+                                                      {ampm(s.start)} - {ampm(s.end)}
+                                                    </b>
+                                                    <small>
+                                                      {blocked && <TriangleAlert size={11} />}
+                                                      {s.originalId ? t('대체 · ') : ''}
+                                                      {s.area}
+                                                    </small>
+                                                  </span>
+                                                </button>
+                                              );
+                                            })}
+                                            <button
+                                              className="roster-celladd"
+                                              aria-label={t('{name} {date} 근무 추가', {
+                                                name: e.name,
+                                                date,
+                                              })}
+                                              onClick={() =>
+                                                open('shift', {
+                                                  employeeId: e.id,
+                                                  date,
+                                                  start: '09:00',
+                                                  end: '17:00',
+                                                  area: e.role,
+                                                })
+                                              }
+                                            >
+                                              <Plus size={15} />
+                                            </button>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })}
+                        {!visibleEmployees.length && (
+                          <div className="roster-empty">{t('조건에 맞는 직원이 없습니다.')}</div>
+                        )}
+                        <div className="roster-total">
+                          <span className="roster-tab">{t('인건비')}</span>
+                          <b>{t('예정')}</b>
+                          <span>
+                            {t('{h}시간', {
+                              h: rosterShifts
+                                .reduce((n, s) => n + duration(s.start, s.end), 0)
+                                .toFixed(2),
+                            })}
+                            <small>{money(rosterCost(rosterShifts))}</small>
+                          </span>
+                        </div>
+                        {weekDates.map((date) => {
+                          const list = rosterShifts.filter((s) => s.date === date);
+                          const dayHours = list.reduce((n, s) => n + duration(s.start, s.end), 0);
+                          const weekHours = rosterShifts.reduce(
+                            (n, s) => n + duration(s.start, s.end),
+                            0,
+                          );
+                          return (
+                            <div className="roster-daytotal" key={date}>
+                              <em
+                                className={dayHours ? '' : 'none'}
+                                title={t('이번 주 예정 시간 중 비중')}
+                              >
+                                {dayHours && weekHours
+                                  ? Math.round((dayHours / weekHours) * 100) + '%'
+                                  : '-'}
+                              </em>
+                              <b>{t('{h}시간', { h: dayHours.toFixed(2) })}</b>
+                              <small>{money(rosterCost(list))}</small>
                             </div>
                           );
                         })}
-                      {!visibleEmployees.length && (
-                        <div className="roster-empty">{t('조건에 맞는 직원이 없습니다.')}</div>
-                      )}
-                      <div className="roster-total">
-                        <b>{t('예정 합계')}</b>
-                        <span>
-                          {t('{h}시간', {
-                            h: rosterShifts
-                              .reduce((n, s) => n + duration(s.start, s.end), 0)
-                              .toFixed(2),
-                          })}
-                          <small>{money(rosterCost(rosterShifts))}</small>
-                        </span>
                       </div>
-                      {weekDates.map((date) => {
-                        const list = rosterShifts.filter((s) => s.date === date);
-                        return (
-                          <div className="roster-daytotal" key={date}>
-                            <b>
-                              {t('{h}시간', {
-                                h: list.reduce((n, s) => n + duration(s.start, s.end), 0).toFixed(2),
-                              })}
-                            </b>
-                            <small>{money(rosterCost(list))}</small>
-                          </div>
-                        );
-                      })}
                     </div>
                   </div>
                 ) : staffReadOnly || view === 'month' ? (
@@ -2700,15 +2988,263 @@ export default function ShiftApp() {
                     </div>
                   </div>
                 )}
-                <div className="schedulefoot">
-                  <span>
-                    <i className="tiny-dot" />{' '}
-                    {t('직원별 컬러는 모든 화면에서 동일하게 표시됩니다.')}
-                  </span>
-                  <span>{t('대체 신청·승인 · 근무일 7일 전까지')}</span>
-                </div>
               </section>
             </TabsContent>
+            <TabsContent value="timeoff">
+              <div className="panel contentpanel">
+                <div className="sectionhead">
+                  <div>
+                    <h2>{t('휴무')}</h2>
+                    <p>
+                      {actor.admin
+                        ? t('직원 휴무 신청을 확인하고 승인하세요. 승인된 휴무와 겹치는 근무는 스케줄에 경고로 표시됩니다.')
+                        : t('휴무를 신청하면 관리자가 승인합니다. 대기 중인 신청은 직접 취소할 수 있습니다.')}
+                    </p>
+                  </div>
+                  <button className="button primary" disabled={setup} onClick={openTimeOff}>
+                    <Plus size={16} /> {actor.admin ? t('휴무 추가') : t('휴무 신청')}
+                  </button>
+                </div>
+                <div className="segmented" role="tablist" aria-label={t('상태')}>
+                  {(['pending', 'approved', 'declined', 'all'] as const).map((k) => (
+                    <button
+                      key={k}
+                      role="tab"
+                      aria-selected={offFilter === k}
+                      className={offFilter === k ? 'on' : ''}
+                      onClick={() => setOffFilter(k)}
+                    >
+                      {k === 'all' ? t('전체') : statusLabel(k)}
+                      <em>
+                        {k === 'all' ? timeOff.length : timeOff.filter((r) => r.status === k).length}
+                      </em>
+                    </button>
+                  ))}
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {['직원', '기간', '시간', '사유', '겹치는 근무', '상태', ''].map((h) => (
+                        <TableHead key={h}>{t(h)}</TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {timeOff
+                      .filter((r) => offFilter === 'all' || r.status === offFilter)
+                      .slice()
+                      .sort((a, b) => a.from.localeCompare(b.from))
+                      .map((r) => {
+                        const clash = offShifts(r);
+                        return (
+                          <TableRow key={r.id}>
+                            <TableCell>{box(emp(r.employeeId))}</TableCell>
+                            <TableCell>
+                              {r.from === r.to ? longDate(r.from) : longDate(r.from) + ' – ' + longDate(r.to)}
+                            </TableCell>
+                            <TableCell>{span(r)}</TableCell>
+                            <TableCell className="cell-wrap">{r.reason || '—'}</TableCell>
+                            <TableCell>
+                              {clash.length ? (
+                                <span className="clash">
+                                  <TriangleAlert size={14} /> {t('{n}개', { n: clash.length })}
+                                </span>
+                              ) : (
+                                '—'
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <span className={'statuspill ' + r.status}>{statusLabel(r.status)}</span>
+                            </TableCell>
+                            <TableCell>
+                              <span className="rowactions">
+                                {actor.admin && r.status === 'pending' && (
+                                  <>
+                                    <button
+                                      className="button primary"
+                                      disabled={busy}
+                                      onClick={() =>
+                                        command('timeOffDecision', { id: r.id, action: 'approve' })
+                                      }
+                                    >
+                                      {t('승인')}
+                                    </button>
+                                    <button
+                                      className="button"
+                                      disabled={busy}
+                                      onClick={() =>
+                                        command('timeOffDecision', { id: r.id, action: 'decline' })
+                                      }
+                                    >
+                                      {t('거절')}
+                                    </button>
+                                  </>
+                                )}
+                                {(actor.admin || r.status === 'pending') && (
+                                  <button
+                                    className="button"
+                                    disabled={busy}
+                                    onClick={() =>
+                                      command('timeOffDecision', { id: r.id, action: 'cancel' })
+                                    }
+                                  >
+                                    {actor.admin ? t('삭제') : t('취소')}
+                                  </button>
+                                )}
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                  </TableBody>
+                </Table>
+                {!timeOff.filter((r) => offFilter === 'all' || r.status === offFilter).length && (
+                  <div className="empty">
+                    <CalendarX size={28} />
+                    <h3>{t('표시할 휴무가 없습니다.')}</h3>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+            <TabsContent value="availability">
+              <div className="panel contentpanel">
+                <div className="sectionhead">
+                  <div>
+                    <h2>{t('근무 가능 시간')}</h2>
+                    <p>
+                      {actor.admin
+                        ? t('매주 반복되는 근무 불가 시간입니다. 승인된 불가 시간과 겹치는 근무는 스케줄에 경고로 표시됩니다.')
+                        : t('매주 일할 수 없는 요일·시간을 등록하면 관리자가 승인합니다.')}
+                    </p>
+                  </div>
+                  <button className="button primary" disabled={setup} onClick={() => openAvailability()}>
+                    <Plus size={16} /> {t('근무 불가 시간 추가')}
+                  </button>
+                </div>
+                <div className="gridscroll">
+                  <div className="availgrid">
+                    <div className="availhead">{t('직원')}</div>
+                    {days.map((d) => (
+                      <div className="availhead" key={d}>
+                        {d}
+                      </div>
+                    ))}
+                    {staffList.map((e) => (
+                      <div className="availrow" key={e.id}>
+                        <div className="availstaff">{box(e)}</div>
+                        {days.map((_, w) => {
+                          const list = availability.filter(
+                            (r) => r.employeeId === e.id && r.weekday === w && r.status !== 'declined',
+                          );
+                          return (
+                            <div className="availcell" key={w}>
+                              {list.length ? (
+                                list.map((r) => (
+                                  <span key={r.id} className={'availtag ' + r.status}>
+                                    {r.status === 'pending' ? t('대기') + ' · ' : ''}
+                                    {r.allDay ? t('종일 불가') : span(r) + ' ' + t('불가')}
+                                  </span>
+                                ))
+                              ) : (
+                                <button
+                                  className="availfree"
+                                  disabled={setup}
+                                  onClick={() => openAvailability(String(w), e.id)}
+                                  aria-label={t('{name} {day} 근무 불가 시간 추가', {
+                                    name: e.name,
+                                    day: days[w],
+                                  })}
+                                >
+                                  {t('가능')}
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <h3 className="subhead">{t('등록된 근무 불가 시간')}</h3>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {['직원', '요일', '시간', '메모', '상태', ''].map((h) => (
+                        <TableHead key={h}>{t(h)}</TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {availability
+                      .slice()
+                      .sort(
+                        (a, b) =>
+                          Number(b.status === 'pending') - Number(a.status === 'pending') ||
+                          name(a.employeeId).localeCompare(name(b.employeeId)) ||
+                          a.weekday - b.weekday,
+                      )
+                      .map((r) => (
+                        <TableRow key={r.id}>
+                          <TableCell>{box(emp(r.employeeId))}</TableCell>
+                          <TableCell>{days[r.weekday]}</TableCell>
+                          <TableCell>{span(r)}</TableCell>
+                          <TableCell className="cell-wrap">{r.note || '—'}</TableCell>
+                          <TableCell>
+                            <span className={'statuspill ' + r.status}>{statusLabel(r.status)}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="rowactions">
+                              {actor.admin && r.status === 'pending' && (
+                                <>
+                                  <button
+                                    className="button primary"
+                                    disabled={busy}
+                                    onClick={() =>
+                                      command('availabilityDecision', { id: r.id, action: 'approve' })
+                                    }
+                                  >
+                                    {t('승인')}
+                                  </button>
+                                  <button
+                                    className="button"
+                                    disabled={busy}
+                                    onClick={() =>
+                                      command('availabilityDecision', { id: r.id, action: 'decline' })
+                                    }
+                                  >
+                                    {t('거절')}
+                                  </button>
+                                </>
+                              )}
+                              <button
+                                className="button"
+                                disabled={busy}
+                                onClick={() =>
+                                  command('availabilityDecision', { id: r.id, action: 'delete' })
+                                }
+                              >
+                                {t('삭제')}
+                              </button>
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+                {!availability.length && (
+                  <div className="empty">
+                    <CalendarClock size={28} />
+                    <h3>{t('등록된 근무 불가 시간이 없습니다.')}</h3>
+                    <p>{t('모든 요일에 근무할 수 있는 것으로 표시됩니다.')}</p>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+            {comingSoon('dashboard', LayoutDashboard, '대시보드', '오늘 근무자, 이번 주 근무시간과 인건비, 처리할 요청을 한 화면에 모아 보여줄 예정입니다.')}
+            {comingSoon('training', GraduationCap, '교육', '교육 자료를 직원에게 배정하고 이수 여부를 확인하는 기능을 준비하고 있습니다.')}
+            {comingSoon('hiring', BriefcaseBusiness, '채용', '지원자를 등록하고 면접·채용 단계를 관리하는 기능을 준비하고 있습니다.')}
+            {comingSoon('logbook', BookOpen, '업무일지', '날짜별 운영 메모와 특이사항을 기록하고 팀과 공유하는 기능을 준비하고 있습니다.')}
+            {comingSoon('help', CircleQuestionMark, '도움말', '스케줄 작성, 휴무·근무 가능 시간, 대체 근무 사용법 안내를 준비하고 있습니다.')}
 {otherTabs}
             <footer>
               PELHAM SHIFT <span>{t('팀의 시간, 더 간편하게.')}</span>
