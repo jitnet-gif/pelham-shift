@@ -19,6 +19,14 @@ const connectionUrl = () => {
   // which the server rejects, so keep only the TLS mode.
   const url = new URL(raw);
   for (const key of [...url.searchParams.keys()]) if (key !== 'sslmode') url.searchParams.delete(key);
+  // Vercel can reach neither the API host (no Postgres listener) nor db.<ref>.supabase.co (IPv6 only),
+  // so a Supabase host is rewritten to the transaction pooler, which is what this deployment needs.
+  const ref = url.hostname.match(/^(?:db\.)?([a-z0-9]{16,})\.supabase\.co$/)?.[1];
+  if (ref) {
+    if (!url.username.includes('.')) url.username = `postgres.${ref}`;
+    url.hostname = process.env.SUPABASE_POOLER_HOST || 'aws-0-us-east-2.pooler.supabase.com';
+    url.port = '6543';
+  }
   return url.toString();
 };
 
