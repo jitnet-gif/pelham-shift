@@ -83,6 +83,7 @@ import {
   blockedBy,
   weekdayOf,
   type Employee,
+  type Message,
   type State,
 } from '@/lib/domain';
 import {
@@ -183,6 +184,8 @@ export default function ShiftApp() {
   const [navOpen, setNavOpen] = useState(false);
   const [ui, setUi] = useState<Layout>('pelham');
   const [offFilter, setOffFilter] = useState('pending');
+  const [inapp, setInapp] = useState<Message | null>(null);
+  const seenMessages = useRef<Set<string>>(new Set());
   const chooseLayout = (next: Layout) => {
     setUi(next);
     try {
@@ -457,6 +460,11 @@ export default function ShiftApp() {
   const availability = data.availability ?? [];
   const pendingOff = timeOff.filter((r) => r.status === 'pending');
   const pendingAvail = availability.filter((r) => r.status === 'pending');
+  // 내가 받은 메시지 중 아직 읽지 않은 것. 종 아이콘의 숫자와 앱 안 알림이 이 목록을 씁니다.
+  const unread = data.messages.filter(
+    (m) => m.sender !== actor.id && !m.readBy.includes(actor.id),
+  );
+  const unreadKey = unread.map((m) => m.id).join(',');
   const conflicts = data.shifts.filter((s) => s.date >= localDate(new Date()) && blockedBy(data, s));
   const warnings = [
     ...pending.map(() => ({ text: t('확인이 필요한 대체근무 요청'), tab: 'swaps' })),
@@ -470,6 +478,13 @@ export default function ShiftApp() {
       .filter((e) => !e.rate)
       .map((e) => ({ text: t('{name} 시급 미설정', { name: e.name }), tab: 'team' })),
   ];
+  // 앱을 열어 둔 동안 새 메시지가 오면 화면 안에 알림을 띄웁니다. 기기 푸시가 꺼져 있어도 보입니다.
+  useEffect(() => {
+    const fresh = unread.filter((m) => !seenMessages.current.has(m.id));
+    if (!fresh.length) return;
+    for (const m of fresh) seenMessages.current.add(m.id);
+    setInapp(fresh[fresh.length - 1]);
+  }, [unreadKey]);
   const money = (n: number) =>
     new Intl.NumberFormat(locale, {
       style: 'currency',
@@ -1627,6 +1642,35 @@ export default function ShiftApp() {
   );
   const dialogs = (
     <>
+      {inapp && (
+        <div className="inapp-alert" role="status">
+          <span className="inapp-icon"><BellRing size={18} /></span>
+          <div>
+            <b>
+              {inapp.kind === 'rain'
+                ? t('우천 근무 종료')
+                : inapp.sender === 'admin'
+                  ? t('관리자 메시지')
+                  : t('{name} 메시지', { name: name(inapp.sender) })}
+            </b>
+            <p>{inapp.body}</p>
+          </div>
+          <div className="inapp-actions">
+            <button
+              className="button primary"
+              onClick={() => {
+                setTab('messages');
+                setInapp(null);
+              }}
+            >
+              {t('보기')}
+            </button>
+            <button className="iconbutton" aria-label={t('닫기')} onClick={() => setInapp(null)}>
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
       <Dialog
         open={!!modal}
         onOpenChange={(o) => {
@@ -2170,10 +2214,11 @@ export default function ShiftApp() {
           {!setup && (
             <button
               aria-label={t('메시지 보기')}
-              className="iconbutton"
+              className="iconbutton bell"
               onClick={() => setTab('messages')}
             >
               <Bell size={19} />
+              {unread.length > 0 && <em className="bellcount">{unread.length}</em>}
             </button>
           )}
           <span className="avatar">
@@ -2207,6 +2252,9 @@ export default function ShiftApp() {
                 <TabsTrigger key={key} value={key}>
                   <Icon size={17} />
                   {t(label)}
+                  {key === 'messages' && unread.length > 0 && (
+                    <em className="navcount">{unread.length}</em>
+                  )}
                 </TabsTrigger>
               ))}
           </TabsList>
@@ -2791,7 +2839,7 @@ export default function ShiftApp() {
               <span>{t('작업')}</span>
             </a>
             {actor.admin && navItem('logbook', '업무일지', BookOpen)}
-            {navItem('messages', '메시지', MessageSquare)}
+            {navItem('messages', '메시지', MessageSquare, { count: unread.length })}
             <hr />
             {navItem('attendance', '출근 기록', Timer)}
             {navItem('payroll', '급여 관리', Wallet)}
@@ -2857,10 +2905,11 @@ export default function ShiftApp() {
             </a>
             <button
               aria-label={t('메시지 보기')}
-              className="iconbutton"
+              className="iconbutton bell"
               onClick={() => setTab('messages')}
             >
               <Bell size={20} />
+              {unread.length > 0 && <em className="bellcount">{unread.length}</em>}
             </button>
           </header>
           <main>

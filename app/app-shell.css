@@ -251,3 +251,15 @@
 .sidenav hr{margin:8px}
 .sidenav-heading,.sidenav-item.sidenav-item{min-height:38px;padding-block:8px}
 .roster-total .roster-tab{display:block;text-align:left}
+
+/* 읽지 않은 메시지: 종 아이콘의 숫자, 탭 옆 숫자, 그리고 앱을 열어 둔 동안 뜨는 알림 카드 */
+.iconbutton.bell{position:relative}
+.bellcount{position:absolute;top:-2px;right:-3px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#c0503a;color:#fff;font-style:normal;font-size:11px;font-weight:700;line-height:18px;text-align:center}
+.navrow .navcount{font-style:normal;font-size:11px;font-weight:700;background:#c0503a;color:#fff;border-radius:9px;padding:1px 7px;margin-left:7px}
+.inapp-alert{position:fixed;right:20px;bottom:20px;z-index:60;display:flex;gap:12px;align-items:flex-start;width:380px;max-width:calc(100vw - 40px);background:#fff;border:1px solid #d9e4df;border-left:4px solid #087e6d;border-radius:11px;box-shadow:0 14px 34px -14px rgba(16,40,33,.5);padding:15px 16px}
+.inapp-alert .inapp-icon{color:#087e6d;margin-top:3px;flex-shrink:0}
+.inapp-alert b{display:block;font-size:14px;margin-bottom:5px}
+.inapp-alert p{margin:0;font-size:13px;color:#5d6f69;line-height:1.6;max-height:64px;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere}
+.inapp-alert .inapp-actions{display:flex;align-items:center;gap:4px;margin-left:auto;flex-shrink:0}
+.inapp-alert .button{padding:7px 12px;font-size:13px}
+@media(max-width:600px){.inapp-alert{left:12px;right:12px;bottom:12px;width:auto;max-width:none}}

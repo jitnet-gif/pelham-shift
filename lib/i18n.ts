@@ -335,6 +335,7 @@ const en: Record<string, string> = {
   '확인 완료': 'Read',
   '직원은 관리자에게만 메시지를 보낼 수 있습니다.': 'Staff can only send messages to the manager.',
   '관리자 메시지': 'Message from the manager',
+  '{name} 메시지': 'Message from {name}',
   '직원 메시지': 'Message from staff',
   '전 직원': 'All staff',
   '확인 {read} / {total}명 · {names} 미확인': 'Read {read} / {total} · Unread: {names}',
