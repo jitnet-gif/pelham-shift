@@ -121,6 +121,9 @@ const en: Record<string, string> = {
   '날짜별 운영 메모와 특이사항을 기록하고 팀과 공유하는 기능을 준비하고 있습니다.': 'Keep daily operating notes and share them with the team.',
   '스케줄 작성, 휴무·근무 가능 시간, 대체 근무 사용법 안내를 준비하고 있습니다.': 'Guides for building schedules, time off and availability, and shift swaps.',
   '확인이 필요한 휴무 요청': 'Time off request needs review',
+  '확인이 필요한 요청 · 휴무 {a}건 · 근무 불가 시간 {b}건':
+    'Requests to review · {a} time off · {b} unavailability',
+  '확인하기': 'Review',
   '확인이 필요한 근무 불가 시간': 'Unavailability needs review',
   '{name} {date} 근무가 휴무·불가 시간과 겹칩니다': "{name}'s shift on {date} overlaps time off or unavailability",
   '종일': 'All day',
@@ -140,10 +143,12 @@ const en: Record<string, string> = {
   '취소': 'Cancel',
   '표시할 휴무가 없습니다.': 'No time off to show.',
   '직원 휴무 신청을 확인하고 승인하세요. 승인된 휴무와 겹치는 근무는 스케줄에 경고로 표시됩니다.': 'Review and approve time off requests. Shifts that overlap approved time off are flagged on the schedule.',
-  '휴무를 신청하면 관리자가 승인합니다. 대기 중인 신청은 직접 취소할 수 있습니다.': 'Your manager approves time off requests. You can cancel a request while it is pending.',
+  '휴무는 시작일 7일 전까지 신청할 수 있고, 관리자가 승인합니다. 대기 중인 신청은 직접 취소할 수 있습니다.':
+    'Request time off at least 7 days before it starts; your manager approves it. You can cancel a request while it is pending.',
   '근무 불가 시간 추가': 'Add unavailability',
   '매주 반복되는 근무 불가 시간입니다. 승인된 불가 시간과 겹치는 근무는 스케줄에 경고로 표시됩니다.': 'Weekly recurring unavailability. Shifts that overlap approved unavailability are flagged on the schedule.',
-  '매주 일할 수 없는 요일·시간을 등록하면 관리자가 승인합니다.': "Add the days and times you can't work each week; your manager approves them.",
+  '매주 일할 수 없는 요일·시간을 등록하면 관리자가 승인합니다. 등록일로부터 7일 뒤 근무부터 적용됩니다.':
+    "Add the days and times you can't work each week; your manager approves them. They apply to shifts from 7 days after you add them.",
   '대기': 'Pending',
   '종일 불가': 'Unavailable all day',
   '불가': 'unavailable',
@@ -163,8 +168,12 @@ const en: Record<string, string> = {
   '불가 시작': 'Unavailable from',
   '불가 종료': 'Unavailable until',
   '메모 (선택)': 'Note (optional)',
-  '관리자가 등록하면 바로 승인됩니다. 매주 같은 요일에 반복 적용됩니다.': 'Entries added by a manager are approved right away and repeat every week.',
-  '관리자가 승인하면 매주 같은 요일에 반복 적용됩니다.': 'Once approved, this repeats on the same day every week.',
+  '관리자가 등록하면 바로 승인되고 오늘 근무부터 적용됩니다. 매주 같은 요일에 반복 적용됩니다.':
+    'Entries added by a manager are approved right away, apply from today and repeat every week.',
+  '관리자가 승인하면 매주 같은 요일에 반복 적용됩니다. 등록일로부터 7일 뒤 근무부터 적용됩니다.':
+    'Once approved, this repeats on the same day every week. It applies to shifts from 7 days after you add it.',
+  '휴무는 시작일 7일 전까지 신청할 수 있습니다.': 'Time off must be requested at least 7 days before it starts.',
+  '적용 시작일': 'Effective from',
   '종료일이 시작일보다 빠릅니다.': 'The end date is before the start date.',
   '휴무는 한 번에 최대 62일까지 신청할 수 있습니다.': 'Time off can cover at most 62 days at once.',
   '휴무 요청을 찾을 수 없습니다.': 'Time off request not found.',
@@ -260,6 +269,11 @@ const en: Record<string, string> = {
   휴게: 'Break',
   '휴게(분)': 'Break (min)',
   실근무: 'Worked',
+  '예정 출근': 'Scheduled in',
+  지각: 'Late',
+  '{n}분 지각': '{n} min late',
+  정시: 'On time',
+  '예정 없음': 'Unscheduled',
   ' (+1일)': ' (+1 day)',
   '{n}분': '{n} min',
   '아직 저장된 출근기록이 없습니다.': 'No attendance records yet.',
@@ -269,17 +283,28 @@ const en: Record<string, string> = {
   // Payroll tab
   '예상 급여': 'Estimated pay',
   '내 예상 급여': 'My estimated pay',
-  '실근무시간 × 직원별 시급 + 승인된 대체 추가수당':
-    'Hours worked × hourly rate + approved swap bonuses',
+  '정규 {r}시간까지 시급 × 실근무, 초과분 {m}배 가산, 지각 차감, 승인된 대체 추가수당':
+    'Hourly rate × hours worked up to {r}h, {m}× premium above that, late minutes deducted, plus approved swap bonuses',
   'CSV 다운로드': 'Download CSV',
   시작일: 'Start date',
   종료일: 'End date',
-  '세금·초과근무 가산·유급휴가를 제외한 예상 금액입니다. 시급 0인 직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급 대상이 아니며 실제 출근기록만 지급합니다.':
-    "Estimates exclude taxes, overtime premiums and paid leave. Check pay for anyone whose hourly rate is 0. Only actual attendance is paid, not the original employee's scheduled hours.",
+  '초과근무는 하루 {d}시간 초과분과 한 주(일요일 시작) {w}시간 초과분 중 큰 쪽만 {m}배로 가산합니다. 지각은 예정 출근 시각을 넘긴 분만큼 시급으로 차감하며, 예정 근무가 없는 출근기록은 지각으로 보지 않습니다. 세금·유급휴가를 제외한 예상 금액이고, 시급 0인 직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급 대상이 아니며 실제 출근기록만 지급합니다.':
+    "Overtime pays {m}× on the greater of hours over {d} in a day or hours over {w} in a week (weeks start Sunday), never both. Lateness is deducted at the hourly rate for every minute past the scheduled start; attendance with no scheduled shift is never counted late. Estimates exclude taxes and paid leave, and pay needs checking for anyone whose hourly rate is 0. Only actual attendance is paid, not the original employee's scheduled hours.",
+  '조회 구간이 주(일요일~토요일) 단위가 아니어서 걸쳐 있는 주의 초과근무가 실제보다 적게 잡힐 수 있습니다.':
+    'This range is not a whole Sunday-to-Saturday week, so overtime in the weeks it cuts across may come out lower than it really is.',
   이름: 'Name',
   실근무시간: 'Hours worked',
+  정규: 'Regular',
+  초과: 'Overtime',
+  정규시간: 'Regular hours',
+  초과시간: 'Overtime hours',
   시급: 'Hourly rate',
   기본급: 'Base pay',
+  초과수당: 'Overtime pay',
+  '지각 차감': 'Late deduction',
+  '지각(분)': 'Late (min)',
+  지각일수: 'Late days',
+  '-{money} · {n}분 {d}일': '-{money} · {n} min over {d} day(s)',
   '대체 추가수당': 'Swap bonus',
   통화: 'Currency',
   예상급여_: 'estimated-pay_',
@@ -325,8 +350,8 @@ const en: Record<string, string> = {
   '직원 추가': 'Add employee',
   '급여 통화': 'Pay currency',
   '직원 접속 주소': 'Staff link',
-  '직원의 생년월일 8자리로 로그인합니다. 생년월일은 로그인 설정에서 관리하세요.':
-    "Staff sign in with their 8-digit birth date. Manage birth dates in each employee's settings.",
+  '직원은 로그인 화면에서 자기 이름을 골라 로그인합니다. 초기 비밀번호는 1111이며, 직원이 직접 변경할 수 있습니다.':
+    'Staff sign in by picking their own name on the sign-in screen. Everyone starts with the password 1111 and can change it themselves.',
   '출근 알림 자동 점검 주소': 'Shift reminder check URL',
   '앱이 열려 있으면 30초마다 자동 점검합니다. 아무도 앱을 열지 않을 때도 1시간 전 알림을 보내려면 외부 cron(예: cron-job.org)에 이 주소를 5분 간격으로 등록하세요. 비공개 사이트는 외부 호출이 차단될 수 있습니다. 이 주소는 비밀번호처럼 보관하세요.':
     "While the app is open it checks every 30 seconds. To send 1-hour reminders even when nobody has the app open, add this URL to an external cron service (e.g. cron-job.org) every 5 minutes. Private sites may block outside calls. Keep this URL secret, like a password.",
@@ -385,19 +410,20 @@ const en: Record<string, string> = {
   // Sign-in and password
   로그인: 'Sign in',
   '로그인하지 못했습니다.': 'Could not sign in.',
-  '생년월일과 비밀번호를 입력하세요. 직원 초기 비밀번호는 생년월일입니다.':
-    'Enter your birth date and password. Staff start with their birth date as the password.',
+  '이름을 고르고 생년월일과 비밀번호를 입력하세요. 직원 초기 비밀번호는 1111입니다.':
+    'Pick your name, then enter your birth date and password. Staff start with the password 1111.',
   '예: 19900115': 'e.g. 19900115',
+  '직원 목록을 불러오지 못했습니다.': 'Could not load the staff list.',
   '확인 중…': 'Checking…',
   '비밀번호 변경': 'Change password',
   '새 비밀번호가 일치하지 않습니다.': 'The new passwords do not match.',
   '비밀번호를 변경하지 못했습니다.': 'Could not change the password.',
-  '초기 비밀번호는 생년월일입니다. 지금 새 비밀번호로 변경하거나 나중에 변경할 수 있습니다.':
-    'Your initial password is your birth date. You can change it now or later.',
+  '초기 비밀번호는 1111입니다. 지금 새 비밀번호로 변경하거나 나중에 변경할 수 있습니다.':
+    'Your initial password is 1111. You can change it now or later.',
   '새 비밀번호를 입력하면 다음 로그인부터 적용됩니다.':
     'The new password applies from your next sign-in.',
   '현재 비밀번호': 'Current password',
-  '초기 비밀번호: 생년월일 8자리': 'Initial password: 8-digit birth date',
+  '초기 비밀번호: 1111': 'Initial password: 1111',
   '새 비밀번호': 'New password',
   '새 비밀번호 확인': 'Confirm new password',
   '변경 중…': 'Changing…',
@@ -480,11 +506,14 @@ const en: Record<string, string> = {
   '점검하지 못했습니다.': 'Could not run the check.',
   '지원하지 않는 요청입니다.': 'Unsupported request.',
   '생년월일 8자리를 입력하세요.': 'Enter an 8-digit birth date.',
-  '등록된 생년월일을 찾을 수 없습니다. 관리자에게 확인하세요.':
-    'That birth date is not registered. Check with your manager.',
+  '직원을 선택하세요.': 'Select your name.',
+  '등록되지 않은 직원입니다. 관리자에게 확인하세요.':
+    'That staff member is not registered. Check with your manager.',
   '생년월일 또는 비밀번호를 확인하세요.': 'Check your birth date or password.',
+  '생년월일이 등록되지 않았습니다. 관리자에게 등록을 요청하세요.':
+    'No birth date is registered for you. Ask your manager to add it.',
   '새 비밀번호는 8~128자로 입력하세요.': 'The new password must be 8–128 characters.',
-  '생년월일로 로그인한 뒤 변경할 수 있습니다.': 'Sign in with your birth date to change it.',
+  '로그인한 뒤 변경할 수 있습니다.': 'Sign in to change it.',
   '관리자 비밀번호는 변경할 수 없습니다.': 'The manager password cannot be changed.',
   '현재 비밀번호를 확인하세요.': 'Check your current password.',
   '데이터베이스 연결 정보가 없습니다. Vercel 환경변수 DATABASE_URL 또는 Supabase 연동(POSTGRES_URL)을 설정하세요.':
@@ -509,6 +538,8 @@ const en: Record<string, string> = {
   '통화를 선택하세요.': 'Choose a currency.',
   '근무를 선택하세요.': 'Choose a shift.',
   '본인 근무만 대체 신청할 수 있습니다.': 'You can only request swaps for your own shifts.',
+  '휴무 신청은 시작일 7일 전까지 가능합니다.':
+    'Time off must be requested at least 7 days before the start date.',
   '대체 신청은 근무일 7일 전까지 가능합니다.':
     'Swaps must be requested at least 7 days before the shift.',
   '다른 대체 직원을 선택하세요.': 'Choose a different covering employee.',

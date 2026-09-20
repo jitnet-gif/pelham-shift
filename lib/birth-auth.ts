@@ -2,8 +2,12 @@ import { env } from '@/lib/db';
 import type { State } from '@/lib/domain';
 
 const SESSION_COOKIE = 'pelham_birth_session';
+// 로그인 목록 맨 앞에 서는 관리자. 직원 id 와 겹치지 않도록 'admin' 을 씁니다.
+const ADMIN_ACTOR = 'admin';
 const MASTER_BIRTH_DATE = '19760802';
 const ADMIN_PASSWORD = '2222';
+// 비밀번호를 아직 바꾸지 않은 직원의 초기 비밀번호.
+const DEFAULT_PASSWORD = '1111';
 const SESSION_DAYS = 30;
 
 type WorkspaceRow = { id: string; owner: string; state: string; version: number };
@@ -15,6 +19,7 @@ type StoredSession = {
   expiresAt: string;
 };
 type Credential = { salt: string; hash: string };
+export type Member = { team: string; id: string; name: string; admin?: boolean };
 
 export type BirthSession = {
   team: string;
@@ -47,12 +52,9 @@ const credentialFor = (workspace: string, actor: string) =>
     .prepare('SELECT salt, hash FROM password_credentials WHERE workspace = ? AND actor = ?')
     .bind(workspace, actor)
     .first<Credential>();
-const defaultPassword = (state: State | null, actor: string) =>
-  state?.employees.find((employee) => employee.id === actor)?.birthDate || '';
 const verifyPassword = async (
   workspace: string,
   actor: string,
-  state: State | null,
   admin: boolean,
   password: string,
 ) => {
@@ -62,7 +64,7 @@ const verifyPassword = async (
   const credential = await credentialFor(workspace, actor);
   return credential
     ? (await passwordHash(password, credential.salt)) === credential.hash
-    : password === defaultPassword(state, actor);
+    : password === DEFAULT_PASSWORD;
 };
 
 const readCookie = (request: Request, name: string) => {
@@ -111,8 +113,8 @@ export async function getBirthSession(request: Request): Promise<BirthSession | 
   };
 }
 
-export async function createBirthSession(birthDate: string, password = '', preferredTeam = '') {
-  if (!/^\d{8}$/.test(birthDate)) throw Error('생년월일 8자리를 입력하세요.');
+// 로그인 드롭다운을 채우는 목록. 팀·id·이름만 내보내고 생년월일·연락처·시급은 내보내지 않습니다.
+export async function listMembers(preferredTeam = '') {
   const rows = preferredTeam
     ? await env.DB
         .prepare('SELECT id, owner, state, version FROM workspaces WHERE id = ?')
@@ -121,31 +123,46 @@ export async function createBirthSession(birthDate: string, password = '', prefe
     : await env.DB
         .prepare('SELECT id, owner, state, version FROM workspaces LIMIT 100')
         .all<WorkspaceRow>();
-  let workspace = '';
-  let actor = '';
-  let admin = false;
-
-  if (birthDate === MASTER_BIRTH_DATE) {
-    workspace = rows.results[0]?.id || 'master';
-    actor = 'admin';
-    admin = true;
-  } else {
-    for (const row of rows.results) {
-      const state = JSON.parse(row.state) as State;
-      const employee = state.employees.find(
-        (candidate) => candidate.birthDate === birthDate,
-      );
-      if (employee) {
-        workspace = row.id;
-        actor = employee.id;
-        break;
-      }
+  // 워크스페이스가 아직 없어도 관리자는 골라야 첫 설정을 시작할 수 있으므로 항상 넣습니다.
+  // 없을 때의 'master' 는 첫 워크스페이스를 만들 때 쓰는 이름이라 그대로 둡니다.
+  const members: Member[] = [
+    { team: rows.results[0]?.id || 'master', id: ADMIN_ACTOR, name: '관리자', admin: true },
+  ];
+  for (const row of rows.results) {
+    const state = JSON.parse(row.state) as State;
+    for (const employee of state.employees) {
+      members.push({ team: row.id, id: employee.id, name: employee.name || employee.id });
     }
-    if (!workspace) throw Error('등록된 생년월일을 찾을 수 없습니다. 관리자에게 확인하세요.');
   }
-  const workspaceRow = rows.results.find((row) => row.id === workspace) || null;
+  return members;
+}
+
+export async function createBirthSession(
+  team: string,
+  actor: string,
+  birthDate = '',
+  password = '',
+) {
+  if (!team || !actor || team.length > 100 || actor.length > 100) {
+    throw Error('직원을 선택하세요.');
+  }
+  if (!/^\d{8}$/.test(birthDate)) throw Error('생년월일 8자리를 입력하세요.');
+  // 관리자 여부는 고른 id 로만 가릅니다. 'admin' 을 흉내 낸 요청도 관리자 생년월일·비밀번호를 거쳐야 합니다.
+  const admin = actor === ADMIN_ACTOR;
+  const workspaceRow = await env.DB
+    .prepare('SELECT id, owner, state, version FROM workspaces WHERE id = ?')
+    .bind(team)
+    .first<WorkspaceRow>();
   const state = workspaceRow ? (JSON.parse(workspaceRow.state) as State) : null;
-  if (!(await verifyPassword(workspace, actor, state, admin, password))) {
+  const employee = admin ? null : state?.employees.find((candidate) => candidate.id === actor);
+  if (!admin && !employee) throw Error('등록되지 않은 직원입니다. 관리자에게 확인하세요.');
+  // 생년월일이 비어 있는 직원은 로그인할 수 없습니다. 관리자가 직원 관리에서 먼저 채워야 합니다.
+  if (employee && !employee.birthDate) {
+    throw Error('생년월일이 등록되지 않았습니다. 관리자에게 등록을 요청하세요.');
+  }
+  // 어느 쪽이 틀렸는지는 알려주지 않습니다.
+  const birthOk = admin ? birthDate === MASTER_BIRTH_DATE : employee!.birthDate === birthDate;
+  if (!birthOk || !(await verifyPassword(team, actor, admin, password))) {
     throw Error('생년월일 또는 비밀번호를 확인하세요.');
   }
 
@@ -154,14 +171,14 @@ export async function createBirthSession(birthDate: string, password = '', prefe
   await env.DB.prepare(
     'INSERT INTO birth_sessions (token, workspace, actor, admin, expires_at) VALUES (?, ?, ?, ?, ?)',
   )
-    .bind(token, workspace, actor, admin ? 1 : 0, expiresAt.toISOString())
+    .bind(token, team, actor, admin ? 1 : 0, expiresAt.toISOString())
     .run();
   return {
     token,
     expiresAt,
-    team: workspace,
+    team,
     actor: { id: actor, admin },
-    passwordChanged: admin || Boolean(await credentialFor(workspace, actor)),
+    passwordChanged: admin || Boolean(await credentialFor(team, actor)),
   };
 }
 
@@ -176,9 +193,9 @@ export async function updatePassword(request: Request, currentPassword: string, 
     throw Error('새 비밀번호는 8~128자로 입력하세요.');
   }
   const session = await getBirthSession(request);
-  if (!session) throw Error('생년월일로 로그인한 뒤 변경할 수 있습니다.');
+  if (!session) throw Error('로그인한 뒤 변경할 수 있습니다.');
   if (session.actor.admin) throw Error('관리자 비밀번호는 변경할 수 없습니다.');
-  if (!(await verifyPassword(session.team, session.actor.id, session.state, session.actor.admin, currentPassword))) {
+  if (!(await verifyPassword(session.team, session.actor.id, session.actor.admin, currentPassword))) {
     throw Error('현재 비밀번호를 확인하세요.');
   }
   const salt = crypto.randomUUID();

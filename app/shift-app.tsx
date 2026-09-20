@@ -72,7 +72,14 @@ import {
   localDate,
   duration,
   payroll,
+  lateBy,
+  scheduledFor,
+  wholeWeeks,
+  OT_DAILY_HOURS,
+  OT_WEEKLY_HOURS,
+  OT_MULTIPLIER,
   canSwap,
+  leadDate,
   blockedBy,
   weekdayOf,
   type Employee,
@@ -129,6 +136,8 @@ function Pick({
 }
 const nav = [
   { key: 'schedule', label: '근무 스케줄', Icon: CalendarDays },
+  { key: 'timeoff', label: '휴무', Icon: CalendarX },
+  { key: 'availability', label: '근무 가능 시간', Icon: CalendarClock },
   { key: 'attendance', label: '출근 기록', Icon: Clock3 },
   { key: 'payroll', label: '급여 관리', Icon: Wallet },
   { key: 'swaps', label: '대체 근무', Icon: ArrowLeftRight },
@@ -657,8 +666,14 @@ export default function ShiftApp() {
         '직원 ID',
         '이름',
         '실근무시간',
+        '정규시간',
+        '초과시간',
         '시급',
         '기본급',
+        '초과수당',
+        '지각(분)',
+        '지각일수',
+        '지각 차감',
         '대체 추가수당',
         '예상 급여',
         '통화',
@@ -669,8 +684,15 @@ export default function ShiftApp() {
         r.e.id,
         r.e.name,
         r.hours.toFixed(2),
+        r.regularHours.toFixed(2),
+        r.otHours.toFixed(2),
         r.e.rate,
         r.base,
+        r.otPay,
+        r.lateMinutes,
+        r.lateDays,
+        // 화면과 같은 부호로 내보내 시트에서 열을 합산해도 결과가 맞습니다.
+        -r.lateDeduction || 0,
         r.bonus,
         r.total,
         data.currency,
@@ -730,8 +752,285 @@ export default function ShiftApp() {
         )}
       </div>
     );
+  const offShifts = (r: (typeof timeOff)[number]) =>
+    data.shifts.filter(
+      (s) =>
+        s.employeeId === r.employeeId &&
+        blockedBy({ ...data, timeOff: [{ ...r, status: 'approved' }], availability: [] }, s),
+    );
+  const staffList = actor.admin ? data.employees : data.employees.filter((e) => e.id === actor.id);
+  const openTimeOff = () =>
+    open('timeOffRequest', {
+      employeeId: actor.admin ? data.employees[0]?.id || '' : actor.id,
+      from: leadDate(),
+      to: leadDate(),
+      allDay: '1',
+      start: '09:00',
+      end: '13:00',
+      reason: '',
+    });
+  const openAvailability = (weekday = '1', employeeId = '') =>
+    open('availabilitySet', {
+      employeeId: employeeId || (actor.admin ? data.employees[0]?.id || '' : actor.id),
+      weekday,
+      allDay: '1',
+      start: '09:00',
+      end: '13:00',
+      note: '',
+    });
   const otherTabs = (
     <>
+            <TabsContent value="timeoff">
+              <div className="panel contentpanel">
+                <div className="sectionhead">
+                  <div>
+                    <h2>{t('휴무')}</h2>
+                    <p>
+                      {actor.admin
+                        ? t('직원 휴무 신청을 확인하고 승인하세요. 승인된 휴무와 겹치는 근무는 스케줄에 경고로 표시됩니다.')
+                        : t('휴무는 시작일 7일 전까지 신청할 수 있고, 관리자가 승인합니다. 대기 중인 신청은 직접 취소할 수 있습니다.')}
+                    </p>
+                  </div>
+                  <button className="button primary" disabled={setup} onClick={openTimeOff}>
+                    <Plus size={16} /> {actor.admin ? t('휴무 추가') : t('휴무 신청')}
+                  </button>
+                </div>
+                <div className="segmented" role="tablist" aria-label={t('상태')}>
+                  {(['pending', 'approved', 'declined', 'all'] as const).map((k) => (
+                    <button
+                      key={k}
+                      role="tab"
+                      aria-selected={offFilter === k}
+                      className={offFilter === k ? 'on' : ''}
+                      onClick={() => setOffFilter(k)}
+                    >
+                      {k === 'all' ? t('전체') : statusLabel(k)}
+                      <em>
+                        {k === 'all' ? timeOff.length : timeOff.filter((r) => r.status === k).length}
+                      </em>
+                    </button>
+                  ))}
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {['직원', '기간', '시간', '사유', '겹치는 근무', '상태', ''].map((h) => (
+                        <TableHead key={h}>{t(h)}</TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {timeOff
+                      .filter((r) => offFilter === 'all' || r.status === offFilter)
+                      .slice()
+                      .sort((a, b) => a.from.localeCompare(b.from))
+                      .map((r) => {
+                        const clash = offShifts(r);
+                        return (
+                          <TableRow key={r.id}>
+                            <TableCell>{box(emp(r.employeeId))}</TableCell>
+                            <TableCell>
+                              {r.from === r.to ? longDate(r.from) : longDate(r.from) + ' – ' + longDate(r.to)}
+                            </TableCell>
+                            <TableCell>{span(r)}</TableCell>
+                            <TableCell className="cell-wrap">{r.reason || '—'}</TableCell>
+                            <TableCell>
+                              {clash.length ? (
+                                <span className="clash">
+                                  <TriangleAlert size={14} /> {t('{n}개', { n: clash.length })}
+                                </span>
+                              ) : (
+                                '—'
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <span className={'statuspill ' + r.status}>{statusLabel(r.status)}</span>
+                            </TableCell>
+                            <TableCell>
+                              <span className="rowactions">
+                                {actor.admin && r.status === 'pending' && (
+                                  <>
+                                    <button
+                                      className="button primary"
+                                      disabled={busy}
+                                      onClick={() =>
+                                        command('timeOffDecision', { id: r.id, action: 'approve' })
+                                      }
+                                    >
+                                      {t('승인')}
+                                    </button>
+                                    <button
+                                      className="button"
+                                      disabled={busy}
+                                      onClick={() =>
+                                        command('timeOffDecision', { id: r.id, action: 'decline' })
+                                      }
+                                    >
+                                      {t('거절')}
+                                    </button>
+                                  </>
+                                )}
+                                {(actor.admin || r.status === 'pending') && (
+                                  <button
+                                    className="button"
+                                    disabled={busy}
+                                    onClick={() =>
+                                      command('timeOffDecision', { id: r.id, action: 'cancel' })
+                                    }
+                                  >
+                                    {actor.admin ? t('삭제') : t('취소')}
+                                  </button>
+                                )}
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                  </TableBody>
+                </Table>
+                {!timeOff.filter((r) => offFilter === 'all' || r.status === offFilter).length && (
+                  <div className="empty">
+                    <CalendarX size={28} />
+                    <h3>{t('표시할 휴무가 없습니다.')}</h3>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+            <TabsContent value="availability">
+              <div className="panel contentpanel">
+                <div className="sectionhead">
+                  <div>
+                    <h2>{t('근무 가능 시간')}</h2>
+                    <p>
+                      {actor.admin
+                        ? t('매주 반복되는 근무 불가 시간입니다. 승인된 불가 시간과 겹치는 근무는 스케줄에 경고로 표시됩니다.')
+                        : t('매주 일할 수 없는 요일·시간을 등록하면 관리자가 승인합니다. 등록일로부터 7일 뒤 근무부터 적용됩니다.')}
+                    </p>
+                  </div>
+                  <button className="button primary" disabled={setup} onClick={() => openAvailability()}>
+                    <Plus size={16} /> {t('근무 불가 시간 추가')}
+                  </button>
+                </div>
+                <div className="gridscroll">
+                  <div className="availgrid">
+                    <div className="availhead">{t('직원')}</div>
+                    {days.map((d) => (
+                      <div className="availhead" key={d}>
+                        {d}
+                      </div>
+                    ))}
+                    {staffList.map((e) => (
+                      <div className="availrow" key={e.id}>
+                        <div className="availstaff">{box(e)}</div>
+                        {days.map((_, w) => {
+                          const list = availability.filter(
+                            (r) => r.employeeId === e.id && r.weekday === w && r.status !== 'declined',
+                          );
+                          return (
+                            <div className="availcell" key={w}>
+                              {list.length ? (
+                                list.map((r) => (
+                                  <span key={r.id} className={'availtag ' + r.status}>
+                                    {r.status === 'pending' ? t('대기') + ' · ' : ''}
+                                    {r.allDay ? t('종일 불가') : span(r) + ' ' + t('불가')}
+                                  </span>
+                                ))
+                              ) : (
+                                <button
+                                  className="availfree"
+                                  disabled={setup}
+                                  onClick={() => openAvailability(String(w), e.id)}
+                                  aria-label={t('{name} {day} 근무 불가 시간 추가', {
+                                    name: e.name,
+                                    day: days[w],
+                                  })}
+                                >
+                                  {t('가능')}
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <h3 className="subhead">{t('등록된 근무 불가 시간')}</h3>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {['직원', '요일', '시간', '적용 시작일', '메모', '상태', ''].map((h) => (
+                        <TableHead key={h}>{t(h)}</TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {availability
+                      .slice()
+                      .sort(
+                        (a, b) =>
+                          Number(b.status === 'pending') - Number(a.status === 'pending') ||
+                          name(a.employeeId).localeCompare(name(b.employeeId)) ||
+                          a.weekday - b.weekday,
+                      )
+                      .map((r) => (
+                        <TableRow key={r.id}>
+                          <TableCell>{box(emp(r.employeeId))}</TableCell>
+                          <TableCell>{days[r.weekday]}</TableCell>
+                          <TableCell>{span(r)}</TableCell>
+                          <TableCell>{r.effectiveFrom ? longDate(r.effectiveFrom) : '—'}</TableCell>
+                          <TableCell className="cell-wrap">{r.note || '—'}</TableCell>
+                          <TableCell>
+                            <span className={'statuspill ' + r.status}>{statusLabel(r.status)}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="rowactions">
+                              {actor.admin && r.status === 'pending' && (
+                                <>
+                                  <button
+                                    className="button primary"
+                                    disabled={busy}
+                                    onClick={() =>
+                                      command('availabilityDecision', { id: r.id, action: 'approve' })
+                                    }
+                                  >
+                                    {t('승인')}
+                                  </button>
+                                  <button
+                                    className="button"
+                                    disabled={busy}
+                                    onClick={() =>
+                                      command('availabilityDecision', { id: r.id, action: 'decline' })
+                                    }
+                                  >
+                                    {t('거절')}
+                                  </button>
+                                </>
+                              )}
+                              <button
+                                className="button"
+                                disabled={busy}
+                                onClick={() =>
+                                  command('availabilityDecision', { id: r.id, action: 'delete' })
+                                }
+                              >
+                                {t('삭제')}
+                              </button>
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+                {!availability.length && (
+                  <div className="empty">
+                    <CalendarClock size={28} />
+                    <h3>{t('등록된 근무 불가 시간이 없습니다.')}</h3>
+                    <p>{t('모든 요일에 근무할 수 있는 것으로 표시됩니다.')}</p>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
           <TabsContent value="attendance">
             <div className="panel contentpanel">
               <div className="sectionhead">
@@ -836,31 +1135,54 @@ export default function ShiftApp() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    {['직원', '근무일', '출근', '퇴근', '휴게', '실근무'].map(
-                      (h) => (
-                        <TableHead key={h}>{t(h)}</TableHead>
-                      ),
-                    )}
+                    {[
+                      '직원',
+                      '근무일',
+                      '예정 출근',
+                      '출근',
+                      '퇴근',
+                      '휴게',
+                      '실근무',
+                      '지각',
+                    ].map((h) => (
+                      <TableHead key={h}>{t(h)}</TableHead>
+                    ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {data.attendance
                     .filter((a) => actor.admin || a.employeeId === actor.id)
-                    .map((a) => (
-                    <TableRow key={a.id}>
-                      <TableCell>{box(emp(a.employeeId))}</TableCell>
-                      <TableCell>{a.date}</TableCell>
-                      <TableCell>{a.start}</TableCell>
-                      <TableCell>
-                        {a.end}
-                        {a.end < a.start ? t(' (+1일)') : ''}
-                      </TableCell>
-                      <TableCell>{t('{n}분', { n: a.breakMinutes })}</TableCell>
-                      <TableCell>
-                        {duration(a.start, a.end, a.breakMinutes).toFixed(2)}h
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                    .map((a) => {
+                      // 예정 근무가 없는 기록은 지각 기준이 없어 '정시'가 아니라 '예정 없음'입니다.
+                      const planned = scheduledFor(data, a);
+                      const late = lateBy(data, a);
+                      return (
+                        <TableRow key={a.id}>
+                          <TableCell>{box(emp(a.employeeId))}</TableCell>
+                          <TableCell>{a.date}</TableCell>
+                          <TableCell>{planned ? planned.start : '—'}</TableCell>
+                          <TableCell>{a.start}</TableCell>
+                          <TableCell>
+                            {a.end}
+                            {a.end < a.start ? t(' (+1일)') : ''}
+                          </TableCell>
+                          <TableCell>
+                            {t('{n}분', { n: a.breakMinutes })}
+                          </TableCell>
+                          <TableCell>
+                            {duration(a.start, a.end, a.breakMinutes).toFixed(2)}
+                            h
+                          </TableCell>
+                          <TableCell className={late ? 'red' : undefined}>
+                            {late === null
+                              ? t('예정 없음')
+                              : late
+                                ? t('{n}분 지각', { n: late })
+                                : t('정시')}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                 </TableBody>
               </Table>
               {!data.attendance.filter((a) => actor.admin || a.employeeId === actor.id)
@@ -874,7 +1196,12 @@ export default function ShiftApp() {
               <div className="sectionhead">
                 <div>
                   <h2>{actor.admin ? t('예상 급여') : t('내 예상 급여')}</h2>
-                  <p>{t('실근무시간 × 직원별 시급 + 승인된 대체 추가수당')}</p>
+                  <p>
+                    {t(
+                      '정규 {r}시간까지 시급 × 실근무, 초과분 {m}배 가산, 지각 차감, 승인된 대체 추가수당',
+                      { r: OT_WEEKLY_HOURS, m: OT_MULTIPLIER },
+                    )}
+                  </p>
                 </div>
                 {actor.admin && (
                   <button className="button" onClick={exportPayroll}>
@@ -906,7 +1233,17 @@ export default function ShiftApp() {
               </div>
               <div className="policy">
                 {t(
-                  '세금·초과근무 가산·유급휴가를 제외한 예상 금액입니다. 시급 0인 직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급 대상이 아니며 실제 출근기록만 지급합니다.',
+                  '초과근무는 하루 {d}시간 초과분과 한 주(일요일 시작) {w}시간 초과분 중 큰 쪽만 {m}배로 가산합니다. 지각은 예정 출근 시각을 넘긴 분만큼 시급으로 차감하며, 예정 근무가 없는 출근기록은 지각으로 보지 않습니다. 세금·유급휴가를 제외한 예상 금액이고, 시급 0인 직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급 대상이 아니며 실제 출근기록만 지급합니다.',
+                  { d: OT_DAILY_HOURS, w: OT_WEEKLY_HOURS, m: OT_MULTIPLIER },
+                )}
+                {/* 주 단위로 끊기지 않은 구간은 걸쳐 있는 주의 초과근무가 적게 잡힙니다. */}
+                {!wholeWeeks(from, to) && (
+                  <b className="red">
+                    {' '}
+                    {t(
+                      '조회 구간이 주(일요일~토요일) 단위가 아니어서 걸쳐 있는 주의 초과근무가 실제보다 적게 잡힐 수 있습니다.',
+                    )}
+                  </b>
                 )}
               </div>
               <Table>
@@ -915,8 +1252,12 @@ export default function ShiftApp() {
                     {[
                       '직원',
                       '실근무',
+                      '정규',
+                      '초과',
                       '시급',
                       '기본급',
+                      '초과수당',
+                      '지각 차감',
                       '대체 추가수당',
                       '예상 급여',
                     ].map((h) => (
@@ -929,11 +1270,27 @@ export default function ShiftApp() {
                       <TableRow key={r.e.id}>
                         <TableCell>{box(r.e)}</TableCell>
                         <TableCell>{r.hours.toFixed(2)}h</TableCell>
+                        <TableCell>{r.regularHours.toFixed(2)}h</TableCell>
+                        <TableCell>{r.otHours.toFixed(2)}h</TableCell>
                         <TableCell>
                           {r.e.rate ? money(r.e.rate) : t('설정 필요')}
                         </TableCell>
                         <TableCell>{money(r.base)}</TableCell>
-                        <TableCell className="green">
+                        <TableCell className={r.otPay ? 'green' : undefined}>
+                          +{money(r.otPay)}
+                        </TableCell>
+                        <TableCell
+                          className={r.lateDeduction ? 'red' : undefined}
+                        >
+                          {r.lateMinutes
+                            ? t('-{money} · {n}분 {d}일', {
+                                money: money(r.lateDeduction),
+                                n: r.lateMinutes,
+                                d: r.lateDays,
+                              })
+                            : money(0)}
+                        </TableCell>
+                        <TableCell className={r.bonus ? 'green' : undefined}>
                           +{money(r.bonus)}
                         </TableCell>
                         <TableCell>
@@ -1201,7 +1558,7 @@ export default function ShiftApp() {
                       onFocus={(e) => e.target.select()}
                     />
                       <small>
-                      {t('직원의 생년월일 8자리로 로그인합니다. 생년월일은 로그인 설정에서 관리하세요.')}
+                      {t('직원은 로그인 화면에서 자기 이름을 골라 로그인합니다. 초기 비밀번호는 1111이며, 직원이 직접 변경할 수 있습니다.')}
                     </small>
                   </div>
                 )}
@@ -1498,6 +1855,7 @@ export default function ShiftApp() {
                     <input
                       type="date"
                       required
+                      min={actor.admin ? undefined : leadDate()}
                       value={form.from || ''}
                       onChange={(e) => {
                         const from = e.target.value;
@@ -1522,6 +1880,9 @@ export default function ShiftApp() {
                     />
                   </label>
                 </div>
+                {!actor.admin && (
+                  <p className="hint">{t('휴무는 시작일 7일 전까지 신청할 수 있습니다.')}</p>
+                )}
                 <label className="recipient all">
                   <Checkbox
                     checked={form.allDay === '1'}
@@ -1575,8 +1936,8 @@ export default function ShiftApp() {
                 {input('note', t('메모 (선택)'), 'text', false)}
                 <p className="hint">
                   {actor.admin
-                    ? t('관리자가 등록하면 바로 승인됩니다. 매주 같은 요일에 반복 적용됩니다.')
-                    : t('관리자가 승인하면 매주 같은 요일에 반복 적용됩니다.')}
+                    ? t('관리자가 등록하면 바로 승인되고 오늘 근무부터 적용됩니다. 매주 같은 요일에 반복 적용됩니다.')
+                    : t('관리자가 승인하면 매주 같은 요일에 반복 적용됩니다. 등록일로부터 7일 뒤 근무부터 적용됩니다.')}
                 </p>
               </>
             )}
@@ -1908,6 +2269,22 @@ export default function ShiftApp() {
                 aria-label={t('다시 불러오기')}
               >
                 <RefreshCw size={15} />
+              </button>
+            </div>
+          )}
+          {actor.admin && (pendingOff.length > 0 || pendingAvail.length > 0) && (
+            <div className="demo-banner setup">
+              <span>
+                {t('확인이 필요한 요청 · 휴무 {a}건 · 근무 불가 시간 {b}건', {
+                  a: pendingOff.length,
+                  b: pendingAvail.length,
+                })}
+              </span>
+              <button
+                className="button"
+                onClick={() => setTab(pendingOff.length ? 'timeoff' : 'availability')}
+              >
+                {t('확인하기')}
               </button>
             </div>
           )}
@@ -2356,32 +2733,6 @@ export default function ShiftApp() {
     </TabsContent>
   );
   // Shifts this request would block if approved (or already blocks).
-  const offShifts = (r: (typeof timeOff)[number]) =>
-    data.shifts.filter(
-      (s) =>
-        s.employeeId === r.employeeId &&
-        blockedBy({ ...data, timeOff: [{ ...r, status: 'approved' }], availability: [] }, s),
-    );
-  const staffList = actor.admin ? data.employees : data.employees.filter((e) => e.id === actor.id);
-  const openTimeOff = () =>
-    open('timeOffRequest', {
-      employeeId: actor.admin ? data.employees[0]?.id || '' : actor.id,
-      from: addDays(localDate(new Date()), 7),
-      to: addDays(localDate(new Date()), 7),
-      allDay: '1',
-      start: '09:00',
-      end: '13:00',
-      reason: '',
-    });
-  const openAvailability = (weekday = '1', employeeId = '') =>
-    open('availabilitySet', {
-      employeeId: employeeId || (actor.admin ? data.employees[0]?.id || '' : actor.id),
-      weekday,
-      allDay: '1',
-      start: '09:00',
-      end: '13:00',
-      note: '',
-    });
   return (
     <div
       className={
@@ -2989,256 +3340,6 @@ export default function ShiftApp() {
                   </div>
                 )}
               </section>
-            </TabsContent>
-            <TabsContent value="timeoff">
-              <div className="panel contentpanel">
-                <div className="sectionhead">
-                  <div>
-                    <h2>{t('휴무')}</h2>
-                    <p>
-                      {actor.admin
-                        ? t('직원 휴무 신청을 확인하고 승인하세요. 승인된 휴무와 겹치는 근무는 스케줄에 경고로 표시됩니다.')
-                        : t('휴무를 신청하면 관리자가 승인합니다. 대기 중인 신청은 직접 취소할 수 있습니다.')}
-                    </p>
-                  </div>
-                  <button className="button primary" disabled={setup} onClick={openTimeOff}>
-                    <Plus size={16} /> {actor.admin ? t('휴무 추가') : t('휴무 신청')}
-                  </button>
-                </div>
-                <div className="segmented" role="tablist" aria-label={t('상태')}>
-                  {(['pending', 'approved', 'declined', 'all'] as const).map((k) => (
-                    <button
-                      key={k}
-                      role="tab"
-                      aria-selected={offFilter === k}
-                      className={offFilter === k ? 'on' : ''}
-                      onClick={() => setOffFilter(k)}
-                    >
-                      {k === 'all' ? t('전체') : statusLabel(k)}
-                      <em>
-                        {k === 'all' ? timeOff.length : timeOff.filter((r) => r.status === k).length}
-                      </em>
-                    </button>
-                  ))}
-                </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      {['직원', '기간', '시간', '사유', '겹치는 근무', '상태', ''].map((h) => (
-                        <TableHead key={h}>{t(h)}</TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {timeOff
-                      .filter((r) => offFilter === 'all' || r.status === offFilter)
-                      .slice()
-                      .sort((a, b) => a.from.localeCompare(b.from))
-                      .map((r) => {
-                        const clash = offShifts(r);
-                        return (
-                          <TableRow key={r.id}>
-                            <TableCell>{box(emp(r.employeeId))}</TableCell>
-                            <TableCell>
-                              {r.from === r.to ? longDate(r.from) : longDate(r.from) + ' – ' + longDate(r.to)}
-                            </TableCell>
-                            <TableCell>{span(r)}</TableCell>
-                            <TableCell className="cell-wrap">{r.reason || '—'}</TableCell>
-                            <TableCell>
-                              {clash.length ? (
-                                <span className="clash">
-                                  <TriangleAlert size={14} /> {t('{n}개', { n: clash.length })}
-                                </span>
-                              ) : (
-                                '—'
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <span className={'statuspill ' + r.status}>{statusLabel(r.status)}</span>
-                            </TableCell>
-                            <TableCell>
-                              <span className="rowactions">
-                                {actor.admin && r.status === 'pending' && (
-                                  <>
-                                    <button
-                                      className="button primary"
-                                      disabled={busy}
-                                      onClick={() =>
-                                        command('timeOffDecision', { id: r.id, action: 'approve' })
-                                      }
-                                    >
-                                      {t('승인')}
-                                    </button>
-                                    <button
-                                      className="button"
-                                      disabled={busy}
-                                      onClick={() =>
-                                        command('timeOffDecision', { id: r.id, action: 'decline' })
-                                      }
-                                    >
-                                      {t('거절')}
-                                    </button>
-                                  </>
-                                )}
-                                {(actor.admin || r.status === 'pending') && (
-                                  <button
-                                    className="button"
-                                    disabled={busy}
-                                    onClick={() =>
-                                      command('timeOffDecision', { id: r.id, action: 'cancel' })
-                                    }
-                                  >
-                                    {actor.admin ? t('삭제') : t('취소')}
-                                  </button>
-                                )}
-                              </span>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                  </TableBody>
-                </Table>
-                {!timeOff.filter((r) => offFilter === 'all' || r.status === offFilter).length && (
-                  <div className="empty">
-                    <CalendarX size={28} />
-                    <h3>{t('표시할 휴무가 없습니다.')}</h3>
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-            <TabsContent value="availability">
-              <div className="panel contentpanel">
-                <div className="sectionhead">
-                  <div>
-                    <h2>{t('근무 가능 시간')}</h2>
-                    <p>
-                      {actor.admin
-                        ? t('매주 반복되는 근무 불가 시간입니다. 승인된 불가 시간과 겹치는 근무는 스케줄에 경고로 표시됩니다.')
-                        : t('매주 일할 수 없는 요일·시간을 등록하면 관리자가 승인합니다.')}
-                    </p>
-                  </div>
-                  <button className="button primary" disabled={setup} onClick={() => openAvailability()}>
-                    <Plus size={16} /> {t('근무 불가 시간 추가')}
-                  </button>
-                </div>
-                <div className="gridscroll">
-                  <div className="availgrid">
-                    <div className="availhead">{t('직원')}</div>
-                    {days.map((d) => (
-                      <div className="availhead" key={d}>
-                        {d}
-                      </div>
-                    ))}
-                    {staffList.map((e) => (
-                      <div className="availrow" key={e.id}>
-                        <div className="availstaff">{box(e)}</div>
-                        {days.map((_, w) => {
-                          const list = availability.filter(
-                            (r) => r.employeeId === e.id && r.weekday === w && r.status !== 'declined',
-                          );
-                          return (
-                            <div className="availcell" key={w}>
-                              {list.length ? (
-                                list.map((r) => (
-                                  <span key={r.id} className={'availtag ' + r.status}>
-                                    {r.status === 'pending' ? t('대기') + ' · ' : ''}
-                                    {r.allDay ? t('종일 불가') : span(r) + ' ' + t('불가')}
-                                  </span>
-                                ))
-                              ) : (
-                                <button
-                                  className="availfree"
-                                  disabled={setup}
-                                  onClick={() => openAvailability(String(w), e.id)}
-                                  aria-label={t('{name} {day} 근무 불가 시간 추가', {
-                                    name: e.name,
-                                    day: days[w],
-                                  })}
-                                >
-                                  {t('가능')}
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <h3 className="subhead">{t('등록된 근무 불가 시간')}</h3>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      {['직원', '요일', '시간', '메모', '상태', ''].map((h) => (
-                        <TableHead key={h}>{t(h)}</TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {availability
-                      .slice()
-                      .sort(
-                        (a, b) =>
-                          Number(b.status === 'pending') - Number(a.status === 'pending') ||
-                          name(a.employeeId).localeCompare(name(b.employeeId)) ||
-                          a.weekday - b.weekday,
-                      )
-                      .map((r) => (
-                        <TableRow key={r.id}>
-                          <TableCell>{box(emp(r.employeeId))}</TableCell>
-                          <TableCell>{days[r.weekday]}</TableCell>
-                          <TableCell>{span(r)}</TableCell>
-                          <TableCell className="cell-wrap">{r.note || '—'}</TableCell>
-                          <TableCell>
-                            <span className={'statuspill ' + r.status}>{statusLabel(r.status)}</span>
-                          </TableCell>
-                          <TableCell>
-                            <span className="rowactions">
-                              {actor.admin && r.status === 'pending' && (
-                                <>
-                                  <button
-                                    className="button primary"
-                                    disabled={busy}
-                                    onClick={() =>
-                                      command('availabilityDecision', { id: r.id, action: 'approve' })
-                                    }
-                                  >
-                                    {t('승인')}
-                                  </button>
-                                  <button
-                                    className="button"
-                                    disabled={busy}
-                                    onClick={() =>
-                                      command('availabilityDecision', { id: r.id, action: 'decline' })
-                                    }
-                                  >
-                                    {t('거절')}
-                                  </button>
-                                </>
-                              )}
-                              <button
-                                className="button"
-                                disabled={busy}
-                                onClick={() =>
-                                  command('availabilityDecision', { id: r.id, action: 'delete' })
-                                }
-                              >
-                                {t('삭제')}
-                              </button>
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
-                {!availability.length && (
-                  <div className="empty">
-                    <CalendarClock size={28} />
-                    <h3>{t('등록된 근무 불가 시간이 없습니다.')}</h3>
-                    <p>{t('모든 요일에 근무할 수 있는 것으로 표시됩니다.')}</p>
-                  </div>
-                )}
-              </div>
             </TabsContent>
             {comingSoon('dashboard', LayoutDashboard, '대시보드', '오늘 근무자, 이번 주 근무시간과 인건비, 처리할 요청을 한 화면에 모아 보여줄 예정입니다.')}
             {comingSoon('training', GraduationCap, '교육', '교육 자료를 직원에게 배정하고 이수 여부를 확인하는 기능을 준비하고 있습니다.')}
