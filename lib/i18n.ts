@@ -239,8 +239,8 @@ const en: Record<string, string> = {
     "Each employee's color is the same on every screen.",
   '대체 신청·승인 · 근무일 7일 전까지': 'Swap request & approval · at least 7 days before the shift',
   '실제 출근기록으로 정확하게': 'Accurate, from real attendance records',
-  '출근기계 엑셀을 업로드하면 근무시간과 예상 급여를 계산합니다.':
-    "Upload the time clock's Excel export to calculate hours and estimated pay.",
+  '출근기계 엑셀·CSV를 업로드하면 근무시간과 예상 급여를 계산합니다.':
+    "Upload the time clock's Excel or CSV export to calculate hours and estimated pay.",
   '출근기록 가져오기 →': 'Import attendance →',
   '월간 근무 일정': 'Monthly schedule',
   '이전 달': 'Previous month',
@@ -255,9 +255,10 @@ const en: Record<string, string> = {
     'Records are matched by employee ID. Duplicate or overlapping records are not saved.',
   '출근기계 기록을 읽기 전용으로 확인합니다.': 'Your time clock records (read-only).',
   '엑셀 양식': 'Excel template',
-  '출근기계에서 내보낸 엑셀을 선택하세요': 'Choose the Excel file exported from the time clock',
-  '.xlsx · 첫 번째 시트 · 최대 5MB / 3,000행': '.xlsx · first sheet · up to 5 MB / 3,000 rows',
-  '1. 엑셀 열 연결': '1. Match Excel columns',
+  '출근기계에서 내보낸 엑셀·CSV 파일을 선택하세요':
+    'Choose the Excel or CSV file exported from the time clock',
+  '.xlsx · .csv · 최대 5MB / 3,000행': '.xlsx · .csv · up to 5 MB / 3,000 rows',
+  '1. 열 연결': '1. Match columns',
   '없음 · 0분': 'None · 0 min',
   '열 {n}': 'Column {n}',
   '2. 미리보기 · {n}개 기록': '2. Preview · {n} records',
@@ -568,7 +569,8 @@ const en: Record<string, string> = {
   '본인에게 배정된 작업만 처리할 수 있습니다.': 'You can only update tasks assigned to you.',
   '잘못된 작업 처리입니다.': 'Invalid task action.',
   '5MB 이하 파일만 업로드할 수 있습니다.': 'Only files up to 5 MB can be uploaded.',
-  '.xlsx 형식으로 저장한 파일을 선택하세요.': 'Choose a file saved as .xlsx.',
+  '.xlsx 또는 .csv 형식으로 저장한 파일을 선택하세요.':
+    'Choose a file saved as .xlsx or .csv.',
   '첫 번째 시트가 비어 있습니다.': 'The first sheet is empty.',
   '최대 3,000개 행을 가져올 수 있습니다.': 'You can import up to 3,000 rows.',
   '제목 행과 출근기록이 필요합니다.': 'The file needs a header row and attendance rows.',

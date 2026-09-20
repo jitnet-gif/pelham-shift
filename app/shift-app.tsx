@@ -87,7 +87,7 @@ import {
   type State,
 } from '@/lib/domain';
 import {
-  readWorkbook,
+  readAttendanceFile,
   mapRows,
   fields,
   downloadTemplate,
@@ -715,7 +715,7 @@ export default function ShiftApp() {
   async function loadFile(file: File) {
     setBusy(true);
     try {
-      const r = await readWorkbook(file);
+      const r = await readAttendanceFile(file);
       setRows(r);
       setFilename(file.name);
       const m: Record<string, string> = {};
@@ -1135,7 +1135,7 @@ export default function ShiftApp() {
                   <input
                     hidden
                     type="file"
-                    accept=".xlsx"
+                    accept=".xlsx,.csv"
                     ref={fileRef}
                     onChange={(e) => {
                       if (e.target.files?.[0]) void loadFile(e.target.files[0]);
@@ -1148,12 +1148,12 @@ export default function ShiftApp() {
                     onClick={() => fileRef.current?.click()}
                   >
                     <Upload size={28} />
-                    <b>{filename || t('출근기계에서 내보낸 엑셀을 선택하세요')}</b>
-                    <span>{t('.xlsx · 첫 번째 시트 · 최대 5MB / 3,000행')}</span>
+                    <b>{filename || t('출근기계에서 내보낸 엑셀·CSV 파일을 선택하세요')}</b>
+                    <span>{t('.xlsx · .csv · 최대 5MB / 3,000행')}</span>
                   </button>
                   {rows.length > 0 && (
                     <div className="importreview">
-                      <h3>{t('1. 엑셀 열 연결')}</h3>
+                      <h3>{t('1. 열 연결')}</h3>
                       <div className="formgrid">
                         {fields.map(([key, label]) => (
                           <Pick
@@ -2772,7 +2772,7 @@ export default function ShiftApp() {
                 <Clock3 size={18} />
                 <b>{t('실제 출근기록으로 정확하게')}</b>
                 <span>
-                  {t('출근기계 엑셀을 업로드하면 근무시간과 예상 급여를 계산합니다.')}
+                  {t('출근기계 엑셀·CSV를 업로드하면 근무시간과 예상 급여를 계산합니다.')}
                 </span>
               </div>
               <button
