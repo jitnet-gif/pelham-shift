@@ -485,6 +485,68 @@ export default function ShiftApp() {
     for (const m of fresh) seenMessages.current.add(m.id);
     setInapp(fresh[fresh.length - 1]);
   }, [unreadKey]);
+  // 설치한 앱 아이콘(배지), 브라우저 탭 제목과 파비콘에도 안 읽은 개수를 올립니다.
+  useEffect(() => {
+    const count = unread.length;
+    // Next 가 기본 제목을 다시 써 넣는 경우가 있어, 제목이 바뀌면 개수를 다시 붙입니다.
+    const wanted = (count ? '(' + count + ') ' : '') + 'Pelham Shift · 근무 관리';
+    const keepTitle = () => {
+      if (document.title !== wanted) document.title = wanted;
+    };
+    keepTitle();
+    const titleTag = document.querySelector('title');
+    const watcher = new MutationObserver(keepTitle);
+    if (titleTag) watcher.observe(titleTag, { childList: true, characterData: true, subtree: true });
+    const badge = navigator as Navigator & {
+      setAppBadge?: (n?: number) => Promise<void>;
+      clearAppBadge?: () => Promise<void>;
+    };
+    // 홈 화면·작업 표시줄에 설치했을 때만 동작하고, 지원하지 않는 브라우저에서는 조용히 넘어갑니다.
+    if (count) void badge.setAppBadge?.(count).catch(() => 0);
+    else void badge.clearAppBadge?.().catch(() => 0);
+    const paint = (href: string) => {
+      let link = document.querySelector<HTMLLinkElement>('link[data-unread-icon]');
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        link.setAttribute('data-unread-icon', '');
+        document.head.appendChild(link);
+      }
+      link.href = href;
+    };
+    if (!count) {
+      paint('/icons/icon-192.png');
+      return () => watcher.disconnect();
+    }
+    let live = true;
+    const icon = new Image();
+    icon.src = '/icons/icon-192.png';
+    icon.onload = () => {
+      if (!live) return;
+      const size = 64;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(icon, 0, 0, size, size);
+      const radius = 21;
+      ctx.beginPath();
+      ctx.arc(size - radius, radius, radius, 0, Math.PI * 2);
+      ctx.fillStyle = '#c0503a';
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 30px Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(count > 9 ? '9+' : String(count), size - radius, radius + 1);
+      paint(canvas.toDataURL('image/png'));
+    };
+    return () => {
+      live = false;
+      watcher.disconnect();
+    };
+  }, [unread.length]);
   const money = (n: number) =>
     new Intl.NumberFormat(locale, {
       style: 'currency',
