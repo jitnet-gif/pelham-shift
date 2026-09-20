@@ -82,6 +82,7 @@ import {
   leadDate,
   blockedBy,
   weekdayOf,
+  AREAS,
   type Employee,
   type Message,
   type State,
@@ -1603,7 +1604,7 @@ export default function ShiftApp() {
                       email: '',
                       rate: '0',
                       color: '#087e6d',
-                      role: 'Outdoor',
+                      role: AREAS[0],
                     })
                   }
                 >
@@ -2554,7 +2555,7 @@ export default function ShiftApp() {
                             date: week,
                             start: '09:00',
                             end: '17:00',
-                            area: 'Outdoor',
+                            area: AREAS[0],
                           })
                         }
                       >
@@ -3163,7 +3164,7 @@ export default function ShiftApp() {
                                 email: '',
                                 rate: '0',
                                 color: '#087e6d',
-                                role: dept === 'all' ? 'Outdoor' : dept,
+                                role: dept === 'all' ? AREAS[0] : dept,
                               })
                             }
                           >
