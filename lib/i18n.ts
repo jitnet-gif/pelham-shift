@@ -425,6 +425,7 @@ const en: Record<string, string> = {
   '현재 비밀번호': 'Current password',
   '초기 비밀번호: 1111': 'Initial password: 1111',
   '새 비밀번호': 'New password',
+  '새 비밀번호 (4자 이상)': 'New password (4 or more characters)',
   '새 비밀번호 확인': 'Confirm new password',
   '변경 중…': 'Changing…',
   나중에: 'Later',
@@ -512,7 +513,7 @@ const en: Record<string, string> = {
   '생년월일 또는 비밀번호를 확인하세요.': 'Check your birth date or password.',
   '생년월일이 등록되지 않았습니다. 관리자에게 등록을 요청하세요.':
     'No birth date is registered for you. Ask your manager to add it.',
-  '새 비밀번호는 8~128자로 입력하세요.': 'The new password must be 8–128 characters.',
+  '새 비밀번호는 4~128자로 입력하세요.': 'The new password must be 4–128 characters.',
   '로그인한 뒤 변경할 수 있습니다.': 'Sign in to change it.',
   '관리자 비밀번호는 변경할 수 없습니다.': 'The manager password cannot be changed.',
   '현재 비밀번호를 확인하세요.': 'Check your current password.',

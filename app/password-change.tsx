@@ -72,10 +72,10 @@ export default function PasswordChange({
             />
           </label>
           <label className="field">
-            {t('새 비밀번호')}
+            {t('새 비밀번호 (4자 이상)')}
             <input
               type="password"
-              minLength={8}
+              minLength={4}
               maxLength={128}
               autoComplete="new-password"
               value={nextPassword}
@@ -87,7 +87,7 @@ export default function PasswordChange({
             {t('새 비밀번호 확인')}
             <input
               type="password"
-              minLength={8}
+              minLength={4}
               maxLength={128}
               autoComplete="new-password"
               value={confirmPassword}

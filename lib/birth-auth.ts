@@ -189,8 +189,9 @@ export async function deleteBirthSession(request: Request) {
 }
 
 export async function updatePassword(request: Request, currentPassword: string, nextPassword: string) {
-  if (nextPassword.length < 8 || nextPassword.length > 128) {
-    throw Error('새 비밀번호는 8~128자로 입력하세요.');
+  // 관리자 2222, 초기 1111 과 같은 네 자리 숫자를 직원이 그대로 쓸 수 있도록 최소 길이는 4자입니다.
+  if (nextPassword.length < 4 || nextPassword.length > 128) {
+    throw Error('새 비밀번호는 4~128자로 입력하세요.');
   }
   const session = await getBirthSession(request);
   if (!session) throw Error('로그인한 뒤 변경할 수 있습니다.');
