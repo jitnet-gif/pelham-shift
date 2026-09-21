@@ -1540,7 +1540,7 @@ export default function ShiftApp() {
                           {t('확인 {read} / {total}명 · {names} 미확인', {
                             read: m.readBy.filter(
                               (id) =>
-                                id !== 'admin' &&
+                                data.employees.some((e) => e.id === id) &&
                                 (m.recipients?.includes(id) ?? true),
                             ).length,
                             total: m.recipients?.length ?? data.employees.length,

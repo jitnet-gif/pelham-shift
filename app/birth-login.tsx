@@ -72,7 +72,7 @@ export default function BirthLogin() {
             <option value="">{t('선택하세요')}</option>
             {members.map((member) => (
               <option key={optionValue(member)} value={optionValue(member)}>
-                {member.admin ? t('관리자') : member.name}
+                {t(member.name)}
               </option>
             ))}
           </select>

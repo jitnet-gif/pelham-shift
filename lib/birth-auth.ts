@@ -2,9 +2,13 @@ import { env } from '@/lib/db';
 import type { State } from '@/lib/domain';
 
 const SESSION_COOKIE = 'pelham_birth_session';
-// 로그인 목록 맨 앞에 서는 관리자. 직원 id 와 겹치지 않도록 'admin' 을 씁니다.
-const ADMIN_ACTOR = 'admin';
-const MASTER_BIRTH_DATE = '19760802';
+// 로그인 목록 맨 앞에 서는 관리자들. 직원 id(E001…) 와 겹치지 않는 id 를 씁니다.
+const ADMINS = [
+  { id: 'admin', name: '관리자', birthDate: '19760802' },
+  { id: 'charlie', name: 'Charlie', birthDate: '19711101' },
+];
+const adminFor = (actor: string) => ADMINS.find((entry) => entry.id === actor) || null;
+// 관리자 비밀번호는 모두 같은 값을 쓰고, 직원처럼 바꿀 수 없습니다.
 const ADMIN_PASSWORD = '2222';
 // 비밀번호를 아직 바꾸지 않은 직원의 초기 비밀번호.
 const DEFAULT_PASSWORD = '1111';
@@ -125,9 +129,13 @@ export async function listMembers(preferredTeam = '') {
         .all<WorkspaceRow>();
   // 워크스페이스가 아직 없어도 관리자는 골라야 첫 설정을 시작할 수 있으므로 항상 넣습니다.
   // 없을 때의 'master' 는 첫 워크스페이스를 만들 때 쓰는 이름이라 그대로 둡니다.
-  const members: Member[] = [
-    { team: rows.results[0]?.id || 'master', id: ADMIN_ACTOR, name: '관리자', admin: true },
-  ];
+  const adminTeam = rows.results[0]?.id || 'master';
+  const members: Member[] = ADMINS.map((entry) => ({
+    team: adminTeam,
+    id: entry.id,
+    name: entry.name,
+    admin: true,
+  }));
   for (const row of rows.results) {
     const state = JSON.parse(row.state) as State;
     for (const employee of state.employees) {
@@ -147,8 +155,9 @@ export async function createBirthSession(
     throw Error('직원을 선택하세요.');
   }
   if (!/^\d{8}$/.test(birthDate)) throw Error('생년월일 8자리를 입력하세요.');
-  // 관리자 여부는 고른 id 로만 가릅니다. 'admin' 을 흉내 낸 요청도 관리자 생년월일·비밀번호를 거쳐야 합니다.
-  const admin = actor === ADMIN_ACTOR;
+  // 관리자 여부는 고른 id 로만 가릅니다. 관리자를 흉내 낸 요청도 그 관리자의 생년월일·비밀번호를 거쳐야 합니다.
+  const adminEntry = adminFor(actor);
+  const admin = adminEntry !== null;
   const workspaceRow = await env.DB
     .prepare('SELECT id, owner, state, version FROM workspaces WHERE id = ?')
     .bind(team)
@@ -161,7 +170,7 @@ export async function createBirthSession(
     throw Error('생년월일이 등록되지 않았습니다. 관리자에게 등록을 요청하세요.');
   }
   // 어느 쪽이 틀렸는지는 알려주지 않습니다.
-  const birthOk = admin ? birthDate === MASTER_BIRTH_DATE : employee!.birthDate === birthDate;
+  const birthOk = adminEntry ? birthDate === adminEntry.birthDate : employee!.birthDate === birthDate;
   if (!birthOk || !(await verifyPassword(team, actor, admin, password))) {
     throw Error('생년월일 또는 비밀번호를 확인하세요.');
   }
