@@ -593,6 +593,26 @@ export default function ShiftApp() {
       />
     </label>
   );
+  // 저장된 근무에는 목록에 없는 장소가 남아 있을 수 있어, 그 값도 선택지에 함께 둡니다.
+  // 일괄 수정의 '유지'는 빈 값으로 보내지만 빈 값은 고른 것이 없는 상태로 표시되어, 표식을 따로 씁니다.
+  const KEEP_AREA = '__keep';
+  const areaPick = (label: string, blank = '') => {
+    const current = form.area || '';
+    return (
+      <Pick
+        label={label}
+        value={current || (blank ? KEEP_AREA : '')}
+        onChange={(v) => put('area', v === KEEP_AREA ? '' : v)}
+        options={[
+          ...(blank ? [{ value: KEEP_AREA, label: blank }] : []),
+          ...AREAS.map((area) => ({ value: area, label: area })),
+          ...(current && !AREAS.some((area) => area === current)
+            ? [{ value: current, label: current }]
+            : []),
+        ]}
+      />
+    );
+  };
   const rainTargets = (form.targets || '').split(',').filter(Boolean);
   const rainAll =
     data.employees.length > 0 &&
@@ -1840,7 +1860,7 @@ export default function ShiftApp() {
                 <p className="hint">
                   {t('퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.')}
                 </p>
-                {input('area', t('업무 / 장소'))}
+                {areaPick(t('업무 / 장소'))}
               </>
             )}
             {modal === 'shiftUpdate' && !isBulk && (
@@ -1854,7 +1874,7 @@ export default function ShiftApp() {
                 <p className="hint">
                   {t('퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.')}
                 </p>
-                {input('area', t('업무 / 장소'))}
+                {areaPick(t('업무 / 장소'))}
               </>
             )}
             {isBulk && (
@@ -1940,7 +1960,7 @@ export default function ShiftApp() {
                   {input('start', t('새 출근'), 'time', false)}
                   {input('end', t('새 퇴근'), 'time', false)}
                 </div>
-                {input('area', t('새 업무 / 장소'), 'text', false)}
+                {areaPick(t('새 업무 / 장소'), t('기존 값 유지'))}
                 <p className="hint">
                   {t('비워 둔 항목은 기존 값을 그대로 유지합니다. 퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.')}
                 </p>

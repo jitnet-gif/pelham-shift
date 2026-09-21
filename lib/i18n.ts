@@ -219,6 +219,7 @@ const en: Record<string, string> = {
   '새 출근': 'New start',
   '새 퇴근': 'New end',
   '새 업무 / 장소': 'New role / location',
+  '기존 값 유지': 'Keep the current value',
   '비워 둔 항목은 기존 값을 그대로 유지합니다. 퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.':
     'Blank fields keep their current values. An end time earlier than the start counts as the next day.',
   '선택한 {n}개 근무 수정': 'Update {n} selected shifts',
