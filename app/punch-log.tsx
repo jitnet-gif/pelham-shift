@@ -78,9 +78,11 @@ export default function PunchLog({
     );
   const label = (status?: string) =>
     t(
-      ({ pending: '확인 대기', approved: '확인됨', disputed: '이의 있음' } as Record<string, string>)[
-        status ?? 'pending'
-      ] || '확인 대기',
+      ({
+        pending: 'review::확인 대기',
+        approved: '확인됨',
+        disputed: '이의 있음',
+      } as Record<string, string>)[status ?? 'pending'] || 'review::확인 대기',
     );
 
   if (!list.length)

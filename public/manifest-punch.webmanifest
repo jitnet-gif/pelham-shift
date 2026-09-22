@@ -2,7 +2,7 @@
   "id": "/attendance",
   "name": "Pelham Punch",
   "short_name": "Punch In",
-  "description": "출근·퇴근과 휴게 시간을 폰에서 바로 찍습니다",
+  "description": "Punch in, punch out and take breaks straight from your phone",
   "start_url": "/attendance",
   "scope": "/",
   "display": "standalone",

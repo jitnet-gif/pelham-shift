@@ -2,6 +2,10 @@
 export type Lang = 'ko' | 'en';
 export type Vars = Record<string, string | number>;
 
+// 화면에 나가는 말은 하나뿐입니다. 화면도 서버가 보내는 알림도 이 한 줄을 봅니다.
+// 여기를 'ko' 로 되돌리면 한국어 원문이 그대로 보입니다 — 번역 열쇠가 곧 한국어이기 때문입니다.
+export const SCREEN_LANG: Lang = 'en';
+
 export const isLang = (value: unknown): value is Lang => value === 'ko' || value === 'en';
 export const locale = (lang: Lang) => (lang === 'en' ? 'en-US' : 'ko-KR');
 export const weekdays = (lang: Lang) =>
@@ -46,6 +50,7 @@ const en: Record<string, string> = {
   비밀번호: 'Password',
   '작업 수신함': 'Task inbox',
   '팀의 시간, 더 간편하게.': "Your team's time, made simple.",
+  '주요 메뉴': 'Main menu',
   '불러오는 중…': 'Loading…',
   '다시 불러오기': 'Reload',
   선택하세요: 'Select',
@@ -258,6 +263,20 @@ const en: Record<string, string> = {
   '{date} 일정 보기': 'View {date}',
 
   // Attendance tab
+  '단말에서 찍힌 출퇴근과 그때 찍힌 사진을 봅니다.':
+    'The punches taken on the time clock, with the photo from that moment.',
+  '찍힌 출퇴근': 'Punches',
+  '출근기계에서 가져온 기록': 'Imported from the time clock',
+  '아직 찍힌 출퇴근 기록이 없습니다.': 'No punches have been recorded yet.',
+  // 'Awaiting review' 는 메시지의 '확인 대기'(Not read yet)와 뜻이 달라 앞가지로 갈라 둡니다.
+  'review::확인 대기': 'Awaiting review',
+  '확인됨': 'Confirmed',
+  '이의 있음': 'Disputed',
+  '휴게 {n}분': 'break {n} min',
+  '무급 {n}분': 'unpaid {n} min',
+  '위치 없음': 'No location',
+  '사진 보기': 'View photo',
+  '사진 확인됨': 'Photo checked',
   '출근기록 가져오기': 'Import attendance',
   '내 출근 기록': 'My attendance',
   '직원 ID로 연결합니다. 중복·겹치는 기록은 저장하지 않습니다.':
@@ -293,6 +312,7 @@ const en: Record<string, string> = {
   '검토한 출근기록 저장': 'Save reviewed attendance',
   '직원 ID': 'Employee ID',
   근무일: 'Date',
+  '근무일 · {date}': 'Date · {date}',
   출근: 'Start',
   퇴근: 'End',
   휴게: 'Break',
@@ -317,8 +337,13 @@ const en: Record<string, string> = {
   'CSV 다운로드': 'Download CSV',
   시작일: 'Start date',
   종료일: 'End date',
-  '초과근무는 하루 {d}시간 초과분과 한 주(일요일 시작) {w}시간 초과분 중 큰 쪽만 {m}배로 가산합니다. 지각은 예정 출근 시각을 넘긴 분만큼 시급으로 차감하며, 예정 근무가 없는 출근기록은 지각으로 보지 않습니다. 세금·유급휴가를 제외한 예상 금액이고, 시급 0인 직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급 대상이 아니며 실제 출근기록만 지급합니다.':
-    "Overtime pays {m}× on the greater of hours over {d} in a day or hours over {w} in a week (weeks start Sunday), never both. Lateness is deducted at the hourly rate for every minute past the scheduled start; attendance with no scheduled shift is never counted late. Estimates exclude taxes and paid leave, and pay needs checking for anyone whose hourly rate is 0. Only actual attendance is paid, not the original employee's scheduled hours.",
+  '지급액은 단말에서 찍힌 출퇴근을 기준으로 계산합니다. 유급 휴게는 근무로 치고 무급 휴게만 뺍니다. 그 사람 그 날짜에 찍힌 기록이 없을 때만 예전에 가져온 기록을 씁니다. 초과근무는 하루 {d}시간 초과분과 한 주(일요일 시작) {w}시간 초과분 중 큰 쪽만 {m}배로 가산합니다. 지각은 예정 출근 시각을 넘긴 분만큼 시급으로 차감하며, 예정 근무가 없는 출근기록은 지각으로 보지 않습니다. 세금·유급휴가를 제외한 예상 금액이고, 시급 0인 직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급 대상이 아니며 실제 출근기록만 지급합니다.':
+    "Pay is worked out from the punches taken on the time clock. Paid breaks count as work; only unpaid breaks come off. Imported time clock records are used only when that person has no punch on that date. Overtime pays {m}× on the greater of hours over {d} in a day or hours over {w} in a week (weeks start Sunday), never both. Lateness is deducted at the hourly rate for every minute past the scheduled start; attendance with no scheduled shift is never counted late. Estimates exclude taxes and paid leave, and pay needs checking for anyone whose hourly rate is 0. Only actual attendance is paid, not the original employee's scheduled hours.",
+  '직원이 이의를 제기한 근무 {n}건이 이 금액에 들어 있습니다. ':
+    'This total includes {n} shift(s) a staff member has disputed. ',
+  '아직 아무도 확인하지 않은 근무 {n}건이 있습니다. ': '{n} shift(s) have not been reviewed yet. ',
+  '지급 전에 출근 기록에서 확인하세요.': 'Check them under Attendance before paying.',
+  '출근 기록 보기': 'Open attendance',
   '조회 구간이 주(일요일~토요일) 단위가 아니어서 걸쳐 있는 주의 초과근무가 실제보다 적게 잡힐 수 있습니다.':
     'This range is not a whole Sunday-to-Saturday week, so overtime in the weeks it cuts across may come out lower than it really is.',
   이름: 'Name',
@@ -568,6 +593,21 @@ const en: Record<string, string> = {
   '이 기기에서 푸시 알림을 받을 수 있습니다.': 'This device can receive push notifications.',
 
   // Server errors (API routes, lib/operations.ts, lib/birth-auth.ts, lib/push.ts)
+  '본인 출퇴근만 찍을 수 있습니다.': 'You can only punch for yourself.',
+  '이미 출근으로 찍혀 있습니다. 먼저 퇴근을 찍으세요.':
+    'You are already punched in. Punch out first.',
+  '출근으로 찍힌 기록이 없습니다.': 'There is no open punch-in.',
+  '휴게 중이 아닙니다.': 'You are not on a break.',
+  '이미 휴게 중입니다.': 'You are already on a break.',
+  '휴게는 하루 12번까지 찍을 수 있습니다.': 'You can take up to 12 breaks a day.',
+  '잘못된 휴게 처리입니다.': 'That is not a valid break action.',
+  '근무 기록을 찾을 수 없습니다.': 'That punch record could not be found.',
+  '본인 근무 기록만 확인할 수 있습니다.': 'You can only review your own punch records.',
+  '퇴근까지 찍힌 근무만 확인할 수 있습니다.': 'Only punches with an out time can be reviewed.',
+  '마감된 근무표입니다. 관리자에게 문의하세요.':
+    'This timesheet is closed. Ask a manager for help.',
+  '급여 기간의 시작일이 아닙니다.': 'That is not the first day of a pay period.',
+  '확인할 근무가 없습니다.': 'There is nothing to review.',
   '로그인이 필요합니다.': 'Please sign in.',
   '허용되지 않은 요청입니다.': 'Request not allowed.',
   '요청이 너무 큽니다.': 'Request too large.',
@@ -602,9 +642,7 @@ const en: Record<string, string> = {
   '관리자 권한이 필요합니다.': 'Manager permission is required.',
   '등록된 직원을 선택하세요.': 'Choose a registered employee.',
   '이 계정은 직원 명부에 없습니다': 'This account is not on the staff list',
-  '출퇴근은 직원 기록이 있어야 찍힙니다. 직원 관리에서 본인을 직원으로 추가하고, 그 이름으로 로그인해 주세요.':
-    'Punching needs a staff record. Add yourself on the team screen, then sign in under that name.',
-  '나를 직원으로 추가': 'Add me as staff',
+  '출퇴근은 직원 명부에 있는 사람만 찍습니다.': 'Only people on the staff list punch in and out.',
   '직원 계정은 전체 일정, 본인 근태 및 급여를 읽기 전용으로만 볼 수 있습니다.':
     'Staff accounts can only view the full schedule and their own attendance and pay.',
   '직원 색상을 확인하세요.': 'Check the employee color.',
@@ -663,6 +701,27 @@ const en: Record<string, string> = {
   '전체 일정': 'Schedule',
   '근무 일정이 없습니다.': 'You are not scheduled to work.',
   '이 날은 아무도 근무하지 않습니다.': 'No one is scheduled to work.',
+  '보기 설정': 'View settings',
+  '근무 없음': 'No shifts',
+  '새 근무 만들기': 'Add a shift',
+  // 팀 화면 · phone team screen
+  '목록으로': 'Back to the list',
+  '보관됨': 'Archived',
+  '이메일 미등록': 'No email',
+  '연락처 미등록': 'No phone number',
+  '생년월일 미등록': 'No date of birth',
+  '배정': 'Assignment',
+  '변경': 'Change',
+  '{money} / 시간': '{money} / hour',
+  '출근기계 ID': 'Time clock ID',
+  '직원은 로그인 화면에서 자기 이름을 골라 들어옵니다. 처음 비밀번호는 본인 직원 ID 이고, 직원이 직접 바꿉니다.':
+    'Staff sign in by picking their own name on the login screen. The first password is their own employee ID, and they change it themselves.',
+  '직원 삭제': 'Remove employee',
+  '재직': 'Active',
+  '보관': 'Archive',
+  '이름으로 검색': 'Search by name',
+  '찾는 이름이 없습니다.': 'No one matches that name.',
+  '아직 직원이 없습니다.': 'No staff yet.',
 
   // 근무표 · timesheets
   '내 근무표': 'My Timesheets',
@@ -735,6 +794,12 @@ const en: Record<string, string> = {
   '직원ID_': 'employee-ids_',
 
   // 출퇴근 단말 · /attendance kiosk
+  '누가 찍나요?': 'Who is punching?',
+  '다음': 'Next',
+  '{name} 이(가) 아니신가요?': 'Not {name}?',
+  '아직 직원이 없습니다. 스케줄 앱에서 먼저 직원을 추가하세요.':
+    'No staff yet. Add staff in the schedule app first.',
+  'Punch ID를 넣어주세요.': 'Enter your Punch ID.',
   '직원 ID를 입력하세요': 'Enter your employee ID',
   '직원 ID가 맞지 않습니다.': 'That employee ID does not match.',
   '직원 ID (숫자 4~8자리)': 'Employee ID (4–8 digits)',
@@ -800,6 +865,11 @@ const patterns: [RegExp, (match: RegExpMatchArray) => string][] = [
     /^근무지에서 약 (\d+)m 떨어져 있어 출퇴근을 기록하지 않았습니다\. 근무지에서 다시 눌러주세요\.$/,
     ([, away]) =>
       `No shift was recorded: you are about ${away} m from the workplace. Try again at the workplace.`,
+  ],
+  [
+    /^데이터베이스에 접속하지 못했습니다 \((.+)\)\. DATABASE_URL이 Supabase Transaction pooler\(포트 6543\) 주소인지 확인하세요\.$/,
+    ([, detail]) =>
+      `Could not reach the database (${detail}). Check that DATABASE_URL points at the Supabase Transaction pooler (port 6543).`,
   ],
   [
     /^반경은 (\d+)~(\d+)m 로 입력하세요\.$/,

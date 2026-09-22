@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Camera, Coffee, Hourglass, LogOut } from 'lucide-react';
 import type { Employee, Punch, Shift } from '@/lib/domain';
 import { duration } from '@/lib/domain';
@@ -68,41 +68,72 @@ export default function StaffClock({
   const [shot, setShot] = useState('');
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
+  // 마지막으로 잡은 프레임의 시각. 같은 값이 또 나오면 영상이 멈춘 것이고,
+  // 그대로 찍으면 아까 찍힌 장면이 한 번 더 저장됩니다.
+  const lastFrame = useRef(-1);
+
+  const stop = useCallback(() => {
+    stream.current?.getTracks().forEach((track) => track.stop());
+    stream.current = null;
+  }, []);
+
+  // 이미 살아 있는 카메라는 그대로 둡니다. 꺼졌거나 잠든 것만 다시 엽니다.
+  const start = useCallback(async () => {
+    const track = stream.current?.getVideoTracks()[0];
+    if (track && track.readyState === 'live' && !track.muted) return;
+    stop();
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) throw Error('no camera');
+      const media = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 960 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      stream.current = media;
+      if (video.current) {
+        video.current.srcObject = media;
+        void video.current.play().catch(() => 0);
+      }
+      // 새로 연 카메라입니다. 지난 프레임과 지난 사진은 여기서 버립니다.
+      lastFrame.current = -1;
+      setShot('');
+      setCamera('on');
+    } catch {
+      setCamera('denied');
+    }
+  }, [stop]);
 
   // 이 화면에 머무는 동안만 카메라를 켭니다. 다른 탭으로 옮기면 곧바로 끕니다.
   useEffect(() => {
-    let alive = true;
-    void (async () => {
-      try {
-        if (!navigator.mediaDevices?.getUserMedia) throw Error('no camera');
-        const media = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: { ideal: 960 }, height: { ideal: 720 } },
-          audio: false,
-        });
-        if (!alive) {
-          media.getTracks().forEach((track) => track.stop());
-          return;
-        }
-        stream.current = media;
-        if (video.current) video.current.srcObject = media;
-        setCamera('on');
-      } catch {
-        if (alive) setCamera('denied');
-      }
-    })();
-    return () => {
-      alive = false;
-      stream.current?.getTracks().forEach((track) => track.stop());
-      stream.current = null;
-      setCamera('off');
+    void start();
+    // 화면을 떠날 때는 카메라만 끕니다. 상태는 이 컴포넌트와 함께 사라집니다.
+    return stop;
+  }, [start, stop]);
+
+  // 화면으로 돌아오면 카메라를 다시 살핍니다.
+  // 잠자던 사이 영상이 멈춰 있으면, 다음에 찍는 것이 잠들기 직전 장면이 됩니다.
+  useEffect(() => {
+    const again = () => {
+      if (document.visibilityState === 'visible') void start();
     };
-  }, []);
+    document.addEventListener('visibilitychange', again);
+    return () => document.removeEventListener('visibilitychange', again);
+  }, [start]);
 
   // 지금 보이는 화면을 한 장 잡습니다. 까맣거나 가려져 있으면 사진으로 치지 않습니다.
   const capture = (): { photo?: string; problem?: string } => {
     const node = video.current;
     if (camera !== 'on' || !node || !node.videoWidth)
       return { problem: '사진을 찍을 수 없어 기록하지 않았습니다.' };
+    const track = stream.current?.getVideoTracks()[0];
+    // 멈춰 있거나 잠든 영상에서 찍으면 지난 장면이 그대로 저장됩니다. 찍지 않고 카메라를 다시 엽니다.
+    if (node.paused || node.ended || node.readyState < 2 || !track || track.readyState !== 'live' || track.muted) {
+      void start();
+      return { problem: '카메라가 멈춰 있습니다. 잠시 뒤 다시 눌러주세요.' };
+    }
+    if (node.currentTime === lastFrame.current) {
+      void start();
+      return { problem: '카메라 화면이 멈춰 있습니다. 잠시 뒤 다시 눌러주세요.' };
+    }
     const width = SHOT_WIDTH;
     const height = Math.round((node.videoHeight / node.videoWidth) * width);
     const canvas = document.createElement('canvas');
@@ -126,6 +157,7 @@ export default function StaffClock({
     const spread = Math.sqrt(Math.max(0, squares / count - mean * mean));
     if (spread < 6 || mean < 12 || mean > 248)
       return { problem: '화면이 너무 어둡거나 가려져 있습니다. 카메라를 보고 다시 눌러주세요.' };
+    lastFrame.current = node.currentTime;
     const photo = canvas.toDataURL('image/jpeg', 0.62);
     // 내용이 제대로 담겼는지는 위 밝기 검사가 보고, 여기서는 사진이 만들어졌는지만 봅니다.
     return photo.startsWith('data:image/jpeg;base64,/9j/')

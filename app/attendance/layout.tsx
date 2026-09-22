@@ -12,8 +12,9 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'Pelham Punch · 출퇴근',
-  description: '출근·퇴근과 휴게 시간을 폰에서 바로 찍습니다.',
+  // 이 글은 서버가 그대로 내보내므로 t() 를 거치지 않습니다. 화면 말과 같게 영어로 적어 둡니다.
+  title: 'Pelham Punch · Time clock',
+  description: 'Punch in, punch out and take breaks straight from your phone.',
   manifest: '/manifest-punch.webmanifest',
   icons: {
     icon: [
