@@ -478,6 +478,96 @@
 .stclock-elapsed b { font-size: 16px; font-weight: 500; }
 .stclock-elapsed small { font-size: 13px; color: var(--sub); }
 .stclock-body { flex: 1; padding: 22px 16px 16px; background: #fafafb; border-top: 1px solid var(--line); }
+.stclock-cam {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  max-height: 38vh;
+  margin-bottom: 8px;
+  border-radius: 14px;
+  background: #1d2126;
+  overflow: hidden;
+}
+.stclock-cam video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* 거울처럼 보여야 사람이 자기 위치를 맞추기 쉽습니다. 저장되는 사진은 그대로입니다. */
+  transform: scaleX(-1);
+}
+.stclock-cam.off video { display: none; }
+.stclock-cam p {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 0;
+  padding: 20px;
+  color: #d5d8dd;
+  font-size: 14px;
+  line-height: 1.6;
+  text-align: center;
+}
+.stclock-camnote { margin: 0 0 18px; font-size: 13px; color: var(--sub); text-align: center; }
+.stclock-break,
+.stclock-end,
+.stclock-start {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 56px;
+  margin-top: 14px;
+  border-radius: 28px;
+  font-size: 17px;
+}
+.stclock-break { border: 1px solid #dcdde1; background: #fff; color: var(--ink); }
+.stclock-end { border: 0; background: #ef5a4e; color: #fff; font-weight: 600; }
+.stclock-start { border: 0; background: #087e6d; color: #fff; font-weight: 600; }
+.stclock-error {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border-radius: 9px;
+  background: #fdecea;
+  color: #8f3a31;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.stclock-shot {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+.stclock-shot > span {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-weight: 600;
+}
+
+.stclock-settings {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  background: #fafafb;
+}
+.stclock-settings a { font-size: 14px; color: #087e6d; font-weight: 600; }
+
 .stclock-body h3 { margin: 0 0 4px; font-size: 24px; font-weight: 500; letter-spacing: -.5px; }
 .stclock-date { margin: 0 0 18px; font-size: 15px; color: var(--sub); }
 .stclock-card {
@@ -525,68 +615,14 @@
 .stclock-break { border: 1px solid #dcdde1; background: #fff; color: var(--ink); }
 .stclock-end { border: 0; background: #ef5a4e; color: #fff; font-weight: 600; }
 
-/* Punch ID 키패드 */
-.stclock-place { display: flex; align-items: center; gap: 14px; padding: 26px 20px 30px; }
-.stclock-mark {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: url(/logo.png) center/contain no-repeat, #eceef0;
-  flex-shrink: 0;
+.stclock-name em.in { background: #d5f0e2; color: #2b7a5c; }
+.stclock-name em.out { background: #eeeef0; color: #5a6068; }
+.stclock-error {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border-radius: 9px;
+  background: #fdecea;
+  color: #8f3a31;
+  font-size: 14px;
+  line-height: 1.6;
 }
-.stclock-place span:last-child { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.stclock-place b { font-size: 21px; font-weight: 500; letter-spacing: -.4px; }
-.stclock-place small { font-size: 14px; color: var(--sub); }
-.stclock-pad {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  padding: 16px 16px 20px;
-  background: #f4f4f6;
-  border-top: 1px solid var(--line);
-}
-.stclock-ask { margin: 0 0 14px; font-size: 16px; color: #4f555e; text-align: center; }
-.stclock-code {
-  display: block;
-  min-height: 44px;
-  margin-bottom: 4px;
-  border-radius: 10px 10px 0 0;
-  background: #fff;
-  font-size: 26px;
-  letter-spacing: 9px;
-  line-height: 44px;
-  text-align: center;
-}
-.stclock-keys {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1px;
-  background: #e3e3e7;
-  border-radius: 0 0 10px 10px;
-  overflow: hidden;
-}
-.stclock-keys button {
-  display: grid;
-  place-items: center;
-  min-height: 58px;
-  border: 0;
-  background: #fff;
-  color: var(--ink);
-  font-size: 25px;
-  font-weight: 400;
-}
-.stclock-keys button.word { font-size: 14px; letter-spacing: .6px; }
-.stclock-keys button:active { background: #eceef1; }
-.stclock-wrong { margin: 12px 0 0; font-size: 14px; color: var(--no); text-align: center; }
-.stclock-signin {
-  width: 100%;
-  min-height: 52px;
-  margin-top: auto;
-  border: 0;
-  border-radius: 26px;
-  background: #2f3440;
-  color: #fff;
-  font-size: 17px;
-  font-weight: 600;
-}
-.stclock-signin:disabled { background: #e0e1e5; color: #9a9fa7; opacity: 1; }

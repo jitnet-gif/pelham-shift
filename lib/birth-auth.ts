@@ -7,9 +7,7 @@ const ADMINS = [{ id: 'admin', name: '관리자' }];
 const adminFor = (actor: string) => ADMINS.find((entry) => entry.id === actor) || null;
 // 관리자 비밀번호는 모두 같은 값을 쓰고, 직원처럼 바꿀 수 없습니다.
 const ADMIN_PASSWORD = '2222';
-// 아직 비밀번호를 바꾸지 않은 직원은 본인 직원 ID 로 들어옵니다.
-// 단말에서 눌러 보이는 번호라 비밀 값이 아닙니다 — 첫 로그인 뒤 바꾸도록 안내합니다.
-// 직원 ID 가 아직 없는 사람만 이 값으로 들어옵니다.
+// 직원은 본인 직원 ID 로 로그인합니다. 아래 값은 아직 직원 ID 가 없는 사람만 쓰는 옛 기본값입니다.
 const DEFAULT_PASSWORD = '1111';
 const SESSION_DAYS = 30;
 
@@ -60,16 +58,18 @@ const verifyPassword = async (
   actor: string,
   roster: boolean,
   password: string,
-  initial = DEFAULT_PASSWORD,
+  punchId = '',
 ) => {
   if (!password) return false;
   // 고정 명단 관리자의 비밀번호만 코드에 있습니다. 관리자로 지정된 직원은 본인 비밀번호를 씁니다.
   if (roster) return password === ADMIN_PASSWORD;
+  // 직원 ID 는 언제나 그 사람의 비밀번호입니다. 이름과 번호만 알면 들어올 수 있습니다.
+  if (punchId && password === punchId) return true;
   const credential = await credentialFor(workspace, actor);
-  // 본인 비밀번호를 한 번이라도 정했다면 초기 비밀번호는 더 이상 통하지 않습니다.
+  // 따로 정해 둔 비밀번호가 있으면 그것도 같이 받습니다. 아직 없고 번호도 없는 사람만 옛 기본값입니다.
   return credential
     ? (await passwordHash(password, credential.salt)) === credential.hash
-    : password === initial;
+    : password === DEFAULT_PASSWORD;
 };
 
 const readCookie = (request: Request, name: string) => {
@@ -170,7 +170,7 @@ export async function createBirthSession(team: string, actor: string, password =
       actor,
       adminEntry !== null,
       password,
-      employee?.punchId || DEFAULT_PASSWORD,
+      employee?.punchId || '',
     ))
   ) {
     throw Error('비밀번호를 확인하세요.');
@@ -208,11 +208,10 @@ export async function updatePassword(request: Request, currentPassword: string, 
   if (!session) throw Error('로그인한 뒤 변경할 수 있습니다.');
   const roster = adminFor(session.actor.id) !== null;
   if (roster) throw Error('관리자 비밀번호는 변경할 수 없습니다.');
-  const initial =
-    session.state?.employees.find((candidate) => candidate.id === session.actor.id)?.punchId ||
-    DEFAULT_PASSWORD;
+  const punchId =
+    session.state?.employees.find((candidate) => candidate.id === session.actor.id)?.punchId || '';
   if (
-    !(await verifyPassword(session.team, session.actor.id, roster, currentPassword, initial))
+    !(await verifyPassword(session.team, session.actor.id, roster, currentPassword, punchId))
   ) {
     throw Error('현재 비밀번호를 확인하세요.');
   }

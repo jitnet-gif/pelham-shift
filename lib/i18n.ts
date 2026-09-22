@@ -676,6 +676,14 @@ const en: Record<string, string> = {
   '공지가 없습니다.': 'No announcements yet.',
   '오늘 고마웠던 동료: ': 'Shout-out to: ',
 
+  // 로그인 목록
+  '직원 ID 일괄 발급': 'Issue missing IDs',
+  '로그인 목록 내려받기': 'Download sign-in list',
+  '번호가 없는 직원에게 1001부터 차례로 내어 줍니다.': 'Gives 1001 and up to anyone without a number.',
+  '모든 직원에게 이미 직원 ID 가 있습니다.': 'Everyone already has an employee ID.',
+  '쓸 수 있는 번호가 없습니다.': 'No free number is left.',
+  '직원ID_': 'employee-ids_',
+
   // 출퇴근 단말 · /attendance kiosk
   '직원 ID를 입력하세요': 'Enter your employee ID',
   '직원 ID가 맞지 않습니다.': 'That employee ID does not match.',

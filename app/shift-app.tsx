@@ -1041,6 +1041,21 @@ export default function ShiftApp() {
     } catch {}
     return () => lifecycle.abort();
   }, [data.employees]);
+  // 직원에게 나눠 줄 로그인 안내. 이름과 직원 ID 만 담습니다 — 그 번호가 곧 비밀번호입니다.
+  function exportLogins() {
+    const safe = (v: string) =>
+      '"' + (/^[=+@-]/.test(v) ? "'" : '') + v.replaceAll('"', '""') + '"';
+    const csv = [
+      ['이름', '직원 ID', '업무'].map((h) => t(h)),
+      ...staff.map((e) => [e.name, e.punchId || t('미등록'), e.role]),
+    ]
+      .map((r) => r.map((v) => safe(String(v))).join(','))
+      .join('\r\n');
+    download(
+      new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }),
+      t('직원ID_') + localDate(new Date()) + '.csv',
+    );
+  }
   function exportPayroll() {
     const safe = (s: string) =>
       '"' + (/^[=+@-]/.test(s) ? "'" : '') + s.replaceAll('"', '""') + '"';
@@ -2004,6 +2019,18 @@ export default function ShiftApp() {
                   }
                 >
                   <Plus size={16} /> {t('직원 추가')}
+                </button>
+                {/* 번호가 곧 비밀번호라, 나눠 줄 목록을 여기서 바로 뽑습니다. */}
+                <button
+                  className="button"
+                  disabled={busy || !staff.some((e) => !e.punchId)}
+                  onClick={() => void command('employeeIds')}
+                  title={t('번호가 없는 직원에게 1001부터 차례로 내어 줍니다.')}
+                >
+                  <UserPlus size={16} /> {t('직원 ID 일괄 발급')}
+                </button>
+                <button className="button" onClick={exportLogins}>
+                  <Download size={16} /> {t('로그인 목록 내려받기')}
                 </button>
               </div>
               <div className="filterbar">
@@ -4061,10 +4088,8 @@ export default function ShiftApp() {
                 shift={myShiftToday}
                 location={LOCATION}
                 busy={busy}
-                onPunchIn={(punchId) => void command('punchIn', { punchId })}
-                onPunchOut={() => void command('punchOut')}
+                onPunch={(action, photo) => void command(action, { photo })}
                 onBreak={(action) => void command('punchBreak', { action, paid: '1' })}
-                onOpenSettings={() => setTab('more')}
               />
             </TabsContent>
             <TabsContent value="more">
