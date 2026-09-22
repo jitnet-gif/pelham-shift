@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Search, TriangleAlert, Send } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Search, Send } from 'lucide-react';
 import type { Employee, Shift } from '@/lib/domain';
 import { useLang } from './use-lang';
 
@@ -102,8 +102,6 @@ export default function DaySchedule({
     (sum, s) => sum + ((endOf(s) - minutes(s.start)) / 60) * rateOf(s.employeeId),
     0,
   );
-  // 시급이 아직 0 인 직원의 근무는 인건비가 0 으로 잡히니, 경고로 알려 줍니다.
-  const warnings = onDay.filter((s) => !rateOf(s.employeeId)).length;
   const heading = new Intl.DateTimeFormat(lang === 'en' ? 'en-US' : 'ko-KR', {
     weekday: 'short',
     month: 'short',
@@ -141,10 +139,6 @@ export default function DaySchedule({
         <div className="dayview-state">
           <span className={'dayview-pub' + (published ? ' on' : '')}>
             {published ? t('게시됨') : t('작성 중')}
-          </span>
-          <span className={'dayview-warn' + (warnings ? ' on' : '')}>
-            <TriangleAlert size={14} />
-            {t('경고 {n}건', { n: warnings })}
           </span>
           {canEdit && (
             <button className="dayview-publish" disabled={published} onClick={onPublish}>

@@ -1,4 +1,4 @@
-import {type State,type Shift,type Attendance,canSwap,leadDate,localDate,localTime,nameKey,overlap,duration} from './domain';
+import {type State,type Shift,type Attendance,type Punch,canSwap,leadDate,localDate,localTime,minutes,nameKey,overlap,duration,payPeriodStart,payPeriodEnd,periodOpen} from './domain';
 export type Actor={id:string;admin:boolean};
 export type Command={type:string;payload:any};
 const fail=(message:string):never=>{throw new Error(message)};
@@ -12,9 +12,9 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
  const punchTarget=(v:unknown)=>{const wanted=typeof v==='string'&&v?v:actor.id;if(!actor.admin&&wanted!==actor.id)fail('본인 출퇴근만 찍을 수 있습니다.');return employee(wanted).id};
  // Staff are read-only except for their own tasks and messages; staff with task permission may also assign tasks.
  const taskManager=actor.admin||!!s.employees.find(e=>e.id===actor.id)?.taskManager;
- if(!actor.admin&&!['taskUpdate','message','read','timeOffRequest','timeOffDecision','availabilitySet','availabilityDecision','punchIn','punchOut'].includes(command.type)&&!(command.type==='taskCreate'&&taskManager))fail('직원 계정은 전체 일정, 본인 근태 및 급여를 읽기 전용으로만 볼 수 있습니다.');
+ if(!actor.admin&&!['taskUpdate','message','read','timeOffRequest','timeOffDecision','availabilitySet','availabilityDecision','punchIn','punchOut','punchBreak','punchReview','punchApproveAll'].includes(command.type)&&!(command.type==='taskCreate'&&taskManager))fail('직원 계정은 전체 일정, 본인 근태 및 급여를 읽기 전용으로만 볼 수 있습니다.');
  switch(command.type){
- case 'employee': {admin();const prev=s.employees.find(x=>x.id===p.id);const e={id:p.id||id(),name:text(p.name,80),color:text(p.color,7),role:text(p.role,60),email:String(p.email||'').trim().toLowerCase(),birthDate:String(p.birthDate||'').trim(),phone:String(p.phone||'').trim(),rate:number(p.rate),taskManager:p.taskManager===true||p.taskManager==='1',admin:p.admin===true||p.admin==='1',archived:prev?.archived};if(!/^#[0-9a-f]{6}$/i.test(e.color))fail('직원 색상을 확인하세요.');if(e.phone&&!/^[0-9+()\-\s]{7,30}$/.test(e.phone))fail('연락처를 확인하세요. 숫자와 + - ( ) 만 입력할 수 있습니다.');if(e.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.email))fail('이메일을 확인하세요.');if(e.birthDate&&!/^\d{8}$/.test(e.birthDate))fail('생년월일 8자리를 입력하세요.');if(e.email&&s.employees.some(x=>x.id!==e.id&&!x.archived&&x.email===e.email))fail('이미 등록된 이메일입니다.');if(e.birthDate&&s.employees.some(x=>x.id!==e.id&&!x.archived&&x.birthDate===e.birthDate))fail('같은 생년월일이 이미 등록되어 있습니다.');s.employees=s.employees.filter(x=>x.id!==e.id).concat(e);break;}
+ case 'employee': {admin();const prev=s.employees.find(x=>x.id===p.id);const e={id:p.id||id(),name:text(p.name,80),color:text(p.color,7),role:text(p.role,60),email:String(p.email||'').trim().toLowerCase(),birthDate:String(p.birthDate||'').trim(),phone:String(p.phone||'').trim(),punchId:String(p.punchId||'').trim(),rate:number(p.rate),taskManager:p.taskManager===true||p.taskManager==='1',admin:p.admin===true||p.admin==='1',archived:prev?.archived};if(!/^#[0-9a-f]{6}$/i.test(e.color))fail('직원 색상을 확인하세요.');if(e.phone&&!/^[0-9+()\-\s]{7,30}$/.test(e.phone))fail('연락처를 확인하세요. 숫자와 + - ( ) 만 입력할 수 있습니다.');if(e.punchId&&!/^\d{4,8}$/.test(e.punchId))fail('Punch ID는 숫자 4~8자리로 입력하세요.');if(e.punchId&&s.employees.some(x=>x.id!==e.id&&!x.archived&&x.punchId===e.punchId))fail('이미 쓰이고 있는 Punch ID 입니다.');if(e.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.email))fail('이메일을 확인하세요.');if(e.birthDate&&!/^\d{8}$/.test(e.birthDate))fail('생년월일 8자리를 입력하세요.');if(e.email&&s.employees.some(x=>x.id!==e.id&&!x.archived&&x.email===e.email))fail('이미 등록된 이메일입니다.');if(e.birthDate&&s.employees.some(x=>x.id!==e.id&&!x.archived&&x.birthDate===e.birthDate))fail('같은 생년월일이 이미 등록되어 있습니다.');s.employees=s.employees.filter(x=>x.id!==e.id).concat(e);break;}
  // 삭제한 직원은 지난 근무·출근·급여 기록이 이름을 잃지 않도록 지우지 않고 감춥니다.
  case 'employeeRemove': {admin();const e=employee(p.id);if(e.id===actor.id)fail('본인 계정은 삭제할 수 없습니다.');s.employees=s.employees.map(x=>x.id===e.id?{...x,archived:true,admin:false}:x);break;}
  case 'shift': {admin();employee(p.employeeId);const shift:Shift={id:id(),employeeId:p.employeeId,date:date(p.date),start:time(p.start,true),end:time(p.end,true),area:text(p.area,60),note:p.note?text(p.note,250):undefined,breakMinutes:p.breakMinutes?number(p.breakMinutes,720):undefined};if(!duration(shift.start,shift.end))fail('출근과 퇴근 시간이 같습니다.');if((shift.breakMinutes??0)>=duration(shift.start,shift.end)*60)fail('휴게시간이 근무시간보다 깁니다.');if(s.shifts.some(x=>x.employeeId===shift.employeeId&&overlap(x,shift)))fail('해당 직원의 근무시간이 겹칩니다.');s.shifts.push(shift);s.published=false;break;}
@@ -27,8 +27,29 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
  case 'swap': {const shift=s.shifts.find(x=>x.id===p.shiftId)??fail('근무를 선택하세요.');if(!actor.admin&&shift.employeeId!==actor.id)fail('본인 근무만 대체 신청할 수 있습니다.');if(!canSwap(shift.date))fail('대체 신청은 근무일 7일 전까지 가능합니다.');employee(p.to);if(p.to===shift.employeeId)fail('다른 대체 직원을 선택하세요.');if(shift.originalId)fail('이미 대체 승인된 근무입니다.');if(s.swaps.some(x=>x.shiftId===shift.id&&x.status!=='rejected'))fail('이미 대체 요청이 있습니다.');if(s.shifts.some(x=>x.employeeId===p.to&&overlap(x,shift)))fail('대체 직원의 기존 근무시간과 겹칩니다.');s.swaps.push({id:id(),shiftId:shift.id,from:shift.employeeId,to:p.to,status:'requested',createdAt:now.toISOString(),bonus:0});break;}
  case 'swapDecision': {const r=s.swaps.find(x=>x.id===p.id)??fail('요청을 찾을 수 없습니다.');if(p.action==='accept'){if(actor.admin||actor.id!==r.to)fail('대체 직원 본인이 수락해야 합니다.');if(r.status!=='requested')fail('처리된 요청입니다.');r.status='accepted'}else if(p.action==='reject'){if(!actor.admin&&actor.id!==r.to&&actor.id!==r.from)fail('권한이 없습니다.');if(r.status==='approved')fail('승인된 대체는 취소할 수 없습니다.');r.status='rejected'}else if(p.action==='approve'){admin();if(r.status!=='accepted')fail('대체 직원의 수락이 먼저 필요합니다.');const shift=s.shifts.find(x=>x.id===r.shiftId)??fail('근무가 없습니다.');if(!canSwap(shift.date))fail('대체 승인도 근무일 7일 전까지 가능합니다.');if(shift.employeeId!==r.from)fail('원래 근무자가 변경되었습니다.');if(s.shifts.some(x=>x.id!==shift.id&&x.employeeId===r.to&&overlap(x,shift)))fail('대체 직원의 근무시간이 겹칩니다.');shift.originalId=r.from;shift.employeeId=r.to;r.bonus=number(p.bonus);r.status='approved'}else fail('잘못된 처리입니다.');break;}
  // 펀치는 서버 시각으로 남깁니다. 기기 시계를 고쳐도 찍히는 시각은 달라지지 않습니다.
- case 'punchIn': {const target=punchTarget(p.employeeId);if(s.punches!.some(x=>x.employeeId===target&&!x.out))fail('이미 출근으로 찍혀 있습니다. 먼저 퇴근을 찍으세요.');s.punches!.push({id:id(),employeeId:target,date:localDate(now),in:localTime(now)});break;}
- case 'punchOut': {const target=punchTarget(p.employeeId);const open=[...s.punches!].reverse().find(x=>x.employeeId===target&&!x.out)??fail('출근으로 찍힌 기록이 없습니다.');open.out=localTime(now);break;}
+ case 'punchIn': {const target=punchTarget(p.employeeId);if(s.punches!.some(x=>x.employeeId===target&&!x.out))fail('이미 출근으로 찍혀 있습니다. 먼저 퇴근을 찍으세요.');const who=employee(target);if(who.punchId&&!actor.admin&&String(p.punchId||'')!==who.punchId)fail('Punch ID가 맞지 않습니다.');const day=localDate(now),at=localTime(now);const near=s.shifts.filter(x=>x.employeeId===target&&x.date===day).sort((x,y)=>Math.abs(minutes(x.start)-minutes(at))-Math.abs(minutes(y.start)-minutes(at)))[0];s.punches!.push({id:id(),employeeId:target,date:day,in:at,area:near?.area||employee(target).role,status:'pending'});break;}
+ case 'punchOut': {const target=punchTarget(p.employeeId);const open=[...s.punches!].reverse().find(x=>x.employeeId===target&&!x.out)??fail('출근으로 찍힌 기록이 없습니다.');const running=(open.breaks??[]).find(b=>!b.end);if(running)running.end=localTime(now);open.out=localTime(now);open.status??='pending';break;}
+ // 휴게 시작과 종료. 유급 휴게는 근무시간에 그대로 남고 무급 휴게만 빠집니다.
+ case 'punchBreak': {const target=punchTarget(p.employeeId);const open=[...s.punches!].reverse().find(x=>x.employeeId===target&&!x.out)??fail('출근으로 찍힌 기록이 없습니다.');open.breaks??=[];const running=open.breaks.find(b=>!b.end);
+  if(p.action==='end'){(running??fail('휴게 중이 아닙니다.')).end=localTime(now)}
+  else if(p.action==='start'){if(running)fail('이미 휴게 중입니다.');if(open.breaks.length>=12)fail('휴게는 하루 12번까지 찍을 수 있습니다.');open.breaks.push({start:localTime(now),paid:p.paid===true||p.paid==='1'})}
+  else fail('잘못된 휴게 처리입니다.');break;}
+ // 직원이 자기 근무 기록을 확인합니다. 지난 급여 기간은 이미 지급이 끝나 손댈 수 없습니다.
+ case 'punchReview': {const punch:Punch=s.punches!.find(x=>x.id===text(p.id,120))??fail('근무 기록을 찾을 수 없습니다.');
+  if(!actor.admin&&punch.employeeId!==actor.id)fail('본인 근무 기록만 확인할 수 있습니다.');
+  if(!punch.out)fail('퇴근까지 찍힌 근무만 확인할 수 있습니다.');
+  if(!periodOpen(payPeriodStart(punch.date),localDate(now)))fail('마감된 근무표입니다. 관리자에게 문의하세요.');
+  if(p.action==='approve'){punch.status='approved';punch.disputeNote=undefined}
+  else if(p.action==='dispute'){punch.status='disputed';punch.disputeNote=String(p.note||'').trim().slice(0,500)}
+  else fail('잘못된 처리입니다.');punch.reviewedAt=now.toISOString();break;}
+ // 한 급여 기간에 남은 확인을 한 번에 끝냅니다.
+ case 'punchApproveAll': {const from=date(p.from),to=payPeriodEnd(from);
+  if(from!==payPeriodStart(from))fail('급여 기간의 시작일이 아닙니다.');
+  if(!periodOpen(from,localDate(now)))fail('마감된 근무표입니다. 관리자에게 문의하세요.');
+  const who=actor.admin&&p.employeeId?employee(p.employeeId).id:actor.id;
+  const mine=s.punches!.filter(x=>x.employeeId===who&&x.date>=from&&x.date<=to&&x.out&&x.status!=='approved');
+  if(!mine.length)fail('확인할 근무가 없습니다.');
+  for(const punch of mine){punch.status='approved';punch.disputeNote=undefined;punch.reviewedAt=now.toISOString()}break;}
  // 출근기계 이름과 직원을 한 번 승인해 두면 다음 타임카드부터 자동으로 이어집니다. 비슷한 이름은 후보로만 제안하고, 확정은 관리자가 합니다.
  case 'clockName': {admin();const who=employee(p.employeeId).id;const key=nameKey(text(p.name,80));if(!key)fail('출근기계에 찍힌 이름을 확인하세요.');const rest=s.clockNames!.filter(x=>x.name!==key);if(rest.length>=500)fail('이름 연결은 500개까지 저장할 수 있습니다.');s.clockNames=[...rest,{name:key,raw:text(p.name,80),employeeId:who}];break;}
  // 잘못 승인한 연결은 지워야 다시 후보로 올라옵니다.

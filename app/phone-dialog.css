@@ -49,6 +49,8 @@
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     padding: 2px 16px 0;
+    /* 칸을 눌러 화면이 따라 움직일 때, 바닥 버튼 줄 아래로 숨지 않게 자리를 비워 둡니다. */
+    scroll-padding-bottom: 96px;
   }
   .shift-dialog .dialog-actions {
     display: flex;

@@ -76,20 +76,6 @@
 .dayview-pub.on {
   color: #087e6d;
 }
-.dayview-warn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 11px;
-  border-radius: 20px;
-  background: #f2f6f4;
-  color: #7a8c80;
-  font-size: 13px;
-}
-.dayview-warn.on {
-  background: #fdeee8;
-  color: #b4543a;
-}
 .dayview-publish {
   display: inline-flex;
   align-items: center;

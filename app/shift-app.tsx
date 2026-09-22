@@ -38,6 +38,8 @@ import {
   LayoutGrid,
   UserPlus,
   ChevronDown,
+  ArrowLeft,
+  House,
   X,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -83,7 +85,9 @@ import {
   blockedBy,
   weekdayOf,
   nameKey,
+  payPeriodStart,
   AREAS,
+  SHIFT_AREAS,
   type Employee,
   type Message,
   type State,
@@ -110,9 +114,21 @@ import LangToggle from './lang-toggle';
 import { useLang } from './use-lang';
 import { useIsMobile } from '@/hooks/use-mobile';
 import PhoneSchedule from './phone-schedule';
+import StaffSchedule from './staff-schedule';
+import StaffMessaging from './staff-messaging';
+import StaffTimesheets from './staff-timesheets';
+import StaffClock from './staff-clock';
+import StaffMore, { type MoreItem } from './staff-more';
+import TimePicker from './time-picker';
 import { LAYOUT_KEY, readLayout, type Layout } from './layout-choice';
+// 근무지 이름. 직원 화면이 근무·근무표·출퇴근 줄에 같은 이름을 씁니다.
+const LOCATION = 'Pelham Hills Golf Club';
+const minutesOf = (v: string) => Number(v.slice(0, 2)) * 60 + Number(v.slice(3, 5));
 // 폰 상단 바는 브랜드 대신 지금 보고 있는 화면 이름을 띄웁니다. 사이드바와 같은 말을 씁니다.
 const TAB_LABELS: Record<string, string> = {
+  home: '출퇴근',
+  more: '더보기',
+  timesheets: '내 근무표',
   dashboard: '대시보드',
   working: '근무 현황',
   schedule: '스케줄',
@@ -172,6 +188,9 @@ const nav = [
   { key: 'team', label: '직원 관리', Icon: Users },
 ];
 const employeeNav = new Set([
+  'home',
+  'more',
+  'timesheets',
   'schedule',
   'attendance',
   'payroll',
@@ -187,6 +206,12 @@ export default function ShiftApp() {
   const [tab, setTab] = useState('schedule');
   // 스케줄은 오늘 하루부터 보여줍니다. 주간은 보기 메뉴에서 고릅니다.
   const [view, setView] = useState('day');
+  // 직원 폰 화면의 상태: 스케줄의 '내 근무/전체', 메시지 탭, 지금 보고 있는 급여 기간.
+  const [scope, setScope] = useState<'mine' | 'all'>('mine');
+  const [msgTab, setMsgTab] = useState<'messages' | 'announcements'>('messages');
+  const [sheet, setSheet] = useState('');
+  // 앱 시계로 고치고 있는 시간 칸. 기기 기본 시간 선택창은 쓰지 않습니다.
+  const [clockField, setClockField] = useState<{ key: string; label: string; step: number } | null>(null);
   const [version, setVersion] = useState(0);
   const [team, setTeam] = useState('');
   const [actor, setActor] = useState({ id: 'admin', admin: true });
@@ -243,6 +268,89 @@ export default function ShiftApp() {
   const [passwordDialog, setPasswordDialog] = useState(false);
   const passwordOfferShown = useRef(false);
   const staffReadOnly = !actor.admin;
+  // 폰으로 보는 직원. 스케줄·메시지·출퇴근이 전용 화면으로 갈립니다.
+  const staffPhone = phone && !actor.admin;
+
+  // 뒤로 가기는 앱을 닫지 않고 한 단계씩 되돌립니다.
+  // 열려 있는 것부터 닫고, 그다음 지나온 화면을 되짚고, 마지막은 홈(스케줄)에 머뭅니다.
+  const back = useRef({
+    // 직원이 폰으로 보면 홈은 출퇴근 화면입니다. 관리자·데스크톱은 스케줄입니다.
+    home: 'schedule',
+    tab: 'schedule',
+    modal: '',
+    navOpen: false,
+    payDetail: '',
+    passwordDialog: false,
+    // 근무표 안에서 보고 있는 급여 기간. 뒤로 가기는 기간 목록으로 먼저 돌아갑니다.
+    sheet: '',
+    clock: false,
+    // 지나온 화면. 뒤로 가기로 옮긴 걸음은 다시 쌓지 않습니다.
+    trail: [] as string[],
+    popping: false,
+  });
+  useEffect(() => {
+    back.current.home = staffPhone ? 'home' : 'schedule';
+    back.current.modal = modal;
+    back.current.navOpen = navOpen;
+    back.current.payDetail = payDetail;
+    back.current.passwordDialog = passwordDialog;
+    back.current.sheet = sheet;
+    back.current.clock = !!clockField;
+  });
+  useEffect(() => {
+    const state = back.current;
+    if (state.tab === tab) return;
+    if (state.popping) state.popping = false;
+    else state.trail.push(state.tab);
+    state.tab = tab;
+  }, [tab]);
+  useEffect(() => {
+    const state = back.current;
+    // 되돌아갈 자리를 항상 하나 채워 둡니다. 이게 없으면 뒤로 가기가 앱을 닫습니다.
+    const refill = () => window.history.pushState({ pelham: true }, '');
+    refill();
+    const step = () => {
+      if (state.navOpen) return setNavOpen(false);
+      if (state.passwordDialog) return setPasswordDialog(false);
+      if (state.payDetail) return setPayDetail('');
+      if (state.clock) return setClockField(null);
+      if (state.modal) return setModal('');
+      if (state.sheet) return setSheet('');
+      const previous = state.trail.pop();
+      if (previous && previous !== state.tab) {
+        state.popping = true;
+        return setTab(previous);
+      }
+      if (state.tab !== state.home) {
+        state.popping = true;
+        return setTab(state.home);
+      }
+      // 홈에서는 더 되돌릴 곳이 없습니다. 자리만 다시 채우고 그대로 머뭅니다.
+    };
+    const onPop = () => {
+      refill();
+      step();
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Backspace') return;
+      // 글자를 지우는 중이면 건드리지 않습니다.
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.isContentEditable ||
+          ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+      )
+        return;
+      event.preventDefault();
+      step();
+    };
+    window.addEventListener('popstate', onPop);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, []);
   const put = (key: string, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
   const query = () =>
@@ -472,6 +580,32 @@ export default function ShiftApp() {
       <small className="notecount">{250 - (form.note || '').length}</small>
     </label>
   );
+  const clockText = (v: string) => {
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(v)) return '';
+    const h = Number(v.slice(0, 2));
+    return `${h % 12 || 12}:${v.slice(3, 5)} ${h < 12 ? 'AM' : 'PM'}`;
+  };
+  const openClock = (key: string, label: string, step = 30) =>
+    setClockField({ key, label, step });
+  // 시간 칸은 눌리면 앱 시계를 엽니다. 값은 시계에서만 바뀌고, 비어 있으면 제출이 막힙니다.
+  const timeInput = (key: string, label: string, step = 30) => (
+    <input
+      type="text"
+      required
+      inputMode="none"
+      placeholder="--:--"
+      className="timepick"
+      value={clockText(form[key] || '')}
+      aria-label={label}
+      onKeyDown={(e) => {
+        e.preventDefault();
+        if (e.key === 'Enter' || e.key === ' ') openClock(key, label, step);
+      }}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={() => openClock(key, label, step)}
+      onChange={() => undefined}
+    />
+  );
   // 이미 짜 놓은 근무에서 가장 자주 쓰인 시간대를 그대로 프리셋으로 씁니다.
   const commonTimes = [
     ...data.shifts
@@ -488,21 +622,9 @@ export default function ShiftApp() {
       <div className="timerow">
         <span className="timebox">
           <Clock3 size={16} />
-          <input
-            type="time"
-            step={1800}
-            required
-            value={form.start || ''}
-            onChange={(e) => put('start', e.target.value)}
-          />
+          {timeInput('start', t('시작 시간'))}
           <em>→</em>
-          <input
-            type="time"
-            step={1800}
-            required
-            value={form.end || ''}
-            onChange={(e) => put('end', e.target.value)}
-          />
+          {timeInput('end', t('종료 시간'))}
           {paidHours > 0 && <b>{t('({n}시간)', { n: paidHours })}</b>}
         </span>
       </div>
@@ -586,10 +708,21 @@ export default function ShiftApp() {
       open: (timecard?.open ?? []).filter((r) => nameKey(r.name) === nameKey(name)).length,
     };
   });
+  // 매장 시각으로 본 오늘. 펀치·근무표·달력이 모두 이 날짜를 기준으로 삼습니다.
+  const today = localDate(new Date(tick));
   // 오늘 내 펀치. 직원 화면의 출근·퇴근 버튼이 이것을 보고 갈립니다.
   const myPunch = [...(data.punches ?? [])]
     .reverse()
-    .find((p) => p.employeeId === actor.id && p.date === localDate(new Date(tick)));
+    .find((p) => p.employeeId === actor.id && p.date === today);
+  // 출퇴근 화면이 띄우는 오늘 근무. 찍힌 출근 시각에 가장 가까운 근무를 고릅니다.
+  const myShiftToday = data.shifts
+    .filter((s) => s.employeeId === actor.id && s.date === today)
+    .sort((a, b) =>
+      myPunch
+        ? Math.abs(minutesOf(a.start) - minutesOf(myPunch.in)) -
+          Math.abs(minutesOf(b.start) - minutesOf(myPunch.in))
+        : a.start.localeCompare(b.start),
+    )[0];
   const swappable = data.shifts.filter(
     (s) => canSwap(s.date) && (actor.admin || s.employeeId === actor.id) && !s.originalId,
   );
@@ -777,7 +910,13 @@ export default function ShiftApp() {
     label: string,
     type = 'text',
     required = true,
-  ) => (
+  ) =>
+    type === 'time' ? (
+      <label className="field">
+        {label}
+        {timeInput(key, label)}
+      </label>
+    ) : (
     <label className="field">
       {label}
       <input
@@ -786,7 +925,7 @@ export default function ShiftApp() {
         value={form[key] || ''}
         onChange={(e) => put(key, e.target.value)}
         min={type === 'number' ? 0 : undefined}
-        step={type === 'number' ? '0.01' : type === 'time' ? 1800 : undefined}
+        step={type === 'number' ? '0.01' : undefined}
       />
     </label>
   );
@@ -859,7 +998,12 @@ export default function ShiftApp() {
   // 직원의 업무와 근무의 장소는 같은 목록에서 고릅니다. 예전에 저장된 값이 목록에 없을 수 있어, 그 값도 선택지에 함께 둡니다.
   // 일괄 수정의 '유지'는 빈 값으로 보내지만 빈 값은 고른 것이 없는 상태로 표시되어, 표식을 따로 씁니다.
   const KEEP_AREA = '__keep';
-  const areaPick = (key: string, label: string, blank = '') => {
+  const areaPick = (
+    key: string,
+    label: string,
+    blank = '',
+    list: readonly string[] = AREAS,
+  ) => {
     const current = form[key] || '';
     return (
       <Pick
@@ -868,8 +1012,8 @@ export default function ShiftApp() {
         onChange={(v) => put(key, v === KEEP_AREA ? '' : v)}
         options={[
           ...(blank ? [{ value: KEEP_AREA, label: blank }] : []),
-          ...AREAS.map((area) => ({ value: area, label: area })),
-          ...(current && !AREAS.some((area) => area === current)
+          ...list.map((area) => ({ value: area, label: area })),
+          ...(current && !list.some((area) => area === current)
             ? [{ value: current, label: current }]
             : []),
         ]}
@@ -1903,6 +2047,32 @@ export default function ShiftApp() {
             </div>
           </TabsContent>
           <TabsContent value="messages">
+            {staffPhone ? (
+              <StaffMessaging
+                me={actor.id}
+                tab={msgTab}
+                messages={data.messages.filter(
+                  (m) =>
+                    m.to !== 'all' ||
+                    !m.recipients ||
+                    m.recipients.includes(actor.id),
+                )}
+                employees={staff}
+                teammates={
+                  new Set(
+                    data.shifts
+                      .filter((x) => x.date === today && x.employeeId !== actor.id)
+                      .map((x) => x.employeeId),
+                  ).size
+                }
+                onTabChange={setMsgTab}
+                onCompose={() => open('message', { to: 'admin', body: '' })}
+                onShoutOut={() =>
+                  open('message', { to: 'admin', body: t('오늘 고마웠던 동료: ') })
+                }
+                onOpen={(id) => void command('read', { id })}
+              />
+            ) : (
             <div className="panel contentpanel">
               <div className="sectionhead">
                 <div>
@@ -2023,6 +2193,7 @@ export default function ShiftApp() {
                 </div>
               )}
             </div>
+            )}
           </TabsContent>
           <TabsContent value="team">
             <div className="panel contentpanel">
@@ -2250,6 +2421,19 @@ export default function ShiftApp() {
           </DialogContent>
         </Dialog>
       )}
+      {clockField && (
+        <TimePicker
+          key={clockField.key}
+          value={form[clockField.key] || ''}
+          label={clockField.label}
+          minuteStep={clockField.step}
+          onCancel={() => setClockField(null)}
+          onPick={(value) => {
+            put(clockField.key, value);
+            setClockField(null);
+          }}
+        />
+      )}
       {inapp && (
         <div className="inapp-alert" role="status">
           <span className="inapp-icon"><BellRing size={18} /></span>
@@ -2299,6 +2483,7 @@ export default function ShiftApp() {
                   swap: '대체근무 신청',
                   approve: '대체근무 승인',
                   message: '메시지 작성',
+                  punchReview: '근무 기록에 이의',
                   detail: '근무 상세',
                 } as Record<string, string>
               )[modal] || '',
@@ -2370,7 +2555,7 @@ export default function ShiftApp() {
                   onChange={(v) => put('employeeId', v)}
                   options={options}
                 />
-                {areaPick('area', t('업무 / 장소'))}
+                {areaPick('area', t('업무 / 장소'), '', SHIFT_AREAS)}
                 {input('date', t('근무일'), 'date')}
                 {shiftTimes}
                 <p className="hint">
@@ -2382,7 +2567,7 @@ export default function ShiftApp() {
             {modal === 'shiftUpdate' && (
               <>
                 {box(emp(data.shifts.find((s) => s.id === form.ids)?.employeeId || ''))}
-                {areaPick('area', t('업무 / 장소'))}
+                {areaPick('area', t('업무 / 장소'), '', SHIFT_AREAS)}
                 {input('date', t('근무일'), 'date')}
                 {shiftTimes}
                 <p className="hint">
@@ -2498,6 +2683,8 @@ export default function ShiftApp() {
                 {input('name', t('이름'))}
                 {birthField(t('생년월일'))}
                 {input('phone', t('연락처 (예: 914-555-0123)'), 'tel', false)}
+                {/* 공용 단말에서 출근을 찍을 때 본인 확인에 쓰는 번호입니다. 비워 두면 묻지 않고 바로 찍습니다. */}
+                {input('punchId', t('Punch ID (숫자 4~8자리, 선택)'), 'text', false)}
                 {input('email', t('로그인 이메일'), 'email', false)}
                 <div className="formgrid">
                   {input('color', t('직원 색상'), 'color')}
@@ -2567,6 +2754,18 @@ export default function ShiftApp() {
                 t('대체 직원 추가수당 ({currency})', { currency: data.currency }),
                 'number',
               )}
+            {modal === 'punchReview' && (
+              <label className="field">
+                {t('어디가 다른가요?')}
+                <textarea
+                  required
+                  maxLength={500}
+                  placeholder={t('예: 12시가 아니라 12시 30분에 퇴근했습니다.')}
+                  value={form.note || ''}
+                  onChange={(e) => put('note', e.target.value)}
+                />
+              </label>
+            )}
             {modal === 'message' && (
               <>
                 <Pick
@@ -3280,18 +3479,90 @@ export default function ShiftApp() {
   );
   // 필터 줄은 데스크톱과 폰이 같은 JSX 를 씁니다. 폰에서는 보기 설정 버튼으로 펼칩니다.
   // 하단 탭바 네 칸. 관리자와 직원이 자주 쓰는 화면이 달라 목록도 갈립니다.
-  const tabBarItems = [
-    { key: 'schedule', label: '스케줄', Icon: CalendarDays, count: 0 },
-    actor.admin
-      ? { key: 'team', label: '팀', Icon: Users, count: 0 }
-      : { key: 'timeoff', label: '휴무', Icon: CalendarX, count: 0 },
-    { key: 'messages', label: '메시지', Icon: MessageSquare, count: unread.length },
-    { key: 'attendance', label: '출근', Icon: Timer, count: 0 },
-  ];
+  const tabBarItems = actor.admin
+    ? [
+        { key: 'schedule', label: '스케줄', Icon: CalendarDays, count: 0 },
+        { key: 'team', label: '팀', Icon: Users, count: 0 },
+        { key: 'messages', label: '메시지', Icon: MessageSquare, count: unread.length },
+        { key: 'attendance', label: '출근', Icon: Timer, count: 0 },
+      ]
+    : [
+        { key: 'home', label: '홈', Icon: House, count: 0 },
+        { key: 'schedule', label: '스케줄', Icon: CalendarDays, count: 0 },
+        { key: 'messages', label: '메시지', Icon: MessageSquare, count: unread.length },
+      ];
   // 탭바에 없는 화면에 처리할 일이 남아 있으면 '더보기'에 점을 띄웁니다.
+  const myPending = (data.punches ?? []).filter(
+    (r) =>
+      r.employeeId === actor.id &&
+      r.out &&
+      (r.status ?? 'pending') === 'pending' &&
+      payPeriodStart(r.date) === payPeriodStart(today),
+  );
   const moreCount = actor.admin
     ? pending.length + pendingOff.length + pendingAvail.length
-    : 0;
+    : myPending.length;
+  // 직원 폰의 '더보기'에 들어가는 화면들. 탭바에서 밀려난 것들이 여기 모입니다.
+  const staffMore: { label?: string; items: MoreItem[] }[] = [
+    {
+      items: [
+        {
+          key: 'timesheets',
+          label: '내 근무표',
+          Icon: Timer,
+          count: myPending.length,
+          onSelect: () => {
+            setSheet('');
+            setTab('timesheets');
+          },
+        },
+        { key: 'timeoff', label: '휴무', Icon: CalendarX, onSelect: () => setTab('timeoff') },
+        {
+          key: 'availability',
+          label: '근무 가능 시간',
+          Icon: CalendarClock,
+          onSelect: () => setTab('availability'),
+        },
+        { key: 'swaps', label: '대체 근무', Icon: ArrowLeftRight, onSelect: () => setTab('swaps') },
+      ],
+    },
+    {
+      label: '기록',
+      items: [
+        { key: 'attendance', label: '출근 기록', Icon: Clock3, onSelect: () => setTab('attendance') },
+        { key: 'payroll', label: '내 예상 급여', Icon: Wallet, onSelect: () => setTab('payroll') },
+      ],
+    },
+    {
+      label: '설정',
+      items: [
+        ...(birthAuth
+          ? [
+              {
+                key: 'password',
+                label: '비밀번호 변경',
+                Icon: ClipboardList,
+                onSelect: () => setPasswordDialog(true),
+              } as MoreItem,
+            ]
+          : []),
+        { key: 'help', label: '도움말', Icon: CircleQuestionMark, onSelect: () => setTab('help') },
+        { key: 'logout', label: '로그아웃', Icon: LogOut, onSelect: () => void logout() },
+      ],
+    },
+  ];
+  // 뒤로가기가 붙는 화면들. 나머지는 탭바가 뿌리입니다.
+  const staffRoot = ['home', 'schedule', 'messages', 'more'].includes(tab);
+  const staffOwnHeader = staffPhone && ['home', 'schedule', 'messages'].includes(tab);
+  // 뒤로가기 줄에 띄울 이름. 근무표는 보고 있는 급여 기간을 그대로 제목으로 씁니다.
+  const staffTitle =
+    tab === 'timesheets' && sheet
+      ? `${monthDay(sheet)} – ${monthDay(addDays(sheet, 13))}`
+      : t(TAB_LABELS[tab] || '더보기');
+  const staffBack = () => {
+    if (tab === 'timesheets' && sheet) setSheet('');
+    else setTab('more');
+  };
   const schedActionsNode = actor.admin ? (
                     <div className="sched-actions">
                       <button
@@ -3357,7 +3628,11 @@ export default function ShiftApp() {
   return (
     <div
       className={
-        'app-shell' + (navCollapsed ? ' collapsed' : '') + (navOpen ? ' nav-open' : '')
+        'app-shell' +
+        (navCollapsed ? ' collapsed' : '') +
+        (navOpen ? ' nav-open' : '') +
+        (staffPhone ? ' staff-shell' : '') +
+        (staffOwnHeader ? ' staff-full' : '')
       }
     >
       <Tabs
@@ -3463,26 +3738,44 @@ export default function ShiftApp() {
           onClick={() => setNavOpen(false)}
         />
         <div className="workarea">
-          <header className="mobilebar">
-            <button
-              className="mobilebar-me"
-              aria-label={t('메뉴 열기')}
-              onClick={() => setNavOpen(true)}
-            >
-              <span className="avatar">
-                {actor.admin ? 'P' : name(actor.id).slice(0, 1)}
-              </span>
-            </button>
-            <h1 className="mobilebar-title">{t(TAB_LABELS[tab] || '스케줄')}</h1>
-            <button
-              aria-label={t('메시지 보기')}
-              className="iconbutton bell"
-              onClick={() => setTab('messages')}
-            >
-              <Bell size={20} />
-              {unread.length > 0 && <em className="bellcount">{unread.length}</em>}
-            </button>
-          </header>
+          {!staffOwnHeader && (
+            <header className={'mobilebar' + (staffPhone ? ' for-staff' : '')}>
+              {staffPhone && !staffRoot ? (
+                <button
+                  className="iconbutton"
+                  aria-label={t('뒤로')}
+                  onClick={staffBack}
+                >
+                  <ArrowLeft size={21} />
+                </button>
+              ) : (
+                <button
+                  className="mobilebar-me"
+                  aria-label={t('메뉴 열기')}
+                  onClick={() => setNavOpen(true)}
+                >
+                  <span className="avatar">
+                    {actor.admin ? 'P' : name(actor.id).slice(0, 1)}
+                  </span>
+                </button>
+              )}
+              <h1 className="mobilebar-title">
+                {staffPhone ? staffTitle : t(TAB_LABELS[tab] || '스케줄')}
+              </h1>
+              {staffPhone ? (
+                <span className="mobilebar-gap" aria-hidden="true" />
+              ) : (
+                <button
+                  aria-label={t('메시지 보기')}
+                  className="iconbutton bell"
+                  onClick={() => setTab('messages')}
+                >
+                  <Bell size={20} />
+                  {unread.length > 0 && <em className="bellcount">{unread.length}</em>}
+                </button>
+              )}
+            </header>
+          )}
           <main>
             {setup && (
               <div className="demo-banner setup">
@@ -3573,7 +3866,21 @@ export default function ShiftApp() {
                 </div>
                 )}
                 {!phone && schedFiltersNode}
-                {phone ? (
+                {staffPhone ? (
+                  <StaffSchedule
+                    me={actor.id}
+                    week={week}
+                    day={day}
+                    scope={scope}
+                    employees={staff}
+                    shifts={data.shifts}
+                    location={LOCATION}
+                    onScopeChange={setScope}
+                    onWeekChange={setWeek}
+                    onDayChange={setDay}
+                    onShiftSelect={(id) => open('detail', { id })}
+                  />
+                ) : phone ? (
                   <PhoneSchedule
                     week={week}
                     day={day}
@@ -3955,6 +4262,44 @@ export default function ShiftApp() {
             {comingSoon('dashboard', LayoutDashboard, '대시보드', '오늘 근무자, 이번 주 근무시간과 인건비, 처리할 요청을 한 화면에 모아 보여줄 예정입니다.')}
             {comingSoon('logbook', BookOpen, '업무일지', '날짜별 운영 메모와 특이사항을 기록하고 팀과 공유하는 기능을 준비하고 있습니다.')}
             {comingSoon('help', CircleQuestionMark, '도움말', '스케줄 작성, 휴무·근무 가능 시간, 대체 근무 사용법 안내를 준비하고 있습니다.')}
+            <TabsContent value="home">
+              <StaffClock
+                employee={emp(actor.id)}
+                punch={myPunch}
+                shift={myShiftToday}
+                location={LOCATION}
+                busy={busy}
+                onPunchIn={(punchId) => void command('punchIn', { punchId })}
+                onPunchOut={() => void command('punchOut')}
+                onBreak={(action) => void command('punchBreak', { action, paid: '1' })}
+                onOpenSettings={() => setTab('more')}
+              />
+            </TabsContent>
+            <TabsContent value="more">
+              <StaffMore
+                name={name(actor.id)}
+                role={emp(actor.id)?.role ?? ''}
+                groups={staffMore}
+              />
+            </TabsContent>
+            <TabsContent value="timesheets">
+              <StaffTimesheets
+                me={actor.id}
+                punches={data.punches ?? []}
+                employee={emp(actor.id)}
+                location={LOCATION}
+                today={today}
+                busy={busy}
+                period={sheet}
+                onPeriodChange={setSheet}
+                onReview={(id, action) => {
+                  // 확인은 바로 저장하고, 이의는 무엇이 다른지 받아서 함께 보냅니다.
+                  if (action === 'approve') void command('punchReview', { id, action });
+                  else open('punchReview', { id, action, note: '' });
+                }}
+                onApproveAll={(from) => void command('punchApproveAll', { from })}
+              />
+            </TabsContent>
 {otherTabs}
             <footer>
               PELHAM SHIFT <span>{t('팀의 시간, 더 간편하게.')}</span>
@@ -3981,9 +4326,12 @@ export default function ShiftApp() {
             ))}
             {/* 서랍이 열리면 이 버튼은 가림막 아래로 들어갑니다. 닫는 쪽은 가림막이 맡습니다. */}
             <button
-              className={'tabbar-item' + (navOpen ? ' on' : '')}
-              aria-expanded={navOpen}
-              onClick={() => setNavOpen(true)}
+              className={
+                'tabbar-item' + ((staffPhone ? tab === 'more' : navOpen) ? ' on' : '')
+              }
+              aria-expanded={staffPhone ? undefined : navOpen}
+              aria-current={staffPhone && tab === 'more' ? 'page' : undefined}
+              onClick={() => (staffPhone ? setTab('more') : setNavOpen(true))}
             >
               <span className="tabbar-icon">
                 <Menu size={21} />

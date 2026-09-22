@@ -137,9 +137,18 @@
   .mobilebar-title{flex:1;min-width:0;margin:0;font-size:19px;font-weight:650;letter-spacing:-.4px;white-space:nowrap;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scrollbar-width:none}
   .mobilebar-title::-webkit-scrollbar{display:none}
   /* 하단 탭바. sticky 라서 본문을 가리지 않고, 짧은 화면에서도 맨 아래에 붙습니다. */
-  .tabbar{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));position:sticky;bottom:0;z-index:30;background:#fff;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+  .tabbar{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);position:sticky;bottom:0;z-index:30;background:#fff;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
   .tabbar-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:56px;padding:7px 2px;border:0;background:none;color:var(--sub);font-size:11px;font-weight:500;line-height:1.2;text-align:center}
   .tabbar-item.on{color:#087e6d}
+  /* 직원 폰: 화면마다 자기 제목 줄을 들고 있어 위 여백을 지우고, 탭바는 먹색으로 켭니다. */
+  .staff-full main{padding-top:0}
+  /* 직원 화면은 아래 탭바가 마무리를 맡습니다. 브랜드 꼬리말은 넣지 않습니다. */
+  .staff-shell main>footer{display:none}
+  .staff-shell .tabbar-item.on{color:#23272f}
+  .staff-shell .tabbar{border-top-color:#ebebef}
+  .mobilebar.for-staff{border-bottom-color:#ebebef}
+  .mobilebar.for-staff .mobilebar-title{font-size:20px;font-weight:500;text-align:center}
+  .mobilebar-gap{width:37px;flex-shrink:0}
   .tabbar-item:active{background:#f1eee8}
   .tabbar-icon{position:relative;display:grid;place-items:center}
   .tabbar-icon em{position:absolute;top:-1px;right:-4px;width:8px;height:8px;border-radius:50%;background:#c0503a}

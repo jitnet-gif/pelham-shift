@@ -1,0 +1,592 @@
+/* 직원 전용 폰 화면. 스케줄·메시지·근무표·출퇴근이 같은 색과 같은 줄 간격을 씁니다. */
+.stsched,
+.stsheet,
+.stmsg,
+.stmore,
+.stclock {
+  --ink: #23272f;
+  --sub: #8b9098;
+  --line: #ebebef;
+  --mint: #5bc4a2;
+  --blue: #6b6ae6;
+  --ok: #3aa76d;
+  --no: #e0574c;
+  /* main 의 좌우 여백을 되돌려 목록을 화면 끝까지 붙입니다. */
+  margin: 0 -16px;
+  background: #fff;
+  color: var(--ink);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── 스케줄 ─────────────────────────────────────────────── */
+.stsched-top {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 52px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--line);
+}
+.stsched-today {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--ink);
+}
+.stsched-today:active { background: #f2f2f4; }
+.stsched-month {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  height: 40px;
+  /* 왼쪽 달력 버튼만큼 오른쪽을 비워 제목이 화면 한가운데 섭니다. */
+  margin-right: 40px;
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -.3px;
+}
+.stsched-month span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stsched-month svg { color: var(--ink); }
+.stsched-month input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  border: 0;
+  padding: 0;
+  background: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* 내 근무 / 전체 일정 */
+.stsched-scope,
+.stmsg-scope {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin: 12px 14px 8px;
+  padding: 4px;
+  border-radius: 11px;
+  background: #eeedf0;
+}
+.stsched-scope-tab,
+.stmsg-scope-tab {
+  min-height: 40px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: #4b525c;
+  font-size: 16px;
+  font-weight: 500;
+}
+.stsched-scope-tab.on,
+.stmsg-scope-tab.on {
+  background: #2f3440;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* 한 주 날짜 줄 */
+.stsched-strip {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  padding: 8px 8px 12px;
+}
+.stsched-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 7px 0 5px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--ink);
+}
+.stsched-chip small { font-size: 13px; color: #6d737c; }
+.stsched-chip b { font-size: 21px; font-weight: 500; letter-spacing: -.5px; }
+/* 근무가 있는 날에만 점이 켜집니다. 자리는 늘 잡아 두어 숫자가 흔들리지 않습니다. */
+.stsched-chip i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: none;
+}
+.stsched-chip i.on { background: #3f444d; }
+.stsched-chip.today { background: #f0eff2; }
+.stsched-chip.on { background: var(--mint); }
+.stsched-chip.on small,
+.stsched-chip.on b { color: #fff; }
+.stsched-chip.on i.on { background: #fff; }
+
+/* 날짜별 줄 */
+.stsched-day {
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--line);
+}
+.stsched-day.picked { background: #fafafb; }
+.stsched-date {
+  flex: 0 0 34px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding-top: 1px;
+}
+.stsched-date small { font-size: 14px; font-weight: 500; color: var(--blue); }
+.stsched-date b { font-size: 21px; font-weight: 400; letter-spacing: -.5px; }
+.stsched-shifts { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.stsched-shift {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: none;
+  text-align: left;
+  color: inherit;
+}
+.stsched-shift:active { opacity: .55; }
+.stsched-shift-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.stsched-shift-main b { font-size: 17px; font-weight: 500; letter-spacing: -.2px; }
+.stsched-where { font-size: 15px; color: #575d66; }
+.stsched-role {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+  color: #5d636c;
+  min-width: 0;
+}
+.stsched-role i { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.stsched-go { color: #b7bcc3; flex-shrink: 0; }
+.stsched-none {
+  flex: 1;
+  margin: 0;
+  align-self: center;
+  font-size: 16px;
+  color: #9a9fa7;
+}
+.stsched-day.nowork { padding: 17px 16px; }
+
+/* ── 근무표 ─────────────────────────────────────────────── */
+.stsheet { padding: 0 0 8px; }
+.stsheet-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 14px 20px;
+  padding: 13px 15px;
+  border-radius: 9px;
+  background: #eeeef0;
+  font-size: 15px;
+  color: #50555d;
+}
+.stsheet-banner.open { background: #fbe2e4; color: #4a4045; }
+.stsheet-banner div { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.stsheet-banner b { font-size: 15px; font-weight: 500; }
+.stsheet-banner span { font-size: 14px; }
+.stsheet-banner svg { color: #6d727a; align-self: flex-start; margin-top: 2px; }
+.stsheet-count { margin: 0 16px 6px; font-size: 25px; font-weight: 500; letter-spacing: -.6px; }
+.stsheet-hours { margin: 0 16px 16px; font-size: 15px; color: var(--sub); }
+.stsheet-approveall {
+  margin: 0 16px 22px;
+  padding: 9px 20px;
+  border: 1px solid #9ed4b6;
+  border-radius: 20px;
+  background: #fff;
+  color: var(--ok);
+  font-size: 15px;
+}
+.stsheet-section { margin: 0 16px 6px; font-size: 16px; font-weight: 600; }
+.stsheet-row { border-top: 1px solid var(--line); }
+.stsheet-row:first-of-type { border-top: 0; }
+.stsheet-rowhead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+}
+.stsheet-rowdate { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.stsheet-rowdate b { font-size: 16px; font-weight: 400; }
+.stsheet-edited { font-size: 13px; color: var(--no); }
+.stsheet-disputed { font-size: 13px; color: var(--no); }
+.stsheet-ok { font-size: 13px; color: var(--ok); }
+.stsheet-verdict { display: flex; gap: 8px; }
+.stsheet-approve,
+.stsheet-dispute {
+  padding: 7px 15px;
+  border-radius: 18px;
+  background: #fff;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.stsheet-approve { border: 1px solid #9ed4b6; color: var(--ok); }
+.stsheet-dispute { border: 1px solid #efb3ae; color: var(--no); }
+.stsheet-expand {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: #a8adb5;
+}
+.stsheet-row.on .stsheet-expand { transform: rotate(180deg); }
+.stsheet-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0 16px 18px 26px;
+  padding-left: 14px;
+  border-left: 2px solid #d9dade;
+}
+.stsheet-detail b { font-size: 21px; font-weight: 400; letter-spacing: -.4px; }
+.stsheet-detail small { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #4f555e; }
+.stsheet-detail small i { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.stsheet-detail p { margin: 4px 0 0; font-size: 14px; color: var(--no); line-height: 1.6; }
+.stsheet-month { margin-bottom: 8px; }
+.stsheet-month h3 { margin: 22px 16px 6px; font-size: 17px; font-weight: 600; }
+.stsheet-period {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 16px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+.stsheet-period > span { flex: 1; min-width: 0; font-size: 16px; }
+.stsheet-period svg { color: #b7bcc3; }
+.stsheet-flag {
+  padding: 5px 11px;
+  border-radius: 14px;
+  background: #f6d7da;
+  color: #8d4049;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+}
+.stsheet-empty { margin: 8px 16px; font-size: 15px; color: var(--sub); }
+
+/* ── 메시지 ─────────────────────────────────────────────── */
+.stmsg-top {
+  display: flex;
+  align-items: center;
+  height: 52px;
+  padding: 0 8px 0 48px;
+  border-bottom: 1px solid var(--line);
+}
+.stmsg-top h2 { flex: 1; margin: 0; font-size: 20px; font-weight: 500; text-align: center; }
+.stmsg-compose {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--ink);
+}
+.stmsg-shout {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  width: calc(100% - 28px);
+  margin: 12px 14px 22px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #fff;
+  text-align: left;
+  color: inherit;
+}
+.stmsg-shout b { display: flex; align-items: center; gap: 9px; font-size: 18px; font-weight: 600; }
+.stmsg-shout span { font-size: 15px; color: var(--sub); }
+.stmsg-section {
+  margin: 0 16px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1.1px;
+  color: var(--sub);
+  text-transform: uppercase;
+}
+.stmsg-row {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+.stmsg-row:first-of-type { border-top: 0; }
+.stmsg-face {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #7f9d8a;
+  color: #fff;
+  flex-shrink: 0;
+}
+.stmsg-face.notice { background: #628597; }
+.stmsg-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.stmsg-main b { font-size: 16px; font-weight: 500; }
+.stmsg-main small {
+  font-size: 14px;
+  color: var(--sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stmsg-row.unread .stmsg-main b { font-weight: 700; }
+.stmsg-row.unread .stmsg-main small { color: #454b54; }
+.stmsg-row time { align-self: flex-start; font-size: 13px; color: var(--sub); white-space: nowrap; }
+.stmsg-empty { margin: 16px; font-size: 15px; color: var(--sub); }
+
+/* ── 더보기 ─────────────────────────────────────────────── */
+.stmore { padding-bottom: 10px; }
+.stmore-me {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.stmore-face {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: #e7ede9;
+  font-size: 18px;
+  font-weight: 600;
+  color: #41524e;
+}
+.stmore-me span { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.stmore-me b { font-size: 18px; font-weight: 600; }
+.stmore-me small { font-size: 14px; color: var(--sub); }
+.stmore-group h3 {
+  margin: 22px 16px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1.1px;
+  color: var(--sub);
+  text-transform: uppercase;
+}
+.stmore-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 15px 16px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+.stmore-row > svg:first-child { color: #5d636c; }
+.stmore-row > span { flex: 1; min-width: 0; font-size: 16px; }
+.stmore-row > svg:last-child { color: #b7bcc3; }
+.stmore-row em {
+  min-width: 21px;
+  padding: 2px 6px;
+  border-radius: 11px;
+  background: #e0574c;
+  color: #fff;
+  font-size: 12px;
+  font-style: normal;
+  text-align: center;
+}
+
+/* ── 출퇴근 ─────────────────────────────────────────────── */
+/* 아래 탭바를 뺀 나머지를 채웁니다 — 키패드 아래가 허옇게 남지 않도록. */
+.stclock { display: flex; flex-direction: column; min-height: calc(100dvh - 60px); }
+.stclock-top {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 52px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--line);
+}
+.stclock-top h2 { flex: 1; margin: 0; font-size: 17px; font-weight: 500; text-align: center; }
+.stclock-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--ink);
+}
+.stclock-who { display: flex; align-items: center; gap: 12px; padding: 20px 18px 24px; }
+.stclock-face {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: #a8c19b;
+  color: #fff;
+  font-size: 19px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.stclock-name { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.stclock-name b { font-size: 17px; font-weight: 500; }
+.stclock-name em {
+  padding: 3px 11px;
+  border-radius: 12px;
+  background: #d5f0e2;
+  color: #2b7a5c;
+  font-size: 13px;
+  font-style: normal;
+}
+.stclock-name em.onbreak { background: #fdeccd; color: #8a6420; }
+.stclock-elapsed { display: flex; align-items: center; gap: 9px; color: #4f555e; }
+.stclock-elapsed span { display: flex; flex-direction: column; gap: 2px; }
+.stclock-elapsed b { font-size: 16px; font-weight: 500; }
+.stclock-elapsed small { font-size: 13px; color: var(--sub); }
+.stclock-body { flex: 1; padding: 22px 16px 16px; background: #fafafb; border-top: 1px solid var(--line); }
+.stclock-body h3 { margin: 0 0 4px; font-size: 24px; font-weight: 500; letter-spacing: -.5px; }
+.stclock-date { margin: 0 0 18px; font-size: 15px; color: var(--sub); }
+.stclock-card {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+.stclock-badge {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #e0574c;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.stclock-card > span:last-child { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.stclock-card b { font-size: 16px; font-weight: 500; }
+.stclock-card small {
+  font-size: 14px;
+  color: var(--sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stclock-break,
+.stclock-end {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 52px;
+  margin-top: 14px;
+  border-radius: 26px;
+  font-size: 17px;
+}
+.stclock-break { border: 1px solid #dcdde1; background: #fff; color: var(--ink); }
+.stclock-end { border: 0; background: #ef5a4e; color: #fff; font-weight: 600; }
+
+/* Punch ID 키패드 */
+.stclock-place { display: flex; align-items: center; gap: 14px; padding: 26px 20px 30px; }
+.stclock-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: url(/logo.png) center/contain no-repeat, #eceef0;
+  flex-shrink: 0;
+}
+.stclock-place span:last-child { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.stclock-place b { font-size: 21px; font-weight: 500; letter-spacing: -.4px; }
+.stclock-place small { font-size: 14px; color: var(--sub); }
+.stclock-pad {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 16px 20px;
+  background: #f4f4f6;
+  border-top: 1px solid var(--line);
+}
+.stclock-ask { margin: 0 0 14px; font-size: 16px; color: #4f555e; text-align: center; }
+.stclock-code {
+  display: block;
+  min-height: 44px;
+  margin-bottom: 4px;
+  border-radius: 10px 10px 0 0;
+  background: #fff;
+  font-size: 26px;
+  letter-spacing: 9px;
+  line-height: 44px;
+  text-align: center;
+}
+.stclock-keys {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: #e3e3e7;
+  border-radius: 0 0 10px 10px;
+  overflow: hidden;
+}
+.stclock-keys button {
+  display: grid;
+  place-items: center;
+  min-height: 58px;
+  border: 0;
+  background: #fff;
+  color: var(--ink);
+  font-size: 25px;
+  font-weight: 400;
+}
+.stclock-keys button.word { font-size: 14px; letter-spacing: .6px; }
+.stclock-keys button:active { background: #eceef1; }
+.stclock-wrong { margin: 12px 0 0; font-size: 14px; color: var(--no); text-align: center; }
+.stclock-signin {
+  width: 100%;
+  min-height: 52px;
+  margin-top: auto;
+  border: 0;
+  border-radius: 26px;
+  background: #2f3440;
+  color: #fff;
+  font-size: 17px;
+  font-weight: 600;
+}
+.stclock-signin:disabled { background: #e0e1e5; color: #9a9fa7; opacity: 1; }

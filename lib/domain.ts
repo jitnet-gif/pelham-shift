@@ -1,5 +1,5 @@
 // admin: 직원이면서 관리자 권한을 가진 사람. archived: 삭제한 직원 — 지난 기록을 위해 데이터에는 남기고 화면 목록에서만 감춥니다.
-export type Employee = {id:string;name:string;color:string;role:string;rate:number;email:string;birthDate:string;phone?:string;taskManager?:boolean;admin?:boolean;archived?:boolean};
+export type Employee = {id:string;name:string;color:string;role:string;rate:number;email:string;birthDate:string;phone?:string;punchId?:string;taskManager?:boolean;admin?:boolean;archived?:boolean};
 export type Shift = {id:string;employeeId:string;date:string;start:string;end:string;area:string;note?:string;breakMinutes?:number;originalId?:string};
 export type Swap = {id:string;shiftId:string;from:string;to:string;status:'requested'|'accepted'|'approved'|'rejected';createdAt:string;bonus:number};
 export type Attendance = {id:string;employeeId:string;date:string;start:string;end:string;breakMinutes:number};
@@ -11,7 +11,9 @@ export type TimeOff = {id:string;employeeId:string;from:string;to:string;allDay:
 // Recurring weekly unavailability: weekday 0 (Sun) – 6 (Sat), all day or between start/end.
 export type Availability = {id:string;employeeId:string;weekday:number;allDay:boolean;start?:string;end?:string;note:string;effectiveFrom?:string;status:Decision;createdAt:string;decidedAt?:string};
 // 직원이 그 자리에서 찍은 실제 출퇴근. 나중에 올리는 출근기계 기록(Attendance)과 달리 지금 이 순간을 말합니다.
-export type Punch = {id:string;employeeId:string;date:string;in:string;out?:string};
+export type PunchBreak = {start:string;end?:string;paid:boolean};
+// 직원이 그 자리에서 찍은 실제 출퇴근. status 는 급여 기간이 닫히기 전 직원 본인이 확인한 결과입니다.
+export type Punch = {id:string;employeeId:string;date:string;in:string;out?:string;area?:string;breaks?:PunchBreak[];status?:'pending'|'approved'|'disputed';disputeNote?:string;editedBy?:string;reviewedAt?:string};
 // 출근기계 타임카드는 사람을 이름으로만 알려 줍니다. 한 번 승인한 이름은 이 목록에 남아 다음 임포트부터 자동으로 이어집니다.
 export type ClockName = {name:string;raw:string;employeeId:string};
 // name 은 비교용으로 다듬은 값, raw 는 출근기계에 찍힌 그대로의 표기입니다.
@@ -30,6 +32,19 @@ export const leadDate=(today=localDate(new Date()))=>addDays(today,LEAD_DAYS);
 export function canSwap(date:string,today=localDate(new Date())){return date>=leadDate(today)}
 export function overlap(a:Shift,b:Shift){const stamp=(s:Shift)=>{const start=Date.parse(s.date+'T00:00:00Z')+minutes(s.start)*60000;return [start,start+duration(s.start,s.end)*3600000]};const [a0,a1]=stamp(a),[b0,b1]=stamp(b);return a0<b1&&b0<a1}
 export const weekdayOf=(date:string)=>new Date(date+'T12:00:00Z').getUTCDay();
+// 급여 기간은 일요일에 시작하는 2주입니다. 기준일 2026-09-20 은 실제 운영 주기(9/20~10/3)에 맞춘 일요일입니다.
+export const PAY_PERIOD_DAYS=14;
+export const PAY_ANCHOR='2026-09-20';
+const dayNumber=(date:string)=>Math.round(Date.parse(date+'T12:00:00Z')/86400000);
+// 기준일보다 앞선 날짜도 같은 주기 위에 떨어지도록 내림으로 맞춥니다.
+export function payPeriodStart(date:string){return addDays(PAY_ANCHOR,Math.floor((dayNumber(date)-dayNumber(PAY_ANCHOR))/PAY_PERIOD_DAYS)*PAY_PERIOD_DAYS)}
+export const payPeriodEnd=(start:string)=>addDays(start,PAY_PERIOD_DAYS-1);
+// 최근 기간부터 과거로 count 개. 화면은 이 목록을 달(시작일 기준)로 묶어 보여 줍니다.
+export function payPeriods(today:string,count:number){const first=payPeriodStart(today);return Array.from({length:count},(_,i)=>{const from=addDays(first,-i*PAY_PERIOD_DAYS);return {from,to:payPeriodEnd(from)}})}
+// 지금 지나고 있는 기간만 직원이 확인할 수 있습니다. 지난 기간은 급여가 나가 닫힙니다.
+export const periodOpen=(from:string,today:string)=>from===payPeriodStart(today);
+// 찍힌 출퇴근으로 실제 근무한 시간을 셉니다. 유급 휴게는 근무로 치고 무급 휴게만 뺍니다.
+export function punchHours(p:Punch){if(!p.out)return 0;const unpaid=(p.breaks??[]).reduce((sum,b)=>sum+(b.end&&!b.paid?duration(b.start,b.end):0),0);return Math.max(0,duration(p.in,p.out)-unpaid)}
 // What an approved time off or unavailability blocks on a shift's date, if anything. Managers are warned, not stopped.
 export function blockedBy(state:State,shift:Shift):'timeoff'|'unavailable'|null{const hits=(allDay:boolean,start?:string,end?:string)=>allDay||!start||!end||overlap(shift,{...shift,start,end});if((state.timeOff??[]).some(r=>r.status==='approved'&&r.employeeId===shift.employeeId&&shift.date>=r.from&&shift.date<=r.to&&hits(r.allDay,r.start,r.end)))return 'timeoff';if((state.availability??[]).some(r=>r.status==='approved'&&r.employeeId===shift.employeeId&&r.weekday===weekdayOf(shift.date)&&(!r.effectiveFrom||shift.date>=r.effectiveFrom)&&hits(r.allDay,r.start,r.end)))return 'unavailable';return null}
 // 급여 규칙 · 미국 연방(FLSA) 주 40시간 기준에 일 8시간 기준을 함께 적용합니다.
@@ -57,5 +72,16 @@ export function payroll(state:State,employeeId:string,from:string,to:string){con
  const lateDeduction=Math.min(earned,(lateMinutes/60)*e.rate);
  return {hours,regularHours,otHours,lateMinutes,lateDays,base:cents(base),otPay:cents(otPay),bonus,lateDeduction:cents(lateDeduction),total:cents(earned-lateDeduction)}}
 // 근무지 장소. 새 직원·새 근무의 기본값이자 시범 데이터의 배정 기준입니다.
-export const AREAS=['Proshop','Workspace','Golf Operations','Golf Simulator','Kitchen - BOH','Bar/Restaurant - FOH','Snack Bar','Beverage Cart','Turf Maintenance','Admin & Operation'] as const;
-export function seed():State{const names=['Josh','Grace','Claudio','Francis','James','Karen','Dylan','Dustin','Sam'];const colors=['#5579cf','#c48537','#20a69a','#9864c3','#e17b57','#5c9d61','#d26395','#628597','#a89643'];const employees=names.map((name,i)=>({id:'E'+String(i+1).padStart(3,'0'),name,color:colors[i],role:AREAS[i%AREAS.length],rate:0,email:'',birthDate:'',phone:''}));const week=weekStart(localDate(new Date()));const shifts:Shift[]=[];for(let d=0;d<7;d++) employees.forEach((e,i)=>{if((i+d)%4!==1) shifts.push({id:`s${d}-${i}`,employeeId:e.id,date:addDays(week,d),start:i%3===0?'10:00':i%3===1?'06:00':'12:00',end:i%3===0?'18:00':i%3===1?'14:00':'20:00',area:e.role})});return {employees,shifts,swaps:[],attendance:[],messages:[],tasks:[],timeOff:[],availability:[],currency:'CAD',published:false}}
+export const AREAS=['Proshop','Workshop'] as const;
+// 근무를 추가·수정할 때 고를 수 있는 장소. 나머지 업무는 목록에서 감춥니다.
+// 예전에 다른 장소로 저장된 근무는 그 값을 그대로 유지하고, 그 근무를 열었을 때만 선택지에 함께 보입니다.
+export const SHIFT_AREAS=['Proshop','Workshop'] as const;
+export function seed():State{const names=['Josh','Grace','Claudio','Francis','James','Karen','Dylan','Dustin','Sam'];const colors=['#5579cf','#c48537','#20a69a','#9864c3','#e17b57','#5c9d61','#d26395','#628597','#a89643'];const employees=names.map((name,i)=>({id:'E'+String(i+1).padStart(3,'0'),name,color:colors[i],role:AREAS[i%AREAS.length],rate:0,email:'',birthDate:'',phone:'',punchId:String(1001+i)}));const week=weekStart(localDate(new Date()));const shifts:Shift[]=[];for(let d=0;d<7;d++) employees.forEach((e,i)=>{if((i+d)%4!==1) shifts.push({id:`s${d}-${i}`,employeeId:e.id,date:addDays(week,d),start:i%3===0?'10:00':i%3===1?'06:00':'12:00',end:i%3===0?'18:00':i%3===1?'14:00':'20:00',area:e.role})});
+ // 지난 두 급여 기간과 이번 기간의 출퇴근 기록. 지난 기간은 이미 확인이 끝나 닫혀 있습니다.
+ const today=localDate(new Date());const start=addDays(payPeriodStart(today),-2*PAY_PERIOD_DAYS);const punches:Punch[]=[];
+ for(let d=0;d<3*PAY_PERIOD_DAYS;d++){const date=addDays(start,d);if(date>today)break;
+  employees.forEach((e,i)=>{if((i+d)%4===1)return;const morning=(i+d)%2===0;
+   const open=periodOpen(payPeriodStart(date),today);
+   punches.push({id:`p${d}-${i}`,employeeId:e.id,date,in:morning?'07:57':'13:59',out:morning?'12:04':'19:35',area:e.role,
+    status:open?'pending':'approved',...(open?{}:{reviewedAt:date+'T23:00:00.000Z'}),...(!open&&(i+d)%5===0?{editedBy:'manager'}:{})})})}
+ return {employees,shifts,swaps:[],attendance:[],messages:[],tasks:[],timeOff:[],availability:[],punches,clockNames:[],currency:'CAD',published:false}}
