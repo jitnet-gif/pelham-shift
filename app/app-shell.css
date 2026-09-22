@@ -133,7 +133,9 @@
   .mobilebar .iconbutton{padding:8px;border-radius:8px;color:var(--ink)}
   .mobilebar-me{border:0;background:none;padding:4px;border-radius:50%}
   .mobilebar-me .avatar{width:32px;height:32px;margin:0;font-size:14px;color:#41524e}
-  .mobilebar-title{flex:1;min-width:0;margin:0;font-size:19px;font-weight:650;letter-spacing:-.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* 화면 이름도 자르지 않고 밀어 읽습니다. */
+  .mobilebar-title{flex:1;min-width:0;margin:0;font-size:19px;font-weight:650;letter-spacing:-.4px;white-space:nowrap;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scrollbar-width:none}
+  .mobilebar-title::-webkit-scrollbar{display:none}
   /* 하단 탭바. sticky 라서 본문을 가리지 않고, 짧은 화면에서도 맨 아래에 붙습니다. */
   .tabbar{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));position:sticky;bottom:0;z-index:30;background:#fff;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
   .tabbar-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:56px;padding:7px 2px;border:0;background:none;color:var(--sub);font-size:11px;font-weight:500;line-height:1.2;text-align:center}
