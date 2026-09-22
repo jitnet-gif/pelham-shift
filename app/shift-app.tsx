@@ -416,6 +416,10 @@ export default function ShiftApp() {
     value: e.id,
     label: e.name + ' · ' + e.id,
   }));
+  // 대체 신청은 근무일 7일 전까지만 받습니다. 가까운 날짜만 남아 있으면 고를 근무가 하나도 없습니다.
+  const swappable = data.shifts.filter(
+    (s) => canSwap(s.date) && (actor.admin || s.employeeId === actor.id) && !s.originalId,
+  );
   const roles = [...new Set(staff.map((e) => e.role))].sort((a, b) =>
     a.localeCompare(b),
   );
@@ -1980,25 +1984,24 @@ export default function ShiftApp() {
             )}
             {modal === 'swap' && (
               <>
-                <Pick
-                  label={t('대체할 근무')}
-                  value={form.shiftId || ''}
-                  onChange={(v) => put('shiftId', v)}
-                  options={[
-                    { value: '', label: t('근무 선택') },
-                    ...data.shifts
-                      .filter(
-                        (s) =>
-                          canSwap(s.date) &&
-                          (actor.admin || s.employeeId === actor.id) &&
-                          !s.originalId,
-                      )
-                      .map((s) => ({
+                {swappable.length ? (
+                  <Pick
+                    label={t('대체할 근무')}
+                    value={form.shiftId || ''}
+                    onChange={(v) => put('shiftId', v)}
+                    options={[
+                      { value: '', label: t('근무 선택') },
+                      ...swappable.map((s) => ({
                         value: s.id,
                         label: `${s.date} ${s.start} · ${name(s.employeeId)}`,
                       })),
-                  ]}
-                />
+                    ]}
+                  />
+                ) : (
+                  <p className="formerror">
+                    {t('지금 대체 신청할 수 있는 근무가 없습니다. 근무일이 7일 넘게 남은 일정만 고를 수 있어, 다음 주 이후 일정을 먼저 등록하세요.')}
+                  </p>
+                )}
                 <Pick
                   label={t('대체 직원')}
                   value={form.to || ''}
@@ -2109,6 +2112,7 @@ export default function ShiftApp() {
                 disabled={
                   busy ||
                   (modal === 'rain' && !rainTargets.length) ||
+                  (modal === 'swap' && !swappable.length) ||
                   (modal === 'detail' &&
                     !canSwap(
                       data.shifts.find((s) => s.id === form.id)?.date || '',

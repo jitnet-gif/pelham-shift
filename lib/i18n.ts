@@ -403,6 +403,8 @@ const en: Record<string, string> = {
   '근무 선택': 'Choose a shift',
   '대체 직원': 'Covering employee',
   '직원 선택': 'Choose an employee',
+  '지금 대체 신청할 수 있는 근무가 없습니다. 근무일이 7일 넘게 남은 일정만 고를 수 있어, 다음 주 이후 일정을 먼저 등록하세요.':
+    "No shift can be swapped right now. Only a shift more than 7 days away can be, so add next week's schedule first.",
   '근무일 7일 이내인 일정은 선택 목록에 표시되지 않습니다.':
     'Shifts less than 7 days away are not listed.',
   '대체 직원 추가수당 ({currency})': 'Bonus for covering employee ({currency})',
