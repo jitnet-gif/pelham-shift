@@ -341,6 +341,18 @@ const en: Record<string, string> = {
   지각일수: 'Late days',
   '-{money} · {n}분 {d}일': '-{money} · {n} min over {d} day(s)',
   '대체 추가수당': 'Swap bonus',
+  '급여 상세': 'Pay detail',
+  '날짜별 상세 보기': 'Open the day-by-day detail',
+  '저장된 출근기록 기준입니다. 예정 시간이 아니라 실제로 찍힌 기록으로 계산합니다.':
+    'Based on saved attendance: what was actually clocked, not what was scheduled.',
+  날짜: 'Date',
+  '예정 근무': 'Scheduled',
+  출퇴근: 'In / Out',
+  금액: 'Amount',
+  '{week} 시작 주 · 실근무 {worked}h · 하루 8시간 초과분 합 {daily}h · 주 40시간 초과분 {weekly}h → 1.5배 가산 {applied}h':
+    'Week of {week} · {worked}h worked · {daily}h over 8h a day · {weekly}h over 40h a week → {applied}h paid at 1.5x',
+  '날짜별 금액은 시급 × 실근무입니다. 초과분에 붙는 0.5배 가산과 지각 차감은 주 단위로 아래에서 더하고 뺍니다.':
+    'Each day shows the hourly rate times hours worked. The extra 0.5x on overtime and the late deduction are applied per week, below.',
   통화: 'Currency',
   예상급여_: 'estimated-pay_',
 

@@ -202,6 +202,7 @@ export default function ShiftApp() {
   const [ui, setUi] = useState<Layout>('seven');
   const [offFilter, setOffFilter] = useState('pending');
   const [inapp, setInapp] = useState<Message | null>(null);
+  const [payDetail, setPayDetail] = useState('');
   const seenMessages = useRef<Set<string>>(new Set());
   const chooseLayout = (next: Layout) => {
     setUi(next);
@@ -739,6 +740,35 @@ export default function ShiftApp() {
     );
   const statusLabel = (v: string) =>
     t(({ pending: '대기 중', approved: '승인됨', declined: '거절됨' } as Record<string, string>)[v] || v);
+  // 급여 상세. 고른 구간의 출근기록을 날짜순으로 펼치고, 그 옆에 예정 근무·지각·그날 금액을 같이 둡니다.
+  const payDays = (employeeId: string) =>
+    data.attendance
+      .filter((a) => a.employeeId === employeeId && a.date >= from && a.date <= to)
+      .slice()
+      .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start))
+      .map((a) => ({
+        a,
+        shift: scheduledFor(data, a),
+        worked: duration(a.start, a.end, a.breakMinutes),
+        late: lateBy(data, a),
+      }));
+  // 초과근무가 어떤 근거로 잡혔는지. 하루 8시간 초과분의 합과 주 40시간 초과분 중 큰 쪽만 가산합니다.
+  const payWeeks = (employeeId: string) => {
+    const byDay = new Map<string, number>();
+    for (const r of payDays(employeeId))
+      byDay.set(r.a.date, (byDay.get(r.a.date) ?? 0) + r.worked);
+    const weeks = new Map<string, number[]>();
+    for (const [day, h] of byDay)
+      weeks.set(weekStart(day), [...(weeks.get(weekStart(day)) ?? []), h]);
+    return [...weeks.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([week, days]) => {
+        const daily = days.reduce((n, h) => n + Math.max(0, h - OT_DAILY_HOURS), 0);
+        const worked = days.reduce((n, h) => n + h, 0);
+        const weekly = Math.max(0, worked - OT_WEEKLY_HOURS);
+        return { week, worked, daily, weekly, applied: Math.max(daily, weekly) };
+      });
+  };
   const totals = data.employees.map((e) => ({
     e,
     ...payroll(data, e.id, from, to),
@@ -1729,7 +1759,20 @@ export default function ShiftApp() {
                 </TableHeader>
                 <TableBody>
                   {visibleTotals.map((r) => (
-                      <TableRow key={r.e.id}>
+                      <TableRow
+                        key={r.e.id}
+                        className="rowlink"
+                        role="button"
+                        tabIndex={0}
+                        title={t('날짜별 상세 보기')}
+                        onClick={() => setPayDetail(r.e.id)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            setPayDetail(r.e.id);
+                          }
+                        }}
+                      >
                         <TableCell>{box(r.e)}</TableCell>
                         <TableCell>{r.hours.toFixed(2)}h</TableCell>
                         <TableCell>{r.regularHours.toFixed(2)}h</TableCell>
@@ -2111,6 +2154,106 @@ export default function ShiftApp() {
   );
   const dialogs = (
     <>
+      {payDetail && (
+        <Dialog open onOpenChange={(open) => !open && setPayDetail('')}>
+          <DialogContent className="shift-dialog paydetail">
+            <DialogTitle>
+              {t('급여 상세')} · {name(payDetail)}
+            </DialogTitle>
+            <DialogDescription>
+              {from} ~ {to} · {t('저장된 출근기록 기준입니다. 예정 시간이 아니라 실제로 찍힌 기록으로 계산합니다.')}
+            </DialogDescription>
+            {payDays(payDetail).length === 0 ? (
+              <p className="hint">{t('아직 저장된 출근기록이 없습니다.')}</p>
+            ) : (
+              <>
+                <div className="paydetail-scroll">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {['날짜', '예정 근무', '출퇴근', '휴게', '실근무', '지각', '초과', '금액'].map(
+                          (h) => (
+                            <TableHead key={h}>{t(h)}</TableHead>
+                          ),
+                        )}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {payDays(payDetail).map(({ a, shift, worked, late }) => (
+                        <TableRow key={a.id}>
+                          <TableCell>{monthDay(a.date)}</TableCell>
+                          <TableCell>
+                            {shift ? ampm(shift.start) + ' – ' + ampm(shift.end) : '—'}
+                          </TableCell>
+                          <TableCell>
+                            {ampm(a.start)} – {ampm(a.end)}
+                          </TableCell>
+                          <TableCell>
+                            {a.breakMinutes ? t('{n}분', { n: a.breakMinutes }) : '—'}
+                          </TableCell>
+                          <TableCell>{worked.toFixed(2)}h</TableCell>
+                          <TableCell className={late ? 'red' : undefined}>
+                            {late === null
+                              ? t('예정 없음')
+                              : late
+                                ? t('{n}분 지각', { n: late })
+                                : t('정시')}
+                          </TableCell>
+                          <TableCell>
+                            {worked > OT_DAILY_HOURS
+                              ? (worked - OT_DAILY_HOURS).toFixed(2) + 'h'
+                              : '—'}
+                          </TableCell>
+                          <TableCell>{money(worked * (emp(payDetail)?.rate ?? 0))}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <p className="hint">
+                  {t('날짜별 금액은 시급 × 실근무입니다. 초과분에 붙는 0.5배 가산과 지각 차감은 주 단위로 아래에서 더하고 뺍니다.')}
+                </p>
+                {payWeeks(payDetail).map((w) => (
+                  <p className="hint" key={w.week}>
+                    {t(
+                      '{week} 시작 주 · 실근무 {worked}h · 하루 8시간 초과분 합 {daily}h · 주 40시간 초과분 {weekly}h → 1.5배 가산 {applied}h',
+                      {
+                        week: monthDay(w.week),
+                        worked: w.worked.toFixed(2),
+                        daily: w.daily.toFixed(2),
+                        weekly: w.weekly.toFixed(2),
+                        applied: w.applied.toFixed(2),
+                      },
+                    )}
+                  </p>
+                ))}
+                {(() => {
+                  const sum = payroll(data, payDetail, from, to);
+                  return (
+                    <div className="paytotals">
+                      <span>
+                        {t('기본급')} <b>{money(sum.base)}</b>
+                      </span>
+                      <span className={sum.otPay ? 'green' : undefined}>
+                        {t('초과수당')} <b>+{money(sum.otPay)}</b>
+                      </span>
+                      <span className={sum.lateDeduction ? 'red' : undefined}>
+                        {t('지각 차감')} <b>-{money(sum.lateDeduction)}</b>
+                      </span>
+                      <span className={sum.bonus ? 'green' : undefined}>
+                        {t('대체 추가수당')} <b>+{money(sum.bonus)}</b>
+                      </span>
+                      <span className="paytotals-sum">
+                        {t('예상 급여')} <b>{money(sum.total)}</b>
+                      </span>
+                    </div>
+                  );
+                })()}
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
       {inapp && (
         <div className="inapp-alert" role="status">
           <span className="inapp-icon"><BellRing size={18} /></span>
