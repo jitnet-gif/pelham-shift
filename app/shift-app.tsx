@@ -2648,16 +2648,19 @@ export default function ShiftApp() {
                 {t(status)}
               </p>
             )}
+            {/* 폰에서는 이 묶음이 시트 바닥에 붙는 푸터가 됩니다. 데스크톱에서는 display:contents 라 아무 영향이 없습니다. */}
             {staffReadOnly && modal === 'detail' ? (
-              <button
-                className="button primary submit"
-                type="button"
-                onClick={() => setModal('')}
-              >
-                {t('닫기')}
-              </button>
+              <div className="dialog-actions">
+                <button
+                  className="button primary submit"
+                  type="button"
+                  onClick={() => setModal('')}
+                >
+                  {t('닫기')}
+                </button>
+              </div>
             ) : (
-              <>
+              <div className="dialog-actions">
               {(modal === 'shift' || modal === 'shiftUpdate') && (
                 <button className="button cancel" type="button" onClick={() => setModal('')}>
                   {t('취소')}
@@ -2686,7 +2689,7 @@ export default function ShiftApp() {
                         : t('선택한 {n}명에게 공지 저장', { n: rainTargets.length })
                       : t('저장')}
               </button>
-              </>
+              </div>
             )}
           </form>
         </DialogContent>
