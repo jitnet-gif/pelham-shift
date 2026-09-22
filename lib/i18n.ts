@@ -201,7 +201,7 @@ const en: Record<string, string> = {
   '이미 신청한 휴무와 날짜가 겹칩니다.': 'These dates overlap time off you already requested.',
   '화면 버전': 'Layout',
   '기본 화면 · 위쪽 탭 메뉴': 'Classic · tabs across the top',
-  '7shifts 스타일 · 왼쪽 메뉴': '7shifts style · menu on the left',
+  '왼쪽 메뉴 · 근무 현황과 하루 보기': 'Side menu · who is working and the day',
   '메뉴 펼치기': 'Expand menu',
   '메뉴 접기': 'Collapse menu',
   '메뉴 열기': 'Open menu',

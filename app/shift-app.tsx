@@ -189,7 +189,7 @@ export default function ShiftApp() {
   const [search, setSearch] = useState('');
   const [navCollapsed, setNavCollapsed] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
-  const [ui, setUi] = useState<Layout>('pelham');
+  const [ui, setUi] = useState<Layout>('seven');
   const [offFilter, setOffFilter] = useState('pending');
   const [inapp, setInapp] = useState<Message | null>(null);
   const seenMessages = useRef<Set<string>>(new Set());
@@ -911,8 +911,8 @@ export default function ShiftApp() {
             <div className="layout-pick" role="radiogroup" aria-label={t('화면 버전')}>
               {(
                 [
-                  ['pelham', '1', 'pelham-shifts', t('기본 화면 · 위쪽 탭 메뉴')],
-                  ['seven', '2', 'seven-shifts', t('7shifts 스타일 · 왼쪽 메뉴')],
+                  // 기본 화면(pelham-shifts)은 잠시 감춰 두었습니다. 줄을 되살리면 다시 고를 수 있습니다.
+                  ['seven', '1', '8 shift', t('왼쪽 메뉴 · 근무 현황과 하루 보기')],
                 ] as const
               ).map(([value, num, label, hint]) => (
                 <button
