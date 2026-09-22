@@ -30,6 +30,7 @@ import {
   BookOpen,
   CircleQuestionMark,
   Timer,
+  Radar,
   CalendarX,
   CalendarClock,
   Network,
@@ -95,6 +96,7 @@ import { translate } from '@/lib/i18n';
 import InstallQr from './install-qr';
 import MonthSchedule from './month-schedule';
 import DaySchedule from './day-schedule';
+import WhosWorking from './whos-working';
 import BirthLogin from './birth-login';
 import PasswordChange from './password-change';
 import LangToggle from './lang-toggle';
@@ -136,6 +138,7 @@ function Pick({
 }
 const nav = [
   { key: 'schedule', label: '근무 스케줄', Icon: CalendarDays },
+  { key: 'working', label: '근무 현황', Icon: Radar },
   { key: 'timeoff', label: '휴무', Icon: CalendarX },
   { key: 'availability', label: '근무 가능 시간', Icon: CalendarClock },
   { key: 'attendance', label: '출근 기록', Icon: Clock3 },
@@ -821,6 +824,23 @@ export default function ShiftApp() {
     });
   const otherTabs = (
     <>
+            <TabsContent value="working">
+              <div className="panel contentpanel">
+                <div className="sectionhead">
+                  <div>
+                    <h2>{t('근무 현황')}</h2>
+                    <p>{t('오늘 누가 나와 있는지 출근 순서대로 봅니다. 실제 출근 기록이 아니라 예정된 근무 기준입니다.')}</p>
+                  </div>
+                </div>
+                <WhosWorking
+                  date={day}
+                  now={tick}
+                  employees={staff}
+                  shifts={data.shifts}
+                  onShiftSelect={(id) => open('detail', { id })}
+                />
+              </div>
+            </TabsContent>
             <TabsContent value="timeoff">
               <div className="panel contentpanel">
                 <div className="sectionhead">
@@ -2753,6 +2773,7 @@ export default function ShiftApp() {
             {actor.admin && navItem('logbook', '업무일지', BookOpen)}
             {navItem('messages', '메시지', MessageSquare, { count: unread.length })}
             <hr />
+            {actor.admin && navItem('working', '근무 현황', Radar)}
             {navItem('attendance', '출근 기록', Timer)}
             {navItem('payroll', '급여 관리', Wallet)}
             <hr />

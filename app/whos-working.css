@@ -1,0 +1,184 @@
+/* 근무 현황: 그날 근무를 출근 순서대로 한 줄씩, 시간 눈금 위에 올려 봅니다. */
+.working {
+  --wk-name: 190px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.working-blocks {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.working-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 18px;
+  border-radius: 10px;
+  background: #f2f6f4;
+}
+.working-block b {
+  font-size: 30px;
+  font-weight: 650;
+  line-height: 1.1;
+  color: #21362e;
+}
+.working-block span {
+  font-size: 13px;
+  color: #6d8074;
+}
+.working-block.on {
+  background: #d9f0e5;
+}
+.working-block.soon {
+  background: #fdf0d8;
+}
+.working-block.done {
+  background: #e7eaf4;
+}
+.working-empty {
+  padding: 60px 20px;
+  text-align: center;
+  color: #7a8c80;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}
+.working-scroll {
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  padding: 6px 20px 18px;
+}
+.working-chart {
+  min-width: calc(var(--wk-name) + 620px);
+}
+.working-ruler {
+  display: flex;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #fff;
+  height: 34px;
+}
+.working-ruler > span {
+  width: var(--wk-name);
+  min-width: var(--wk-name);
+}
+.working-ruler > div {
+  position: relative;
+  flex: 1;
+}
+.working-ruler i {
+  position: absolute;
+  top: 8px;
+  transform: translateX(-50%);
+  font-size: 12px;
+  font-style: normal;
+  color: #8a9a92;
+  white-space: nowrap;
+}
+.working-row {
+  display: flex;
+  align-items: center;
+  min-height: 49px;
+}
+.working-name {
+  width: var(--wk-name);
+  min-width: var(--wk-name);
+  padding-right: 18px;
+  text-align: right;
+  font-size: 14px;
+  color: #33463d;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.working-track {
+  position: relative;
+  flex: 1;
+  align-self: stretch;
+}
+.working-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #eef2f0;
+}
+.working-now {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #d9534f;
+  z-index: 2;
+}
+.working-bar {
+  position: absolute;
+  top: 7px;
+  height: 34px;
+  min-width: 34px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  overflow: hidden;
+  color: #fff;
+  text-align: left;
+}
+.working-bar i {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  min-width: 34px;
+  align-self: stretch;
+  background: rgba(0, 0, 0, 0.16);
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 700;
+}
+.working-bar b {
+  padding: 0 11px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 이미 끝난 근무는 한 톤 죽입니다. */
+.working-bar.done {
+  opacity: 0.55;
+}
+@media (max-width: 700px) {
+  .working {
+    --wk-name: 116px;
+    gap: 14px;
+  }
+  .working-blocks {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .working-block {
+    padding: 13px 14px;
+  }
+  .working-block b {
+    font-size: 25px;
+  }
+  .working-scroll {
+    padding: 6px 12px 14px;
+  }
+  .working-chart {
+    min-width: calc(var(--wk-name) + 520px);
+  }
+  .working-name {
+    padding-right: 11px;
+    font-size: 13px;
+  }
+}

@@ -13,6 +13,13 @@ const en: Record<string, string> = {
   // App shell and navigation
   'Pelham Shift · 근무 관리': 'Pelham Shift · Staff scheduling',
   '근무 스케줄': 'Schedule',
+  '근무 현황': "Who's working",
+  '근무 중': 'On now',
+  '종료': 'Done',
+  '오늘 근무': 'Scheduled',
+  '오늘 누가 나와 있는지 출근 순서대로 봅니다. 실제 출근 기록이 아니라 예정된 근무 기준입니다.':
+    'Who is on the floor today, in the order they start. It follows the schedule, not the time clock.',
+  '이 날 예정된 근무가 없습니다.': 'No shifts are scheduled for this day.',
   '출근 기록': 'Attendance',
   '급여 관리': 'Payroll',
   '대체 근무': 'Shift swaps',
