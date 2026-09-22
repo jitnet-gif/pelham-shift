@@ -485,17 +485,6 @@ export default function ShiftApp() {
           />
           {paidHours > 0 && <b>{t('({n}시간)', { n: paidHours })}</b>}
         </span>
-        <label className="flagcheck">
-          <Checkbox
-            checked={form.close === '1'}
-            onCheckedChange={(on) => put('close', on ? '1' : '')}
-          />
-          {t('마감')}
-        </label>
-        <label className="flagcheck">
-          <Checkbox checked={form.bd === '1'} onCheckedChange={(on) => put('bd', on ? '1' : '')} />
-          BD
-        </label>
       </div>
       {commonTimes.length > 0 && (
         <button type="button" className="linklike" onClick={() => setPresets((v) => !v)}>

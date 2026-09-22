@@ -12,7 +12,6 @@
 .timebox input{border:0;padding:0;background:none;font-size:14px;color:#243e31;width:auto;min-height:auto}
 .timebox em{font-style:normal;color:#9bada4}
 .timebox b{font-size:13px;font-weight:500;color:#7a8c80;margin-left:2px}
-.flagcheck{display:inline-flex;align-items:center;gap:7px;font-size:14px;color:#50685b}
 .linklike{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;border:0;background:none;padding:0;margin:0 0 14px;font-size:14px;color:#50685b;text-decoration:underline}
 .linklike.plus{margin:6px 0 16px;color:#087e6d;font-weight:500}
 .presetrow{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}

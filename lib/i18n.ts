@@ -439,7 +439,6 @@ const en: Record<string, string> = {
   '{n}시간 근무 · 퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.':
     '{n} hour shift · an end time earlier than the start counts as the next day.',
   '({n}시간)': '({n} hrs)',
-  '마감': 'Close',
   '자주 쓰는 시간대 고르기': 'or use common shift times',
   '휴게 추가': 'Add break',
   '휴게시간이 근무시간보다 깁니다.': 'The break is longer than the shift.',
