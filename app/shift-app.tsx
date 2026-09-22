@@ -126,6 +126,9 @@ const TAB_LABELS: Record<string, string> = {
   dashboard: '대시보드',
   working: '근무 현황',
   schedule: '스케줄',
+  // 메뉴에서는 뺐지만 스케줄 화면에서 열리므로 제목은 그대로 둡니다.
+  timeoff: '휴무',
+  availability: '근무 가능 시간',
   team: '팀',
   logbook: '업무일지',
   messages: '메시지',
@@ -175,11 +178,16 @@ const nav = [
   { key: 'messages', label: '메시지', Icon: MessageSquare },
   { key: 'team', label: '직원 관리', Icon: Users },
 ];
+// 메뉴 목록이 아니라 직원이 머물 수 있는 화면의 명단입니다. 여기 없는 화면은
+// 스케줄로 되돌립니다. 휴무와 근무 가능 시간은 메뉴에서 뺐어도 스케줄에서
+// 열리므로 남겨 둡니다.
 const employeeNav = new Set([
   'home',
   'more',
   'timesheets',
   'schedule',
+  'timeoff',
+  'availability',
   'attendance',
   'payroll',
   'messages',
