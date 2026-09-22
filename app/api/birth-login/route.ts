@@ -28,16 +28,10 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       team?: unknown;
       actor?: unknown;
-      birthDate?: unknown;
       password?: unknown;
     };
     const team = String(body.team || '') || new URL(request.url).searchParams.get('team') || '';
-    const session = await createBirthSession(
-      team,
-      String(body.actor || ''),
-      String(body.birthDate || ''),
-      String(body.password || ''),
-    );
+    const session = await createBirthSession(team, String(body.actor || ''), String(body.password || ''));
     return Response.json(
       { team: session.team, actor: session.actor, passwordChanged: session.passwordChanged },
       { headers: { 'Set-Cookie': sessionCookie(session.token, session.expiresAt) } },

@@ -448,7 +448,6 @@ const en: Record<string, string> = {
   '퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.':
     'If the end time is earlier than the start time, the shift ends the next day.',
   '업무 / 장소': 'Role / location',
-  '생년월일 · 로그인에 필요': 'Birth date · needed to sign in',
   '달력에서 고르세요': 'Pick from the calendar',
   '생년월일 지우기': 'Clear birth date',
   '연락처 (예: 914-555-0123)': 'Phone (e.g. 914-555-0123)',
@@ -476,9 +475,8 @@ const en: Record<string, string> = {
   // Sign-in and password
   로그인: 'Sign in',
   '로그인하지 못했습니다.': 'Could not sign in.',
-  '이름을 고르고 생년월일과 비밀번호를 입력하세요. 직원 초기 비밀번호는 1111입니다.':
-    'Pick your name, then enter your birth date and password. Staff start with the password 1111.',
-  '예: 19900115': 'e.g. 19900115',
+  '이름을 고르고 비밀번호를 입력하세요. 직원 초기 비밀번호는 1111입니다.':
+    'Pick your name, then enter your password. Staff start with the password 1111.',
   '직원 목록을 불러오지 못했습니다.': 'Could not load the staff list.',
   '확인 중…': 'Checking…',
   '비밀번호 변경': 'Change password',
@@ -576,9 +574,7 @@ const en: Record<string, string> = {
   '직원을 선택하세요.': 'Select your name.',
   '등록되지 않은 직원입니다. 관리자에게 확인하세요.':
     'That staff member is not registered. Check with your manager.',
-  '생년월일 또는 비밀번호를 확인하세요.': 'Check your birth date or password.',
-  '생년월일이 등록되지 않았습니다. 관리자에게 등록을 요청하세요.':
-    'No birth date is registered for you. Ask your manager to add it.',
+  '비밀번호를 확인하세요.': 'Check your password.',
   '새 비밀번호는 4~128자로 입력하세요.': 'The new password must be 4–128 characters.',
   '로그인한 뒤 변경할 수 있습니다.': 'Sign in to change it.',
   '관리자 비밀번호는 변경할 수 없습니다.': 'The manager password cannot be changed.',

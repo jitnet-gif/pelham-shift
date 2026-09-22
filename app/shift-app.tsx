@@ -2500,7 +2500,7 @@ export default function ShiftApp() {
             {modal === 'employee' && (
               <>
                 {input('name', t('이름'))}
-                {birthField(t('생년월일 · 로그인에 필요'))}
+                {birthField(t('생년월일'))}
                 {input('phone', t('연락처 (예: 914-555-0123)'), 'tel', false)}
                 {input('email', t('로그인 이메일'), 'email', false)}
                 <div className="formgrid">

@@ -3,7 +3,7 @@ import type { State } from '@/lib/domain';
 
 const SESSION_COOKIE = 'pelham_birth_session';
 // 로그인 목록 맨 앞에 서는 관리자들. 직원 id(E001…) 와 겹치지 않는 id 를 씁니다.
-const ADMINS = [{ id: 'admin', name: '관리자', birthDate: '19760802' }];
+const ADMINS = [{ id: 'admin', name: '관리자' }];
 const adminFor = (actor: string) => ADMINS.find((entry) => entry.id === actor) || null;
 // 관리자 비밀번호는 모두 같은 값을 쓰고, 직원처럼 바꿀 수 없습니다.
 const ADMIN_PASSWORD = '2222';
@@ -144,17 +144,11 @@ export async function listMembers(preferredTeam = '') {
   return members;
 }
 
-export async function createBirthSession(
-  team: string,
-  actor: string,
-  birthDate = '',
-  password = '',
-) {
+export async function createBirthSession(team: string, actor: string, password = '') {
   if (!team || !actor || team.length > 100 || actor.length > 100) {
     throw Error('직원을 선택하세요.');
   }
-  if (!/^\d{8}$/.test(birthDate)) throw Error('생년월일 8자리를 입력하세요.');
-  // 관리자를 흉내 낸 요청도 그 계정의 생년월일·비밀번호를 그대로 거쳐야 합니다.
+  // 관리자를 흉내 낸 요청도 그 계정의 비밀번호를 그대로 거쳐야 합니다.
   const adminEntry = adminFor(actor);
   const workspaceRow = await env.DB
     .prepare('SELECT id, owner, state, version FROM workspaces WHERE id = ?')
@@ -166,14 +160,8 @@ export async function createBirthSession(
   if (!adminEntry && (!employee || employee.archived)) {
     throw Error('등록되지 않은 직원입니다. 관리자에게 확인하세요.');
   }
-  // 생년월일이 비어 있는 직원은 로그인할 수 없습니다. 관리자가 직원 관리에서 먼저 채워야 합니다.
-  if (employee && !employee.birthDate) {
-    throw Error('생년월일이 등록되지 않았습니다. 관리자에게 등록을 요청하세요.');
-  }
-  // 어느 쪽이 틀렸는지는 알려주지 않습니다.
-  const birthOk = adminEntry ? birthDate === adminEntry.birthDate : employee!.birthDate === birthDate;
-  if (!birthOk || !(await verifyPassword(team, actor, adminEntry !== null, password))) {
-    throw Error('생년월일 또는 비밀번호를 확인하세요.');
+  if (!(await verifyPassword(team, actor, adminEntry !== null, password))) {
+    throw Error('비밀번호를 확인하세요.');
   }
   const admin = adminEntry !== null || employee?.admin === true;
 
