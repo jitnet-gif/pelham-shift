@@ -12,7 +12,6 @@ export const weekdays = (lang: Lang) =>
 const en: Record<string, string> = {
   // App shell and navigation
   'Pelham Shift · 근무 관리': 'Pelham Shift · Staff scheduling',
-  'Pelham Punch · 출퇴근': 'Pelham Punch · Time clock',
   '근무 스케줄': 'Schedule',
   '근무 현황': "Who's working",
   '근무 중': 'On now',
@@ -487,6 +486,18 @@ const en: Record<string, string> = {
   '새 비밀번호 확인': 'Confirm new password',
   '변경 중…': 'Changing…',
   나중에: 'Later',
+
+  // Punch app (주황 아이콘으로 여는 출퇴근 전용 앱)
+  'Pelham Punch · 출퇴근': 'Pelham Punch · Time clock',
+  '스케줄 앱 열기': 'Open the Shift app',
+  '알림 켜짐': 'Alerts on',
+  '알림 켜기': 'Turn on alerts',
+  '기록했습니다.': 'Recorded.',
+  '기록하지 못했습니다.': 'Could not record.',
+  '아직 워크스페이스가 없습니다. 관리자가 먼저 만들어야 기록이 남습니다.':
+    'There is no workspace yet. An admin has to create one before punches are saved.',
+  '출퇴근은 직원 기록이 있어야 찍힙니다. 스케줄 앱의 직원 관리에서 본인을 직원으로 추가하고, 그 이름으로 로그인해 주세요.':
+    'Punching needs an employee record. Add yourself under Team in the Shift app, then sign in with that name.',
 
   // Install QR
   '앱 설치 QR': 'Install app (QR)',

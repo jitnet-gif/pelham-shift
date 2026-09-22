@@ -663,3 +663,22 @@
 .nostaff h2 { margin: 0; font-size: 21px; font-weight: 650; letter-spacing: -.5px; }
 .nostaff p { margin: 0; font-size: 15px; line-height: 1.8; color: #6b7a76; }
 .nostaff .button { margin-top: 6px; min-height: 46px; padding: 0 20px; border-radius: 24px; }
+
+/* 출근할 때 넣는 Punch ID. 미리 채우지 않으므로 칸은 늘 비어 있는 채로 열립니다. */
+.stclock-code { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; }
+.stclock-code span { font-size: 13px; color: #69767a; }
+.stclock-code input {
+  width: 100%;
+  min-height: 52px;
+  padding: 0 14px;
+  border: 1px solid #d9dcd8;
+  border-radius: 10px;
+  background: #fff;
+  font: inherit;
+  font-size: 22px;
+  letter-spacing: .32em;
+  text-align: center;
+  color: #1f2b2e;
+  font-variant-numeric: tabular-nums;
+}
+.stclock-code input:focus-visible { outline: none; border-color: #087e6d; box-shadow: 0 0 0 2px #d9ece6; }

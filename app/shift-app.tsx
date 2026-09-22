@@ -115,6 +115,7 @@ import TimePicker from './time-picker';
 import GpsGuard, { useGps } from './gps-guard';
 import { LAYOUT_KEY, readLayout, type Layout } from './layout-choice';
 import { appAt } from './apps';
+import { pushOn, relangPush, subscribePush } from '@/lib/push-client';
 const minutesOf = (v: string) => Number(v.slice(0, 2)) * 60 + Number(v.slice(3, 5));
 // 폰 상단 바는 브랜드 대신 지금 보고 있는 화면 이름을 띄웁니다. 사이드바와 같은 말을 씁니다.
 const TAB_LABELS: Record<string, string> = {
@@ -191,13 +192,11 @@ const employeeNav = new Set([
   'availability',
   'help',
 ]);
-// landing 은 홈 화면 아이콘이 어느 탭에서 시작할지 정합니다.
-// '/' 는 스케줄에서, 따로 설치하는 출퇴근 앱('/attendance')은 출퇴근 탭에서 엽니다.
-export default function ShiftApp({ landing = 'schedule' }: { landing?: string }) {
+export default function ShiftApp() {
   const { t, lang, days, locale } = useLang();
   const [data, setData] = useState<State>(seed);
   const [week, setWeek] = useState(weekStart(localDate(new Date())));
-  const [tab, setTab] = useState(landing);
+  const [tab, setTab] = useState('schedule');
   // 스케줄은 오늘 하루부터 보여줍니다. 주간은 보기 메뉴에서 고릅니다.
   const [view, setView] = useState('day');
   // 직원 폰 화면의 상태: 스케줄의 '내 근무/전체', 메시지 탭, 지금 보고 있는 급여 기간.
@@ -284,7 +283,7 @@ export default function ShiftApp({ landing = 'schedule' }: { landing?: string })
     popping: false,
   });
   useEffect(() => {
-    back.current.home = landing === 'home' ? (actor.admin ? 'attendance' : 'home') : staffPhone ? 'home' : 'schedule';
+    back.current.home = staffPhone ? 'home' : 'schedule';
     back.current.modal = modal;
     back.current.navOpen = navOpen;
     back.current.payDetail = payDetail;
@@ -396,14 +395,6 @@ export default function ShiftApp({ landing = 'schedule' }: { landing?: string })
     }, 30000);
     return () => clearInterval(timer);
   }, []);
-  // 출퇴근 앱을 관리자가 열면 시계 대신 출근 기록을 띄웁니다. 관리자에게는 찍을 자기 근무가 없습니다.
-  // 로그인이 끝나야 관리자인지 알 수 있어 한 번만, 그때 옮깁니다.
-  const landed = useRef(false);
-  useEffect(() => {
-    if (landed.current || auth !== 'in' || landing !== 'home') return;
-    landed.current = true;
-    if (actor.admin) setTab('attendance');
-  }, [auth, actor.admin, landing]);
   useEffect(() => {
     if (!actor.admin) {
       setFilter('all');
@@ -455,69 +446,19 @@ export default function ShiftApp({ landing = 'schedule' }: { landing?: string })
       try {
         const r = await fetch('/api/push' + query());
         const json = (await r.json()) as { tickUrl?: string };
-        const sub = await (
-          await navigator.serviceWorker?.getRegistration()
-        )?.pushManager.getSubscription();
-        setPush({
-          on:
-            !!sub &&
-            typeof Notification !== 'undefined' &&
-            Notification.permission === 'granted',
-          tickUrl: json.tickUrl,
-        });
+        setPush({ on: await pushOn(), tickUrl: json.tickUrl });
       } catch {}
     })();
   }, [setup]);
   // Push text is chosen per device on the server, so re-register this device whenever its language changes.
   useEffect(() => {
     if (!push.on) return;
-    void (async () => {
-      try {
-        const sub = await (
-          await navigator.serviceWorker?.getRegistration()
-        )?.pushManager.getSubscription();
-        if (sub)
-          await post('/api/push', {
-            action: 'subscribe',
-            subscription: sub.toJSON(),
-            lang,
-          });
-      } catch {}
-    })();
+    void relangPush(query(), lang);
   }, [lang, push.on]);
   async function enablePush() {
     setBusy(true);
     try {
-      if (
-        !('serviceWorker' in navigator) ||
-        !('PushManager' in window) ||
-        typeof Notification === 'undefined'
-      )
-        throw Error(
-          '이 브라우저에서는 푸시 알림을 켤 수 없습니다. iPhone은 Safari 공유 버튼 → 홈 화면에 추가한 뒤, 홈 화면 앱에서 켜세요.',
-        );
-      await navigator.serviceWorker.register('/sw.js');
-      const reg = await navigator.serviceWorker.ready;
-      if ((await Notification.requestPermission()) !== 'granted')
-        throw Error(
-          '알림 권한이 허용되지 않았습니다. 브라우저 설정에서 이 사이트의 알림을 허용하세요.',
-        );
-      const r = await fetch('/api/push' + query());
-      const json = (await r.json()) as { publicKey?: string; error?: string };
-      if (!r.ok || !json.publicKey) throw Error(json.error);
-      await (await reg.pushManager.getSubscription())?.unsubscribe();
-      const key = atob(
-        json.publicKey.replaceAll('-', '+').replaceAll('_', '/'),
-      );
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: Uint8Array.from(key, (c) => c.charCodeAt(0)),
-      });
-      await post('/api/push', {
-        action: 'subscribe',
-        subscription: sub.toJSON(),
-        lang,
-      });
+      await subscribePush(query(), lang);
       setPush((p) => ({ ...p, on: true }));
       setStatus(
         '이 기기에서 푸시 알림을 켰습니다. 출근 1시간 전 알림과 우천 공지를 받습니다.',
@@ -4215,8 +4156,9 @@ export default function ShiftApp({ landing = 'schedule' }: { landing?: string })
                 busy={busy}
                 needsLocation={!!data.workplace}
                 spot={gps.spot}
-                onPunch={(action, photo, place) =>
-                  void command(action, { photo, ...place })
+                needsPunchId={!!emp(actor.id)?.punchId}
+                onPunch={(action, photo, place, punchId) =>
+                  void command(action, { photo, punchId: punchId ?? '', ...place })
                 }
                 onBreak={(action) => void command('punchBreak', { action, paid: '1' })}
               />

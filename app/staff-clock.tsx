@@ -33,6 +33,7 @@ export default function StaffClock({
   spot,
   onPunch,
   onBreak,
+  needsPunchId,
 }: {
   employee?: Employee;
   punch?: Punch;
@@ -47,8 +48,11 @@ export default function StaffClock({
     action: 'punchIn' | 'punchOut',
     photo: string,
     place?: { lat: number; lng: number },
+    punchId?: string,
   ) => void;
   onBreak: (action: 'start' | 'end') => void;
+  // 이 직원에게 Punch ID 가 지정돼 있으면, 출근을 찍을 때 그 번호를 함께 확인합니다.
+  needsPunchId: boolean;
 }) {
   const { t, locale } = useLang();
   // 헤더 시계와 '근무한 시간'은 분이 바뀌면 같이 움직입니다.
@@ -59,6 +63,8 @@ export default function StaffClock({
   }, []);
   const [camera, setCamera] = useState<'off' | 'on' | 'denied'>('off');
   const [problem, setProblem] = useState('');
+  // 출근할 때 직접 넣는 Punch ID. 미리 채우지 않습니다 — 채우면 확인하는 뜻이 없어집니다.
+  const [code, setCode] = useState('');
   const [shot, setShot] = useState('');
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
@@ -138,6 +144,11 @@ export default function StaffClock({
     });
   // 출근·퇴근은 사진이 먼저입니다. 사진이 없으면 서버로 보내지도 않습니다.
   const press = async (action: 'punchIn' | 'punchOut') => {
+    // 번호가 비어 있으면 사진부터 찍지 않습니다. 어차피 저장되지 않습니다.
+    if (action === 'punchIn' && needsPunchId && !code.trim()) {
+      setProblem('Punch ID를 넣어주세요.');
+      return;
+    }
     const taken = capture();
     if (!taken.photo) {
       setProblem(taken.problem || '사진이 찍히지 않았습니다.');
@@ -158,7 +169,8 @@ export default function StaffClock({
     }
     setProblem('');
     setShot(taken.photo);
-    onPunch(action, taken.photo, place);
+    onPunch(action, taken.photo, place, code.trim());
+    setCode('');
   };
 
   const working = punch && !punch.out ? punch : undefined;
@@ -267,6 +279,21 @@ export default function StaffClock({
             {t(problem)}
           </p>
         )}
+        {/* 출근할 때만 물어봅니다. 서버가 확인하는 것도 출근뿐이라, 퇴근에서 묻지 않습니다. */}
+        {!working && needsPunchId && (
+          <label className="stclock-code">
+            <span>{t('Punch ID')}</span>
+            <input
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={8}
+              value={code}
+              placeholder="••••"
+              aria-label={t('Punch ID')}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
+            />
+          </label>
+        )}
         <div className="stclock-actions">
         {working ? (
           <>
@@ -284,7 +311,11 @@ export default function StaffClock({
             </button>
           </>
         ) : (
-          <button className="stclock-start" disabled={busy} onClick={() => void press('punchIn')}>
+          <button
+            className="stclock-start"
+            disabled={busy || (needsPunchId && !code.trim())}
+            onClick={() => void press('punchIn')}
+          >
             <Camera size={20} />
             {t('start::출근 찍기')}
           </button>
