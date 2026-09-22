@@ -1,4 +1,4 @@
-import {type State,type Shift,type Attendance,type Punch,canSwap,leadDate,localDate,localTime,minutes,nameKey,overlap,duration,payPeriodStart,payPeriodEnd,periodOpen} from './domain';
+import {MIN_WORKPLACE_RADIUS,MAX_WORKPLACE_RADIUS,type State,type Shift,type Attendance,type Punch,canSwap,leadDate,localDate,localTime,minutes,nameKey,overlap,duration,payPeriodStart,payPeriodEnd,periodOpen} from './domain';
 export type Actor={id:string;admin:boolean};
 export type Command={type:string;payload:any};
 const fail=(message:string):never=>{throw new Error(message)};
@@ -27,6 +27,13 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
   // Edit every target first, then check overlaps, so shifts moved together are compared at their new times and never against themselves.
   for(const x of targets){if(s.swaps.some(r=>r.shiftId===x.id&&(r.status==='requested'||r.status==='accepted')))fail(`${x.date}: 진행 중인 대체근무 요청이 있어 수정할 수 없습니다.`);if(start)x.start=start;if(end)x.end=end;if(area)x.area=area;if(day)x.date=day;if(note!==null)x.note=note||undefined;if(rest!==null)x.breakMinutes=rest||undefined;if((x.breakMinutes??0)>=duration(x.start,x.end)*60)fail('휴게시간이 근무시간보다 깁니다.');if(!duration(x.start,x.end))fail(`${x.date}: 출근과 퇴근 시간이 같습니다.`)}
   for(const x of targets)if(s.shifts.some(y=>y.id!==x.id&&y.employeeId===x.employeeId&&overlap(x,y)))fail(`${x.date} ${employee(x.employeeId).name}: 근무시간이 겹칩니다.`);s.published=false;break;}
+ // 출퇴근을 찍을 수 있는 자리. 비우면 어디서든 찍을 수 있던 예전 방식으로 돌아갑니다.
+ case 'workplace': {admin();
+  if(p.clear==='1'||p.clear===true){s.workplace=undefined;break}
+  const lat=Number(p.lat),lng=Number(p.lng),radius=Math.round(Number(p.radius));
+  if(!Number.isFinite(lat)||lat<-90||lat>90||!Number.isFinite(lng)||lng<-180||lng>180)fail('위치를 확인하세요.');
+  if(!Number.isFinite(radius)||radius<MIN_WORKPLACE_RADIUS||radius>MAX_WORKPLACE_RADIUS)fail(`반경은 ${MIN_WORKPLACE_RADIUS}~${MAX_WORKPLACE_RADIUS}m 로 입력하세요.`);
+  s.workplace={lat,lng,radius};break;}
  case 'publish':admin();s.published=true;break;
  case 'currency':admin();if(!['CAD'].includes(p.currency))fail('통화를 선택하세요.');s.currency=p.currency;break;
  case 'swap': {const shift=s.shifts.find(x=>x.id===p.shiftId)??fail('근무를 선택하세요.');if(!actor.admin&&shift.employeeId!==actor.id)fail('본인 근무만 대체 신청할 수 있습니다.');if(!canSwap(shift.date))fail('대체 신청은 근무일 7일 전까지 가능합니다.');employee(p.to);if(p.to===shift.employeeId)fail('다른 대체 직원을 선택하세요.');if(shift.originalId)fail('이미 대체 승인된 근무입니다.');if(s.swaps.some(x=>x.shiftId===shift.id&&x.status!=='rejected'))fail('이미 대체 요청이 있습니다.');if(s.shifts.some(x=>x.employeeId===p.to&&overlap(x,shift)))fail('대체 직원의 기존 근무시간과 겹칩니다.');s.swaps.push({id:id(),shiftId:shift.id,from:shift.employeeId,to:p.to,status:'requested',createdAt:now.toISOString(),bonus:0});break;}

@@ -19,7 +19,9 @@ export type ClockName = {name:string;raw:string;employeeId:string};
 // name 은 비교용으로 다듬은 값, raw 는 출근기계에 찍힌 그대로의 표기입니다.
 // 출근기계가 내보내는 이름은 대소문자와 공백이 들쭉날쭉해, 비교할 때도 저장할 때도 이 형태로 맞춥니다.
 export const nameKey=(v:string)=>v.toLowerCase().replace(/\s+/g,' ').trim();
-export type State = {employees:Employee[];shifts:Shift[];swaps:Swap[];attendance:Attendance[];messages:Message[];tasks:Task[];timeOff?:TimeOff[];availability?:Availability[];punches?:Punch[];clockNames?:ClockName[];currency:string;published:boolean};
+// 출퇴근을 찍을 수 있는 자리. 관리자가 현장에서 지정하고, 반경(m) 밖이면 찍히지 않습니다.
+export type Workplace = {lat:number;lng:number;radius:number};
+export type State = {workplace?:Workplace;employees:Employee[];shifts:Shift[];swaps:Swap[];attendance:Attendance[];messages:Message[];tasks:Task[];timeOff?:TimeOff[];availability?:Availability[];punches?:Punch[];clockNames?:ClockName[];currency:string;published:boolean};
 export const localTime=(d:Date)=>new Intl.DateTimeFormat('en-GB',{timeZone:'America/New_York',hour:'2-digit',minute:'2-digit',hour12:false}).format(d);
 export const localDate=(d:Date)=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
 export function addDays(date:string,n:number){const d=new Date(date+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)}
@@ -31,6 +33,15 @@ export const LEAD_DAYS=7;
 export const leadDate=(today=localDate(new Date()))=>addDays(today,LEAD_DAYS);
 export function canSwap(date:string,today=localDate(new Date())){return date>=leadDate(today)}
 export function overlap(a:Shift,b:Shift){const stamp=(s:Shift)=>{const start=Date.parse(s.date+'T00:00:00Z')+minutes(s.start)*60000;return [start,start+duration(s.start,s.end)*3600000]};const [a0,a1]=stamp(a),[b0,b1]=stamp(b);return a0<b1&&b0<a1}
+// 두 지점 사이 거리(m). 지구를 공으로 보고 재는 흔한 방법입니다.
+export function distanceMeters(a:{lat:number;lng:number},b:{lat:number;lng:number}){
+ const rad=(v:number)=>v*Math.PI/180,R=6371000;
+ const dLat=rad(b.lat-a.lat),dLng=rad(b.lng-a.lng);
+ const h=Math.sin(dLat/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLng/2)**2;
+ return 2*R*Math.asin(Math.min(1,Math.sqrt(h)))}
+// 기본 반경. 클럽하우스 둘레를 넉넉히 덮으면서 옆 동네까지는 열어 주지 않는 선입니다.
+export const DEFAULT_WORKPLACE_RADIUS=300;
+export const MIN_WORKPLACE_RADIUS=50,MAX_WORKPLACE_RADIUS=2000;
 export const weekdayOf=(date:string)=>new Date(date+'T12:00:00Z').getUTCDay();
 // 급여 기간은 일요일에 시작하는 2주입니다. 기준일 2026-09-20 은 실제 운영 주기(9/20~10/3)에 맞춘 일요일입니다.
 export const PAY_PERIOD_DAYS=14;

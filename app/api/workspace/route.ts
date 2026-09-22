@@ -1,6 +1,6 @@
 import {after} from 'next/server';
 import {env} from '@/lib/db';
-import {seed,PAY_PERIOD_DAYS,addDays,localDate,payPeriodStart} from '@/lib/domain';
+import {seed,PAY_PERIOD_DAYS,addDays,distanceMeters,localDate,payPeriodStart} from '@/lib/domain';
 import {photoBytes} from '@/lib/punch-photo';
 import {applyCommand,type Command} from '@/lib/operations';
 import {context,visible,json,sameOrigin} from '@/lib/workspace';
@@ -12,8 +12,18 @@ export async function POST(req:Request){try{if(!sameOrigin(req))return json({err
  const needsPhoto=body.type==='punchIn'||body.type==='punchOut';
  const photo=needsPhoto?photoBytes((body.payload as {photo?:unknown})?.photo):null;
  if(needsPhoto&&!photo)return json({error:'사진이 찍히지 않아 출퇴근을 기록하지 않았습니다. 카메라를 확인하고 다시 눌러주세요.'},400);
+ // 출퇴근 자리를 지정해 두었으면, 그 자리 가까이에서 찍은 것인지 함께 봅니다.
+ const place=c.state.workplace;
+ if(needsPhoto&&place){
+  const p=body.payload as {lat?:unknown;lng?:unknown};
+  const lat=Number(p?.lat),lng=Number(p?.lng);
+  if(!Number.isFinite(lat)||!Number.isFinite(lng)||lat<-90||lat>90||lng<-180||lng>180)
+   return json({error:'위치를 확인하지 못해 출퇴근을 기록하지 않았습니다. 위치 권한을 허용하고 다시 눌러주세요.'},400);
+  const away=Math.round(distanceMeters(place,{lat,lng}));
+  if(away>place.radius)
+   return json({error:`근무지에서 약 ${away}m 떨어져 있어 출퇴근을 기록하지 않았습니다. 근무지에서 다시 눌러주세요.`},400)}
  // 사진 자체는 state 에 넣지 않습니다 — 찍힌 시각만 남고 사진은 punch_photos 표로 갑니다.
- if(photo){const p=body.payload as Record<string,unknown>;delete p.photo;p.photoAt=new Date().toISOString()}
+ if(photo){const p=body.payload as Record<string,unknown>;delete p.photo;delete p.lat;delete p.lng;delete p.accuracy;p.photoAt=new Date().toISOString()}
  const state=applyCommand(c.state,body,c.actor);const result=await env.DB.prepare('UPDATE workspaces SET state = ?, version = version + 1 WHERE id = ? AND version = ?').bind(JSON.stringify(state),c.team,c.row.version).run();if(result.meta.changes!==1)return json({error:'동시 변경이 감지되었습니다. 다시 불러오세요.'},409);
  if(photo){
   // 사진은 기록이 남은 뒤에 붙입니다. 사진 저장이 실패해도 찍힌 출퇴근은 그대로 남습니다.

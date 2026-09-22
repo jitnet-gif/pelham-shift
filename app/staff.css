@@ -626,3 +626,8 @@
   font-size: 14px;
   line-height: 1.6;
 }
+
+/* 출퇴근 화면은 폰 폭에 맞춰 그렸습니다. 넓은 화면에서는 가운데로 모읍니다. */
+@media (min-width: 901px) {
+  .stclock { max-width: 520px; margin: 0 auto; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+}

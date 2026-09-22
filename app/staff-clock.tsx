@@ -29,6 +29,7 @@ export default function StaffClock({
   shift,
   location,
   busy,
+  needsLocation,
   onPunch,
   onBreak,
 }: {
@@ -37,7 +38,13 @@ export default function StaffClock({
   shift?: Shift;
   location: string;
   busy: boolean;
-  onPunch: (action: 'punchIn' | 'punchOut', photo: string) => void;
+  // 근무지를 지정해 둔 곳이면, 사진과 함께 지금 서 있는 자리도 보냅니다.
+  needsLocation: boolean;
+  onPunch: (
+    action: 'punchIn' | 'punchOut',
+    photo: string,
+    place?: { lat: number; lng: number },
+  ) => void;
   onBreak: (action: 'start' | 'end') => void;
 }) {
   const { t, locale } = useLang();
@@ -116,16 +123,35 @@ export default function StaffClock({
       ? { photo }
       : { problem: '사진을 만들지 못했습니다. 다시 눌러주세요.' };
   };
+  // 기기에 지금 자리를 물어봅니다. 권한이 없거나 신호를 못 잡으면 찍지 않습니다.
+  const locate = () =>
+    new Promise<{ lat: number; lng: number } | null>((done) => {
+      if (!navigator.geolocation) return done(null);
+      navigator.geolocation.getCurrentPosition(
+        (spot) => done({ lat: spot.coords.latitude, lng: spot.coords.longitude }),
+        () => done(null),
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 },
+      );
+    });
   // 출근·퇴근은 사진이 먼저입니다. 사진이 없으면 서버로 보내지도 않습니다.
-  const press = (action: 'punchIn' | 'punchOut') => {
+  const press = async (action: 'punchIn' | 'punchOut') => {
     const taken = capture();
     if (!taken.photo) {
       setProblem(taken.problem || '사진이 찍히지 않았습니다.');
       return;
     }
+    let place: { lat: number; lng: number } | undefined;
+    if (needsLocation) {
+      setProblem('위치를 확인하는 중입니다…');
+      place = (await locate()) ?? undefined;
+      if (!place) {
+        setProblem('위치를 확인하지 못했습니다. 위치 권한을 허용하고 다시 눌러주세요.');
+        return;
+      }
+    }
     setProblem('');
     setShot(taken.photo);
-    onPunch(action, taken.photo);
+    onPunch(action, taken.photo, place);
   };
 
   const working = punch && !punch.out ? punch : undefined;
@@ -241,13 +267,13 @@ export default function StaffClock({
               <Coffee size={19} />
               {onBreakNow ? t('휴게 끝내기') : t('유급 휴게 시작')}
             </button>
-            <button className="stclock-end" disabled={busy} onClick={() => press('punchOut')}>
+            <button className="stclock-end" disabled={busy} onClick={() => void press('punchOut')}>
               {t('endshift::퇴근 찍기')}
               <LogOut size={20} />
             </button>
           </>
         ) : (
-          <button className="stclock-start" disabled={busy} onClick={() => press('punchIn')}>
+          <button className="stclock-start" disabled={busy} onClick={() => void press('punchIn')}>
             <Camera size={20} />
             {t('start::출근 찍기')}
           </button>

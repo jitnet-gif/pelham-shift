@@ -85,6 +85,7 @@ import {
   blockedBy,
   weekdayOf,
   payPeriodStart,
+  DEFAULT_WORKPLACE_RADIUS,
   LOCATION,
   AREAS,
   SHIFT_AREAS,
@@ -115,7 +116,7 @@ import { LAYOUT_KEY, readLayout, type Layout } from './layout-choice';
 const minutesOf = (v: string) => Number(v.slice(0, 2)) * 60 + Number(v.slice(3, 5));
 // 폰 상단 바는 브랜드 대신 지금 보고 있는 화면 이름을 띄웁니다. 사이드바와 같은 말을 씁니다.
 const TAB_LABELS: Record<string, string> = {
-  home: '출퇴근',
+  home: 'tab::출퇴근',
   more: '더보기',
   timesheets: '내 근무표',
   dashboard: '대시보드',
@@ -201,6 +202,8 @@ export default function ShiftApp() {
   const [sheet, setSheet] = useState('');
   // 앱 시계로 고치고 있는 시간 칸. 기기 기본 시간 선택창은 쓰지 않습니다.
   const [clockField, setClockField] = useState<{ key: string; label: string; step: number } | null>(null);
+  // 근무지를 지정하는 동안 기기에 자리를 물어보는 중인지.
+  const [locating, setLocating] = useState(false);
   const [version, setVersion] = useState(0);
   const [team, setTeam] = useState('');
   const [actor, setActor] = useState({ id: 'admin', admin: true });
@@ -2053,6 +2056,78 @@ export default function ShiftApp() {
                     </small>
                   </div>
                 )}
+                {/* 출퇴근을 찍을 수 있는 자리. 비워 두면 어디서든 찍을 수 있습니다. */}
+                <div className="teamlink">
+                  <b>{t('출퇴근 가능 위치')}</b>
+                  <span className="workplace">
+                    <button
+                      className="button"
+                      disabled={busy || locating}
+                      onClick={() => {
+                        if (!navigator.geolocation) {
+                          setStatus('이 기기는 위치를 알려주지 않습니다.');
+                          return;
+                        }
+                        setLocating(true);
+                        navigator.geolocation.getCurrentPosition(
+                          (spot) => {
+                            setLocating(false);
+                            void command('workplace', {
+                              lat: String(spot.coords.latitude),
+                              lng: String(spot.coords.longitude),
+                              radius: String(data.workplace?.radius ?? DEFAULT_WORKPLACE_RADIUS),
+                            });
+                          },
+                          () => {
+                            setLocating(false);
+                            setStatus('위치를 확인하지 못했습니다. 위치 권한을 허용하고 다시 눌러주세요.');
+                          },
+                          { enableHighAccuracy: true, timeout: 12000 },
+                        );
+                      }}
+                    >
+                      <MapPin size={16} />{' '}
+                      {locating ? t('위치를 확인하는 중입니다…') : t('지금 내 위치로 지정')}
+                    </button>
+                    {data.workplace && (
+                      <>
+                        <label>
+                          {t('반경(m)')}
+                          <input
+                            type="number"
+                            min={50}
+                            max={2000}
+                            step={50}
+                            defaultValue={data.workplace.radius}
+                            onBlur={(e) =>
+                              void command('workplace', {
+                                lat: String(data.workplace!.lat),
+                                lng: String(data.workplace!.lng),
+                                radius: e.target.value,
+                              })
+                            }
+                          />
+                        </label>
+                        <button
+                          className="button"
+                          disabled={busy}
+                          onClick={() => void command('workplace', { clear: '1' })}
+                        >
+                          {t('해제')}
+                        </button>
+                      </>
+                    )}
+                  </span>
+                  <small>
+                    {data.workplace
+                      ? t('근무지에서 {n}m 안에서만 출퇴근이 찍힙니다. 위도 {lat}, 경도 {lng}', {
+                          n: data.workplace.radius,
+                          lat: data.workplace.lat.toFixed(5),
+                          lng: data.workplace.lng.toFixed(5),
+                        })
+                      : t('아직 지정하지 않았습니다. 근무지에서 이 버튼을 누르면 그 자리가 기준이 되고, 그 뒤로는 근처에서만 출퇴근이 찍힙니다.')}
+                  </small>
+                </div>
                 {push.tickUrl && (
                   <div className="teamlink">
                     <b>{t('출근 알림 자동 점검 주소')}</b>
@@ -3300,13 +3375,13 @@ export default function ShiftApp() {
   // 하단 탭바 네 칸. 관리자와 직원이 자주 쓰는 화면이 달라 목록도 갈립니다.
   const tabBarItems = actor.admin
     ? [
+        { key: 'home', label: 'tab::출퇴근', Icon: House, count: 0 },
         { key: 'schedule', label: '스케줄', Icon: CalendarDays, count: 0 },
         { key: 'team', label: '팀', Icon: Users, count: 0 },
         { key: 'messages', label: '메시지', Icon: MessageSquare, count: unread.length },
-        { key: 'attendance', label: '출근', Icon: Timer, count: 0 },
       ]
     : [
-        { key: 'home', label: '홈', Icon: House, count: 0 },
+        { key: 'home', label: 'tab::출퇴근', Icon: House, count: 0 },
         { key: 'schedule', label: '스케줄', Icon: CalendarDays, count: 0 },
         { key: 'messages', label: '메시지', Icon: MessageSquare, count: unread.length },
       ];
@@ -3372,7 +3447,8 @@ export default function ShiftApp() {
   ];
   // 뒤로가기가 붙는 화면들. 나머지는 탭바가 뿌리입니다.
   const staffRoot = ['home', 'schedule', 'messages', 'more'].includes(tab);
-  const staffOwnHeader = staffPhone && ['home', 'schedule', 'messages'].includes(tab);
+  const staffOwnHeader =
+    tab === 'home' || (staffPhone && ['schedule', 'messages'].includes(tab));
   // 뒤로가기 줄에 띄울 이름. 근무표는 보고 있는 급여 기간을 그대로 제목으로 씁니다.
   const staffTitle =
     tab === 'timesheets' && sheet
@@ -3479,6 +3555,7 @@ export default function ShiftApp() {
             </button>
           </div>
           <TabsList className="sidenav">
+            {navItem('home', 'tab::출퇴근', House)}
             {actor.admin && navItem('dashboard', '대시보드', LayoutDashboard)}
             {actor.admin && navItem('working', '근무 현황', Radar, { sub: true })}
             <div className={'sidenav-group' + (scheduleTabs.includes(tab) ? ' current' : '')}>
@@ -4088,7 +4165,10 @@ export default function ShiftApp() {
                 shift={myShiftToday}
                 location={LOCATION}
                 busy={busy}
-                onPunch={(action, photo) => void command(action, { photo })}
+                needsLocation={!!data.workplace}
+                onPunch={(action, photo, place) =>
+                  void command(action, { photo, ...place })
+                }
                 onBreak={(action) => void command('punchBreak', { action, paid: '1' })}
               />
             </TabsContent>

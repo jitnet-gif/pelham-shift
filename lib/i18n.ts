@@ -631,6 +631,7 @@ const en: Record<string, string> = {
 
   // 직원 전용 폰 화면 · staff-only phone screens
   '홈': 'Home',
+  'tab::출퇴근': 'Time clock',
   '더보기': 'More',
   '뒤로': 'Back',
   '오늘로': 'Today',
@@ -675,6 +676,23 @@ const en: Record<string, string> = {
   '주고받은 메시지가 없습니다.': 'No messages yet.',
   '공지가 없습니다.': 'No announcements yet.',
   '오늘 고마웠던 동료: ': 'Shout-out to: ',
+
+  // 출퇴근 가능 위치 · geofence
+  '출퇴근 가능 위치': 'Where shifts can be punched',
+  '지금 내 위치로 지정': 'Use my location',
+  '위치를 확인하는 중입니다…': 'Checking your location…',
+  '반경(m)': 'Radius (m)',
+  '해제': 'Turn off',
+  '근무지에서 {n}m 안에서만 출퇴근이 찍힙니다. 위도 {lat}, 경도 {lng}':
+    'Shifts can be punched within {n} m of the workplace. Latitude {lat}, longitude {lng}.',
+  '아직 지정하지 않았습니다. 근무지에서 이 버튼을 누르면 그 자리가 기준이 되고, 그 뒤로는 근처에서만 출퇴근이 찍힙니다.':
+    'Not set yet. Press this button while at the workplace and that spot becomes the centre; after that, shifts can only be punched nearby.',
+  '이 기기는 위치를 알려주지 않습니다.': 'This device does not report a location.',
+  '위치를 확인하지 못했습니다. 위치 권한을 허용하고 다시 눌러주세요.':
+    'Your location could not be checked. Allow location access and try again.',
+  '위치를 확인하지 못해 출퇴근을 기록하지 않았습니다. 위치 권한을 허용하고 다시 눌러주세요.':
+    'No shift was recorded because your location could not be checked. Allow location access and try again.',
+  '위치를 확인하세요.': 'Check the location.',
 
   // 로그인 목록
   '직원 ID 일괄 발급': 'Issue missing IDs',
@@ -745,6 +763,15 @@ const en: Record<string, string> = {
 
 // Messages built from data (a date, a row number, a list of names) can't be dictionary keys.
 const patterns: [RegExp, (match: RegExpMatchArray) => string][] = [
+  [
+    /^근무지에서 약 (\d+)m 떨어져 있어 출퇴근을 기록하지 않았습니다\. 근무지에서 다시 눌러주세요\.$/,
+    ([, away]) =>
+      `No shift was recorded: you are about ${away} m from the workplace. Try again at the workplace.`,
+  ],
+  [
+    /^반경은 (\d+)~(\d+)m 로 입력하세요\.$/,
+    ([, low, high]) => `Enter a radius between ${low} and ${high} m.`,
+  ],
   [
     /^\[우천 근무 종료\] (\S+) (\S+)에 (.+?) 근무를 종료합니다\. ?([\s\S]*)$/,
     ([, date, end, names, body]) =>

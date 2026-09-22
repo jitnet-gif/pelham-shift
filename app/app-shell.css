@@ -295,3 +295,8 @@
 .paytotals .paytotals-sum{margin-left:auto}
 .paytotals .paytotals-sum b{font-size:18px;color:#087e6d}
 @media(max-width:600px){.paytotals .paytotals-sum{margin-left:0}}
+
+/* 출퇴근 가능 위치: 버튼과 반경 입력을 한 줄에 둡니다. */
+.workplace{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:2px 0 4px}
+.workplace label{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:#50685b}
+.workplace input{width:90px;border:1px solid #d3dfd9;border-radius:6px;padding:8px}
