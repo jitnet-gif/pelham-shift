@@ -271,6 +271,14 @@ const en: Record<string, string> = {
   '출근기계에서 내보낸 엑셀·CSV 파일을 선택하세요':
     'Choose the Excel or CSV file exported from the time clock',
   '.xlsx · .csv · 최대 5MB / 3,000행': '.xlsx · .csv · up to 5 MB / 3,000 rows',
+  '출근기계 타임카드 · 기록 {n}건': 'Time clock timecard · {n} records',
+  '이 형식은 열을 연결할 필요가 없습니다. 이름으로 직원을 찾아 넣습니다.':
+    'This format needs no column matching. Staff are found by name.',
+  '직원을 찾지 못한 이름: {names}': 'No staff record matches: {names}',
+  '퇴근이 찍히지 않아 건너뛴 기록 {n}건: {rows}':
+    '{n} records were skipped because no one punched out: {rows}',
+  '검토한 출근기록 {n}건 저장': 'Save {n} reviewed records',
+  '읽은 내용을 확인하고 저장하세요.': 'Check what was read, then save.',
   '1. 열 연결': '1. Match columns',
   '없음 · 0분': 'None · 0 min',
   '열 {n}': 'Column {n}',

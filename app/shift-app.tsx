@@ -91,6 +91,8 @@ import {
   fields,
   downloadTemplate,
   download,
+  parseTimecard,
+  type Timecard,
 } from '@/lib/importer';
 import { translate } from '@/lib/i18n';
 import InstallQr from './install-qr';
@@ -172,6 +174,7 @@ export default function ShiftApp() {
   const [modal, setModal] = useState('');
   const [form, setForm] = useState<Record<string, string>>({});
   const [rows, setRows] = useState<string[][]>([]);
+  const [timecard, setTimecard] = useState<Timecard | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [filename, setFilename] = useState('');
   const [filter, setFilter] = useState('all');
@@ -417,6 +420,21 @@ export default function ShiftApp() {
     label: e.name + ' · ' + e.id,
   }));
   // 대체 신청은 근무일 7일 전까지만 받습니다. 가까운 날짜만 남아 있으면 고를 근무가 하나도 없습니다.
+  // 타임카드는 이름으로만 사람을 알려 주므로, 직원 명단에서 같은 이름을 찾아 ID 를 붙입니다.
+  const nameKey = (v: string) => v.toLowerCase().replace(/\s+/g, ' ').trim();
+  const timecardReady = (timecard?.rows ?? []).flatMap((r) => {
+    const person = staff.find((e) => nameKey(e.name) === nameKey(r.name));
+    return person
+      ? [{ employeeId: person.id, date: r.date, start: r.start, end: r.end, breakMinutes: 0 }]
+      : [];
+  });
+  const timecardUnknown = [
+    ...new Set(
+      [...(timecard?.rows ?? []), ...(timecard?.open ?? [])]
+        .filter((r) => !staff.some((e) => nameKey(e.name) === nameKey(r.name)))
+        .map((r) => r.name),
+    ),
+  ];
   // 오늘 내 펀치. 직원 화면의 출근·퇴근 버튼이 이것을 보고 갈립니다.
   const myPunch = [...(data.punches ?? [])]
     .reverse()
@@ -691,8 +709,17 @@ export default function ShiftApp() {
     setBusy(true);
     try {
       const r = await readAttendanceFile(file);
-      setRows(r);
       setFilename(file.name);
+      // 출근기계의 Timecard Report 는 직원별 블록이라 열을 연결할 것이 없습니다. 바로 읽습니다.
+      const card = parseTimecard(r);
+      if (card) {
+        setTimecard(card);
+        setRows([]);
+        setStatus('읽은 내용을 확인하고 저장하세요.');
+        return;
+      }
+      setTimecard(null);
+      setRows(r);
       const m: Record<string, string> = {};
       // Accept headers from either language's template.
       fields.forEach(([key, label], i) => {
@@ -1176,6 +1203,56 @@ export default function ShiftApp() {
                     <b>{filename || t('출근기계에서 내보낸 엑셀·CSV 파일을 선택하세요')}</b>
                     <span>{t('.xlsx · .csv · 최대 5MB / 3,000행')}</span>
                   </button>
+                  {timecard && (
+                    <div className="importreview">
+                      <h3>
+                        {t('출근기계 타임카드 · 기록 {n}건', { n: timecard.rows.length })}
+                      </h3>
+                      <p className="hint">
+                        {t('이 형식은 열을 연결할 필요가 없습니다. 이름으로 직원을 찾아 넣습니다.')}
+                      </p>
+                      {timecardUnknown.length > 0 && (
+                        <p className="formerror">
+                          {t('직원을 찾지 못한 이름: {names}', {
+                            names: timecardUnknown.join(', '),
+                          })}
+                        </p>
+                      )}
+                      {timecard.open.length > 0 && (
+                        <p className="hint">
+                          {t('퇴근이 찍히지 않아 건너뛴 기록 {n}건: {rows}', {
+                            n: timecard.open.length,
+                            rows: timecard.open
+                              .map((r) => `${r.name} ${r.date} ${r.start}`)
+                              .join(' / '),
+                          })}
+                        </p>
+                      )}
+                      <div className="rawpreview">
+                        {timecardReady.slice(0, 6).map((r, i) => (
+                          <div key={i}>
+                            {r.employeeId} | {r.date} | {r.start} | {r.end}
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        className="button primary"
+                        disabled={busy || setup || !timecardReady.length}
+                        onClick={async () => {
+                          try {
+                            if (await command('attendance', { rows: timecardReady })) {
+                              setTimecard(null);
+                              setFilename('');
+                            }
+                          } catch (e) {
+                            setStatus((e as Error).message);
+                          }
+                        }}
+                      >
+                        {t('검토한 출근기록 {n}건 저장', { n: timecardReady.length })}
+                      </button>
+                    </div>
+                  )}
                   {rows.length > 0 && (
                     <div className="importreview">
                       <h3>{t('1. 열 연결')}</h3>

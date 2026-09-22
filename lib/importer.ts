@@ -9,6 +9,25 @@ function decodeText(buffer:ArrayBuffer):string{const utf8=new TextDecoder().deco
 function parseCsv(text:string):string[][]{if(text.charCodeAt(0)===0xfeff)text=text.slice(1);const d=delimiterOf(text),rows:string[][]=[];let row:string[]=[],field='',quoted=false;for(let i=0;i<text.length;i++){const c=text[i];if(quoted){if(c!=='"')field+=c;else if(text[i+1]==='"'){field+='"';i++}else quoted=false}else if(c==='"')quoted=true;else if(c===d){row.push(field.trim());field=''}else if(c==='\n'||c==='\r'){if(c==='\r'&&text[i+1]==='\n')i++;row.push(field.trim());rows.push(row);row=[];field=''}else field+=c}if(field!==''||row.length){row.push(field.trim());rows.push(row)}while(rows.length&&rows[rows.length-1].every(v=>v===''))rows.pop();return rows}
 // Korean and European spreadsheets save CSV with a semicolon or a tab, so the header row picks the delimiter.
 function delimiterOf(text:string):string{const counts:Record<string,number>={',':0,';':0,'\t':0};let quoted=false;for(let i=0;i<text.length;i++){const c=text[i];if(c==='"'){if(quoted&&text[i+1]==='"')i++;else quoted=!quoted}else if(quoted)continue;else if(c==='\n'||c==='\r')break;else if(c in counts)counts[c]++}return Object.keys(counts).reduce((a,b)=>counts[b]>counts[a]?b:a,',')}
+// 출근기계의 Timecard Report. 직원마다 블록이 있고, 한 날에 여러 번 찍은 줄은 날짜 칸이 비어 있습니다.
+export type Timecard={rows:{name:string;date:string;start:string;end:string}[];open:{name:string;date:string;start:string}[]};
+const hhmm=(v:string)=>/^\d{1,2}:\d{2}$/.test(v)?v.padStart(5,'0'):'';
+export function parseTimecard(rows:string[][]):Timecard|null{
+ if(!rows.some(r=>r.some(c=>c.trim()==='Timecard Report')||r[0]?.trim()==='Pay Period'))return null;
+ const out:Timecard['rows']=[],open:Timecard['open']=[];let name='',date='';
+ for(const r of rows){
+  const c0=(r[0]||'').trim(),c1=(r[1]||'').trim(),c2=(r[2]||'').trim(),c3=(r[3]||'').trim();
+  // 이름 뒤 괄호 안 번호는 출근기계 자체 번호라 직원 ID 와 다릅니다. 이름으로만 맞춥니다.
+  if(c0==='Employee'){name=(r[3]||'').replace(/\s*\(\d+\)\s*$/,'').trim();date='';continue}
+  if(c0==='Pay Period'||c0==='Date'||c0==='Total Hours')continue;
+  if(/^\d{8}$/.test(c1))date=c1.slice(0,4)+'-'+c1.slice(4,6)+'-'+c1.slice(6);
+  const start=hhmm(c2);
+  if(!name||!date||!start)continue;
+  const end=hhmm(c3);
+  if(end)out.push({name,date,start,end});else open.push({name,date,start});
+ }
+ return {rows:out,open};
+}
 export function mapRows(rows:string[][],mapping:Record<string,string>):Omit<Attendance,'id'>[]{for(const key of ['employeeId','date','start','end'])if(mapping[key]===undefined||mapping[key]==='')throw new Error('필수 열을 연결하세요.');return rows.slice(1).map((r,i)=>{const date=(r[Number(mapping.date)]||'').replaceAll('/','-');const result={employeeId:r[Number(mapping.employeeId)]||'',date,start:r[Number(mapping.start)]||'',end:r[Number(mapping.end)]||'',breakMinutes:mapping.breakMinutes===''?0:Number(r[Number(mapping.breakMinutes)]||0)};if(!result.employeeId||!/^\d{4}-\d{2}-\d{2}$/.test(date)||!/^\d{2}:\d{2}$/.test(result.start)||!/^\d{2}:\d{2}$/.test(result.end))throw new Error(`${i+2}행: 직원 ID, 날짜(YYYY-MM-DD), 시간(HH:mm)을 확인하세요.`);return result})}
 // Headers follow the viewer's language; the import screen matches Korean or English headers.
 export async function downloadTemplate(tr:(text:string)=>string=text=>text){const ExcelJS=await import('exceljs');const wb=new ExcelJS.Workbook();const ws=wb.addWorksheet(tr('출근기록'));ws.addRow(fields.map(f=>tr(f[1])));ws.addRow(['E001','2026-09-14','09:00','17:00',30]);ws.columns.forEach(c=>c.width=20);const bytes=await wb.xlsx.writeBuffer();download(new Blob([bytes]),tr('출근기록_양식.xlsx'))}
