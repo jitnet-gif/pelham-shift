@@ -383,6 +383,8 @@ const en: Record<string, string> = {
   '퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.':
     'If the end time is earlier than the start time, the shift ends the next day.',
   '업무 / 장소': 'Role / location',
+  '생년월일 8자리 (YYYYMMDD) · 로그인에 필요':
+    'Birth date, 8 digits (YYYYMMDD) · needed to sign in',
   '생년월일 8자리 (YYYYMMDD)': 'Birth date, 8 digits (YYYYMMDD)',
   '연락처 (예: 914-555-0123)': 'Phone (e.g. 914-555-0123)',
   '로그인 이메일': 'Login email',
