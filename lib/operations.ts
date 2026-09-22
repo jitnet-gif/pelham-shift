@@ -1,4 +1,4 @@
-import {type State,type Shift,type Attendance,canSwap,leadDate,localDate,localTime,overlap,duration} from './domain';
+import {type State,type Shift,type Attendance,canSwap,leadDate,localDate,localTime,nameKey,overlap,duration} from './domain';
 export type Actor={id:string;admin:boolean};
 export type Command={type:string;payload:any};
 const fail=(message:string):never=>{throw new Error(message)};
@@ -7,7 +7,7 @@ function date(value:string){if(!/^\d{4}-\d{2}-\d{2}$/.test(value)||new Date(valu
 function time(value:string,halfHour=false){if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(value)||(halfHour&&!['00','30'].includes(value.slice(3))))fail(halfHour?'근무시간은 30분 단위로 입력하세요.':'시간 형식을 확인하세요.');return value}
 function number(value:unknown,max=1000000){const n=Number(value);if(!Number.isFinite(n)||n<0||n>max)fail('0 이상의 유효한 금액/시간을 입력하세요.');return n}
 export function applyCommand(current:State,command:Command,actor:Actor,now=new Date()):State{
- const s=structuredClone(current),p=command.payload??{},id=()=>crypto.randomUUID();s.tasks??=[];s.timeOff??=[];s.availability??=[];s.punches??=[];const admin=()=>{if(!actor.admin)fail('관리자 권한이 필요합니다.')};const employee=(v:string)=>s.employees.find(e=>e.id===v)??fail('등록된 직원을 선택하세요.');
+ const s=structuredClone(current),p=command.payload??{},id=()=>crypto.randomUUID();s.tasks??=[];s.timeOff??=[];s.availability??=[];s.punches??=[];s.clockNames??=[];const admin=()=>{if(!actor.admin)fail('관리자 권한이 필요합니다.')};const employee=(v:string)=>s.employees.find(e=>e.id===v)??fail('등록된 직원을 선택하세요.');
  // 관리자는 공용 단말에서 직원 대신 찍어 줄 수 있고, 직원은 본인 것만 찍습니다.
  const punchTarget=(v:unknown)=>{const wanted=typeof v==='string'&&v?v:actor.id;if(!actor.admin&&wanted!==actor.id)fail('본인 출퇴근만 찍을 수 있습니다.');return employee(wanted).id};
  // Staff are read-only except for their own tasks and messages; staff with task permission may also assign tasks.
@@ -29,10 +29,16 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
  // 펀치는 서버 시각으로 남깁니다. 기기 시계를 고쳐도 찍히는 시각은 달라지지 않습니다.
  case 'punchIn': {const target=punchTarget(p.employeeId);if(s.punches!.some(x=>x.employeeId===target&&!x.out))fail('이미 출근으로 찍혀 있습니다. 먼저 퇴근을 찍으세요.');s.punches!.push({id:id(),employeeId:target,date:localDate(now),in:localTime(now)});break;}
  case 'punchOut': {const target=punchTarget(p.employeeId);const open=[...s.punches!].reverse().find(x=>x.employeeId===target&&!x.out)??fail('출근으로 찍힌 기록이 없습니다.');open.out=localTime(now);break;}
+ // 출근기계 이름과 직원을 한 번 승인해 두면 다음 타임카드부터 자동으로 이어집니다. 비슷한 이름은 후보로만 제안하고, 확정은 관리자가 합니다.
+ case 'clockName': {admin();const who=employee(p.employeeId).id;const key=nameKey(text(p.name,80));if(!key)fail('출근기계에 찍힌 이름을 확인하세요.');const rest=s.clockNames!.filter(x=>x.name!==key);if(rest.length>=500)fail('이름 연결은 500개까지 저장할 수 있습니다.');s.clockNames=[...rest,{name:key,raw:text(p.name,80),employeeId:who}];break;}
+ // 잘못 승인한 연결은 지워야 다시 후보로 올라옵니다.
+ case 'clockNameRemove': {admin();const key=nameKey(text(p.name,80));const rest=s.clockNames!.filter(x=>x.name!==key);if(rest.length===s.clockNames!.length)fail('저장된 이름 연결이 아닙니다.');s.clockNames=rest;break;}
  case 'attendance': {admin();if(!Array.isArray(p.rows)||!p.rows.length||p.rows.length>3000)fail('1~3,000개 행을 가져올 수 있습니다.');for(const row of p.rows){employee(row.employeeId);const a:Attendance={id:id(),employeeId:row.employeeId,date:date(row.date),start:time(row.start),end:time(row.end),breakMinutes:number(row.breakMinutes,1440)};if(!duration(a.start,a.end)||a.breakMinutes>=duration(a.start,a.end)*60)fail('퇴근 시간과 휴게시간을 확인하세요.');const shift={...a,area:''};if(s.attendance.some(x=>x.employeeId===a.employeeId&&overlap({...x,area:''},shift)))fail(`${a.date} ${a.employeeId}: 중복 또는 겹치는 출근기록입니다.`);s.attendance.push(a)}break;}
  case 'message': {if(!actor.admin&&p.to!=='admin')fail('직원은 관리자에게만 메시지를 보낼 수 있습니다.');if(p.to!=='admin'&&p.to!=='all')employee(p.to);if(p.to==='all')admin();s.messages.push({id:id(),sender:actor.id,to:p.to,body:text(p.body,2000),createdAt:now.toISOString(),readBy:[actor.id],kind:'message'});break;}
  case 'rain': {admin();const end=time(p.end,true);const ids=p.targets===undefined?s.employees.map(e=>e.id):[...new Set(String(p.targets).split(',').filter(Boolean))];if(!ids.length)fail('공지를 받을 직원을 선택하세요.');const names=ids.map(v=>employee(v).name);const all=s.employees.every(e=>ids.includes(e.id));s.messages.push({id:id(),sender:actor.id,to:'all',...(all?{}:{recipients:ids}),body:`[우천 근무 종료] ${date(p.date)} ${end}에 ${all?'전 직원':names.join(', ')} 근무를 종료합니다. ${text(p.body,1000)}`,createdAt:now.toISOString(),readBy:[actor.id],kind:'rain'});break;}
  case 'read': {const m=s.messages.find(x=>x.id===p.id)??fail('메시지가 없습니다.');if((m.to==='all'?m.recipients&&!m.recipients.includes(actor.id):m.to!==actor.id)&&m.sender!==actor.id)fail('권한이 없습니다.');if(!m.readBy.includes(actor.id))m.readBy.push(actor.id);break;}
+ // 메시지 삭제는 관리자만 할 수 있습니다. 지우면 직원 화면에서도 함께 사라집니다.
+ case 'messageRemove': {admin();const m=s.messages.find(x=>x.id===text(p.id,120))??fail('메시지가 없습니다.');s.messages=s.messages.filter(x=>x.id!==m.id);break;}
  case 'taskCreate': {if(!taskManager)fail('작업 지시 권한이 필요합니다.');const assignedTo=text(p.assignedTo,80);employee(assignedTo);s.tasks.push({id:id(),assignedTo,title:text(p.title,160),notes:typeof p.notes==='string'?p.notes.trim().slice(0,2000):'',date:date(p.date),status:'sent',createdAt:now.toISOString(),createdBy:actor.id});break;}
  case 'taskUpdate': {const task=s.tasks.find(x=>x.id===text(p.id,120))??fail('작업을 찾을 수 없습니다.');if(!actor.admin&&task.assignedTo!==actor.id)fail('본인에게 배정된 작업만 처리할 수 있습니다.');if(p.action==='seen'){if(task.status==='sent')task.status='seen'}else if(p.action==='complete'){task.status='completed';task.completedAt=now.toISOString()}else fail('잘못된 작업 처리입니다.');break;}
  // Staff request time off / unavailability for themselves (pending); a manager's entries are approved on creation.

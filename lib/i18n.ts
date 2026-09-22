@@ -157,6 +157,8 @@ const en: Record<string, string> = {
   '승인': 'Approve',
   '거절': 'Decline',
   '삭제': 'Delete',
+  '이 메시지를 삭제할까요? 직원 화면에서도 사라집니다.':
+    'Delete this message? It disappears from the staff screens too.',
   '취소': 'Cancel',
   '표시할 휴무가 없습니다.': 'No time off to show.',
   '직원 휴무 신청을 확인하고 승인하세요. 승인된 휴무와 겹치는 근무는 스케줄에 경고로 표시됩니다.': 'Review and approve time off requests. Shifts that overlap approved time off are flagged on the schedule.',
@@ -274,7 +276,18 @@ const en: Record<string, string> = {
   '출근기계 타임카드 · 기록 {n}건': 'Time clock timecard · {n} records',
   '이 형식은 열을 연결할 필요가 없습니다. 이름으로 직원을 찾아 넣습니다.':
     'This format needs no column matching. Staff are found by name.',
-  '직원을 찾지 못한 이름: {names}': 'No staff record matches: {names}',
+  '직원을 찾지 못한 이름 {n}개 · 확인하고 승인하세요':
+    '{n} name(s) with no staff record · review and approve',
+  '비슷한 이름을 미리 골라 두었습니다. 승인하면 이 이름은 다음 임포트부터 같은 직원으로 자동 연결됩니다.':
+    'The closest name is preselected. Once approved, this name is linked to that employee on every later import.',
+  '연결할 직원': 'Link to employee',
+  '기록 {n}건': '{n} records',
+  '기록 {n}건 · 퇴근 미기록 {open}건': '{n} records · {open} with no punch out',
+  '승인해 둔 이름 연결 {n}개': '{n} approved name link(s)',
+  '연결 해제': 'Unlink',
+  '출근기계에 찍힌 이름을 확인하세요.': 'Check the name as the time clock recorded it.',
+  '이름 연결은 500개까지 저장할 수 있습니다.': 'Up to 500 name links can be saved.',
+  '저장된 이름 연결이 아닙니다.': 'That name link is not saved.',
   '퇴근이 찍히지 않아 건너뛴 기록 {n}건: {rows}':
     '{n} records were skipped because no one punched out: {rows}',
   '검토한 출근기록 {n}건 저장': 'Save {n} reviewed records',
@@ -423,9 +436,9 @@ const en: Record<string, string> = {
   '퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.':
     'If the end time is earlier than the start time, the shift ends the next day.',
   '업무 / 장소': 'Role / location',
-  '생년월일 8자리 (YYYYMMDD) · 로그인에 필요':
-    'Birth date, 8 digits (YYYYMMDD) · needed to sign in',
-  '생년월일 8자리 (YYYYMMDD)': 'Birth date, 8 digits (YYYYMMDD)',
+  '생년월일 · 로그인에 필요': 'Birth date · needed to sign in',
+  '달력에서 고르세요': 'Pick from the calendar',
+  '생년월일 지우기': 'Clear birth date',
   '연락처 (예: 914-555-0123)': 'Phone (e.g. 914-555-0123)',
   '로그인 이메일': 'Login email',
   '직원 색상': 'Color',

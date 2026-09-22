@@ -55,6 +55,8 @@ import {
   SelectContent,
   SelectItem,
 } from '@/components/ui/select';
+import { Calendar } from '@/components/ui/calendar';
+import { ko, enUS } from 'date-fns/locale';
 import {
   Table,
   TableHeader,
@@ -80,6 +82,7 @@ import {
   leadDate,
   blockedBy,
   weekdayOf,
+  nameKey,
   AREAS,
   type Employee,
   type Message,
@@ -92,6 +95,8 @@ import {
   downloadTemplate,
   download,
   parseTimecard,
+  nameCandidates,
+  NAME_MATCH_MIN,
   type Timecard,
 } from '@/lib/importer';
 import { translate } from '@/lib/i18n';
@@ -179,6 +184,11 @@ export default function ShiftApp() {
   const [presets, setPresets] = useState(false);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [filename, setFilename] = useState('');
+  // 승인 전에 관리자가 고른 직원. 승인한 연결은 서버 상태(clockNames)에만 두고 여기에는 남기지 않습니다.
+  const [clockPick, setClockPick] = useState<Record<string, string>>({});
+  // 생년월일 달력. 열림 여부와 보고 있는 달은 모달을 열 때마다 초기화합니다.
+  const [birthOpen, setBirthOpen] = useState(false);
+  const [birthMonth, setBirthMonth] = useState<Date | undefined>();
   const [filter, setFilter] = useState('all');
   const [day, setDay] = useState(localDate(new Date()));
   const [from, setFrom] = useState(week);
@@ -403,6 +413,8 @@ export default function ShiftApp() {
     setForm(values);
     setModal(kind);
     setStatus('');
+    setBirthOpen(false);
+    setBirthMonth(undefined);
   };
   const box = (e: Employee | undefined) =>
     e ? (
@@ -525,21 +537,45 @@ export default function ShiftApp() {
       )}
     </>
   );
-  // 타임카드는 이름으로만 사람을 알려 주므로, 직원 명단에서 같은 이름을 찾아 ID 를 붙입니다.
-  const nameKey = (v: string) => v.toLowerCase().replace(/\s+/g, ' ').trim();
+  // 타임카드는 이름으로만 사람을 알려 주므로, 승인해 둔 이름 연결을 먼저 보고 없으면 명단에서 같은 이름을 찾아 ID 를 붙입니다.
+  const clockNames = data.clockNames ?? [];
+  const clockMatch = (name: string) => {
+    const key = nameKey(name);
+    const saved = clockNames.find((x) => x.name === key);
+    return (
+      (saved ? staff.find((e) => e.id === saved.employeeId) : undefined) ??
+      staff.find((e) => nameKey(e.name) === key)
+    );
+  };
   const timecardReady = (timecard?.rows ?? []).flatMap((r) => {
-    const person = staff.find((e) => nameKey(e.name) === nameKey(r.name));
+    const person = clockMatch(r.name);
     return person
       ? [{ employeeId: person.id, date: r.date, start: r.start, end: r.end, breakMinutes: 0 }]
       : [];
   });
+  // 아직 승인되지 않은 이름. 비슷한 이름을 후보로 올려 두되 자동으로 적용하지는 않습니다.
+  // 같은 사람이 대소문자·공백만 다르게 여러 번 찍혔을 수 있어, 다듬은 이름으로 하나로 묶고 표시는 처음 찍힌 표기를 씁니다.
   const timecardUnknown = [
-    ...new Set(
-      [...(timecard?.rows ?? []), ...(timecard?.open ?? [])]
-        .filter((r) => !staff.some((e) => nameKey(e.name) === nameKey(r.name)))
-        .map((r) => r.name),
-    ),
-  ];
+    ...[...(timecard?.rows ?? []), ...(timecard?.open ?? [])]
+      .filter((r) => !clockMatch(r.name))
+      .reduce(
+        (seen, r) =>
+          seen.has(nameKey(r.name)) ? seen : seen.set(nameKey(r.name), r.name),
+        new Map<string, string>(),
+      )
+      .values(),
+  ].map((name) => {
+    const ranked = nameCandidates(name, staff);
+    const best = ranked[0];
+    return {
+      name,
+      ranked,
+      guess: best && best.score >= NAME_MATCH_MIN ? best.person.id : '',
+      // 이 이름으로 들어온 기록 수. 퇴근이 안 찍힌 줄은 승인해도 저장되지 않으므로 따로 셉니다.
+      records: (timecard?.rows ?? []).filter((r) => nameKey(r.name) === nameKey(name)).length,
+      open: (timecard?.open ?? []).filter((r) => nameKey(r.name) === nameKey(name)).length,
+    };
+  });
   // 오늘 내 펀치. 직원 화면의 출근·퇴근 버튼이 이것을 보고 갈립니다.
   const myPunch = [...(data.punches ?? [])]
     .reverse()
@@ -728,16 +764,82 @@ export default function ShiftApp() {
       />
     </label>
   );
-  // 저장된 근무에는 목록에 없는 장소가 남아 있을 수 있어, 그 값도 선택지에 함께 둡니다.
+  // 생년월일은 달력에서 고릅니다. 저장 형식은 지금까지와 같은 8자리(YYYYMMDD)라 로그인 쪽은 손대지 않았습니다.
+  // 시간대가 하루씩 밀리지 않도록 UTC 를 거치지 않고 연·월·일을 그대로 읽고 씁니다.
+  const birthDate = (v: string) =>
+    /^\d{8}$/.test(v)
+      ? new Date(Number(v.slice(0, 4)), Number(v.slice(4, 6)) - 1, Number(v.slice(6)))
+      : undefined;
+  const birthDigits = (d: Date) =>
+    String(d.getFullYear()) +
+    String(d.getMonth() + 1).padStart(2, '0') +
+    String(d.getDate()).padStart(2, '0');
+  const birthField = (label: string) => {
+    const picked = birthDate(form.birthDate || '');
+    return (
+      <div className="field birthfield">
+        {label}
+        <button
+          type="button"
+          className="birthtrigger"
+          aria-expanded={birthOpen}
+          onClick={() => setBirthOpen((v) => !v)}
+        >
+          <CalendarDays size={16} />
+          <span>
+            {picked
+              ? picked.toLocaleDateString(locale, {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })
+              : t('달력에서 고르세요')}
+          </span>
+          <ChevronDown size={16} />
+        </button>
+        {birthOpen && (
+          <Calendar
+            className="birthcalendar"
+            mode="single"
+            locale={lang === 'ko' ? ko : enUS}
+            captionLayout="dropdown"
+            startMonth={new Date(1930, 0)}
+            endMonth={new Date()}
+            month={birthMonth ?? picked ?? new Date(1980, 0)}
+            onMonthChange={setBirthMonth}
+            selected={picked}
+            onSelect={(chosen) => {
+              if (!chosen) return;
+              put('birthDate', birthDigits(chosen));
+              setBirthOpen(false);
+            }}
+          />
+        )}
+        {picked && (
+          <button
+            type="button"
+            className="linklike"
+            onClick={() => {
+              put('birthDate', '');
+              setBirthMonth(undefined);
+            }}
+          >
+            {t('생년월일 지우기')}
+          </button>
+        )}
+      </div>
+    );
+  };
+  // 직원의 업무와 근무의 장소는 같은 목록에서 고릅니다. 예전에 저장된 값이 목록에 없을 수 있어, 그 값도 선택지에 함께 둡니다.
   // 일괄 수정의 '유지'는 빈 값으로 보내지만 빈 값은 고른 것이 없는 상태로 표시되어, 표식을 따로 씁니다.
   const KEEP_AREA = '__keep';
-  const areaPick = (label: string, blank = '') => {
-    const current = form.area || '';
+  const areaPick = (key: string, label: string, blank = '') => {
+    const current = form[key] || '';
     return (
       <Pick
         label={label}
         value={current || (blank ? KEEP_AREA : '')}
-        onChange={(v) => put('area', v === KEEP_AREA ? '' : v)}
+        onChange={(v) => put(key, v === KEEP_AREA ? '' : v)}
         options={[
           ...(blank ? [{ value: KEEP_AREA, label: blank }] : []),
           ...AREAS.map((area) => ({ value: area, label: area })),
@@ -1318,11 +1420,86 @@ export default function ShiftApp() {
                         {t('이 형식은 열을 연결할 필요가 없습니다. 이름으로 직원을 찾아 넣습니다.')}
                       </p>
                       {timecardUnknown.length > 0 && (
-                        <p className="formerror">
-                          {t('직원을 찾지 못한 이름: {names}', {
-                            names: timecardUnknown.join(', '),
-                          })}
-                        </p>
+                        <div className="namematch">
+                          <h4>
+                            {t('직원을 찾지 못한 이름 {n}개 · 확인하고 승인하세요', {
+                              n: timecardUnknown.length,
+                            })}
+                          </h4>
+                          <p className="hint">
+                            {t('비슷한 이름을 미리 골라 두었습니다. 승인하면 이 이름은 다음 임포트부터 같은 직원으로 자동 연결됩니다.')}
+                          </p>
+                          {timecardUnknown.map((u) => (
+                            <div className="namematch-row" key={u.name}>
+                              <div className="namematch-name">
+                                <b>{u.name}</b>
+                                <small>
+                                  {u.open > 0
+                                    ? t('기록 {n}건 · 퇴근 미기록 {open}건', {
+                                        n: u.records,
+                                        open: u.open,
+                                      })
+                                    : t('기록 {n}건', { n: u.records })}
+                                </small>
+                              </div>
+                              <Pick
+                                label={t('연결할 직원')}
+                                value={clockPick[u.name] ?? u.guess}
+                                onChange={(v) =>
+                                  setClockPick((m) => ({ ...m, [u.name]: v }))
+                                }
+                                options={[
+                                  { value: '', label: t('선택하세요') },
+                                  ...u.ranked.map(({ person, score }) => ({
+                                    value: person.id,
+                                    label:
+                                      person.name +
+                                      ' · ' +
+                                      person.id +
+                                      (score > 0
+                                        ? ' · ' + Math.round(score * 100) + '%'
+                                        : ''),
+                                  })),
+                                ]}
+                              />
+                              <button
+                                className="button"
+                                disabled={busy || setup || !(clockPick[u.name] ?? u.guess)}
+                                onClick={() =>
+                                  void command('clockName', {
+                                    name: u.name,
+                                    employeeId: clockPick[u.name] ?? u.guess,
+                                  })
+                                }
+                              >
+                                <Check size={16} /> {t('승인')}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {clockNames.length > 0 && (
+                        <details className="namematch-saved">
+                          <summary>
+                            {t('승인해 둔 이름 연결 {n}개', { n: clockNames.length })}
+                          </summary>
+                          {clockNames.map((link) => (
+                            <div className="namematch-row" key={link.name}>
+                              <span>
+                                {link.raw || link.name} → {name(link.employeeId)}
+                              </span>
+                              <button
+                                className="linklike"
+                                disabled={busy || setup}
+                                onClick={() =>
+                                  void command('clockNameRemove', { name: link.name })
+                                }
+                              >
+                                <X size={14} /> {t('연결 해제')}
+                              </button>
+                            </div>
+                          ))}
+                        </details>
                       )}
                       {timecard.open.length > 0 && (
                         <p className="hint">
@@ -1783,6 +1960,19 @@ export default function ShiftApp() {
                           <Check size={14} /> {t('확인했습니다')}
                         </button>
                       )}
+                      {/* 메시지 삭제는 관리자만 보입니다. 서버에서도 관리자만 통과시킵니다. */}
+                      {actor.admin && (
+                        <button
+                          disabled={busy}
+                          className="button"
+                          onClick={() => {
+                            if (confirm(t('이 메시지를 삭제할까요? 직원 화면에서도 사라집니다.')))
+                              void command('messageRemove', { id: m.id });
+                          }}
+                        >
+                          <X size={14} /> {t('삭제')}
+                        </button>
+                      )}
                     </div>
                   </article>
                 ))}
@@ -1854,6 +2044,8 @@ export default function ShiftApp() {
                   </div>
                 )}
               </div>
+              {/* 이름 열과 수정·삭제 열, 제목 줄을 고정해 가로로 밀어도 늘 보이게 합니다. */}
+              <div className="stafftable">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1912,6 +2104,7 @@ export default function ShiftApp() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             </div>
           </TabsContent>
     </>
@@ -2038,7 +2231,7 @@ export default function ShiftApp() {
                   onChange={(v) => put('employeeId', v)}
                   options={options}
                 />
-                {areaPick(t('업무 / 장소'))}
+                {areaPick('area', t('업무 / 장소'))}
                 {input('date', t('근무일'), 'date')}
                 {shiftTimes}
                 <p className="hint">
@@ -2050,7 +2243,7 @@ export default function ShiftApp() {
             {modal === 'shiftUpdate' && (
               <>
                 {box(emp(data.shifts.find((s) => s.id === form.ids)?.employeeId || ''))}
-                {areaPick(t('업무 / 장소'))}
+                {areaPick('area', t('업무 / 장소'))}
                 {input('date', t('근무일'), 'date')}
                 {shiftTimes}
                 <p className="hint">
@@ -2164,7 +2357,7 @@ export default function ShiftApp() {
             {modal === 'employee' && (
               <>
                 {input('name', t('이름'))}
-                {input('birthDate', t('생년월일 8자리 (YYYYMMDD) · 로그인에 필요'), 'text', false)}
+                {birthField(t('생년월일 · 로그인에 필요'))}
                 {input('phone', t('연락처 (예: 914-555-0123)'), 'tel', false)}
                 {input('email', t('로그인 이메일'), 'email', false)}
                 <div className="formgrid">
@@ -2175,7 +2368,7 @@ export default function ShiftApp() {
                     'number',
                   )}
                 </div>
-                {input('role', t('업무'))}
+                {areaPick('role', t('업무'))}
                 <label className="recipient all">
                   <Checkbox
                     checked={form.admin === '1'}

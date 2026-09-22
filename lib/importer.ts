@@ -12,6 +12,24 @@ function delimiterOf(text:string):string{const counts:Record<string,number>={','
 // 출근기계의 Timecard Report. 직원마다 블록이 있고, 한 날에 여러 번 찍은 줄은 날짜 칸이 비어 있습니다.
 export type Timecard={rows:{name:string;date:string;start:string;end:string}[];open:{name:string;date:string;start:string}[]};
 const hhmm=(v:string)=>/^\d{1,2}:\d{2}$/.test(v)?v.padStart(5,'0'):'';
+// 이름이 조금씩 달라도(오타, 성·이름 순서, 가운데 이름, 대소문자) 같은 사람을 찾아내려면 글자 두 개씩 묶어 겹치는 정도를 봅니다.
+// Dice 계수 0~1. 1이면 완전히 같은 이름입니다. 자동으로 적용하지 않고 관리자에게 후보로 보여 주기만 합니다.
+const bigrams=(v:string)=>{const out=new Map<string,number>();for(let i=0;i<v.length-1;i++){const g=v.slice(i,i+2);out.set(g,(out.get(g)??0)+1)}return out};
+const plain=(v:string)=>v.toLowerCase().replace(/[^a-z0-9가-힣]+/g,'');
+export function similarity(a:string,b:string):number{
+ const x=plain(a),y=plain(b);
+ if(!x||!y)return 0;
+ if(x===y)return 1;
+ if(x.length<2||y.length<2)return 0;
+ const gx=bigrams(x),gy=bigrams(y);let hit=0,total=0;
+ for(const [g,n] of gx){total+=n;hit+=Math.min(n,gy.get(g)??0)}
+ for(const [,n] of gy)total+=n;
+ return (2*hit)/total;
+}
+// 후보를 비슷한 정도 순으로 돌려줍니다. 같은 점수면 이름순입니다.
+export function nameCandidates<T extends {name:string}>(name:string,people:T[]){return people.map(person=>({person,score:similarity(name,person.name)})).sort((a,b)=>b.score-a.score||a.person.name.localeCompare(b.person.name))}
+// 이 점수 아래는 근거가 약해 미리 골라 두지 않고 관리자가 직접 고르게 합니다.
+export const NAME_MATCH_MIN=0.45;
 export function parseTimecard(rows:string[][]):Timecard|null{
  if(!rows.some(r=>r.some(c=>c.trim()==='Timecard Report')||r[0]?.trim()==='Pay Period'))return null;
  const out:Timecard['rows']=[],open:Timecard['open']=[];let name='',date='';
