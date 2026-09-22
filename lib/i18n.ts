@@ -211,18 +211,6 @@ const en: Record<string, string> = {
   '{name} 시급 미설정': '{name} has no hourly rate',
   '근무 시간 수정': 'Edit shift',
   '시간 수정': 'Edit time',
-  '여러 날 한번에 수정': 'Edit several days',
-  '수정할 근무 ({n}/{total}개)': 'Shifts to edit ({n}/{total})',
-  '전체 선택': 'Select all',
-  '대체 요청 진행 중': 'swap in progress',
-  '이 기간에 등록된 근무가 없습니다.': 'No shifts in this date range.',
-  '새 출근': 'New start',
-  '새 퇴근': 'New end',
-  '새 업무 / 장소': 'New role / location',
-  '기존 값 유지': 'Keep the current value',
-  '비워 둔 항목은 기존 값을 그대로 유지합니다. 퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.':
-    'Blank fields keep their current values. An end time earlier than the start counts as the next day.',
-  '선택한 {n}개 근무 수정': 'Update {n} selected shifts',
   '저장하면 스케줄이 작성 중 상태로 바뀝니다. 수정 후 직원에게 공개를 다시 누르세요.':
     'Saving puts the schedule back into draft. Press Publish to staff again after editing.',
   '수정할 근무를 선택하세요.': 'Choose the shifts to edit.',

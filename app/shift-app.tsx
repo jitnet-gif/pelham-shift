@@ -40,7 +40,6 @@ import {
   UserPlus,
   ChevronDown,
   X,
-  CalendarRange,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
@@ -625,63 +624,6 @@ export default function ShiftApp() {
         .filter((v) => (v === id ? on : rainTargets.includes(v)))
         .join(','),
     );
-  // Shifts with a swap in progress can't be edited, so bulk edit lists them without letting them be picked.
-  const swapLocked = new Set(
-    data.swaps
-      .filter((r) => ['requested', 'accepted'].includes(r.status))
-      .map((r) => r.shiftId),
-  );
-  const bulkMatches = (f: Record<string, string>) =>
-    data.shifts
-      .filter(
-        (s) =>
-          (f.employee === 'all' || s.employeeId === f.employee) &&
-          s.date >= (f.from || '') &&
-          s.date <= (f.to || ''),
-      )
-      .sort(
-        (a, b) =>
-          a.date.localeCompare(b.date) ||
-          a.start.localeCompare(b.start) ||
-          name(a.employeeId).localeCompare(name(b.employeeId)),
-      );
-  const bulkSelectable = (f: Record<string, string>) =>
-    bulkMatches(f)
-      .filter((s) => !swapLocked.has(s.id))
-      .map((s) => s.id);
-  const isBulk = modal === 'shiftUpdate' && form.bulk === '1';
-  const bulkShifts = isBulk ? bulkMatches(form) : [];
-  const bulkOptions = isBulk ? bulkSelectable(form) : [];
-  // Selection is kept as ids and re-checked against current shifts, since a background refresh can remove some.
-  const bulkIds = (form.ids || '')
-    .split(',')
-    .filter((id) => bulkOptions.includes(id));
-  const bulkAll =
-    bulkOptions.length > 0 && bulkOptions.every((id) => bulkIds.includes(id));
-  const putBulkFilter = (key: string, value: string) =>
-    setForm((f) => {
-      const next = { ...f, [key]: value };
-      return { ...next, ids: bulkSelectable(next).join(',') };
-    });
-  const toggleBulk = (id: string, on: boolean) =>
-    put(
-      'ids',
-      bulkOptions
-        .filter((v) => (v === id ? on : bulkIds.includes(v)))
-        .join(','),
-    );
-  const openBulk = () => {
-    const values = {
-      bulk: '1',
-      employee: filter,
-      from: week,
-      to: addDays(week, 6),
-      start: '',
-      end: '',
-      area: '',
-    };
-    open('shiftUpdate', { ...values, ids: bulkSelectable(values).join(',') });
-  };
   const reminders = data.published
     ? data.shifts
         .filter(
@@ -1767,7 +1709,7 @@ export default function ShiftApp() {
                 {
                   rain: '우천 근무 종료 공지',
                   shift: '근무 추가',
-                  shiftUpdate: isBulk ? '여러 날 한번에 수정' : '근무 시간 수정',
+                  shiftUpdate: '근무 시간 수정',
                   timeOffRequest: actor.admin ? '휴무 추가' : '휴무 신청',
                   availabilitySet: '근무 불가 시간 추가',
                   employee: '직원 설정',
@@ -1793,13 +1735,6 @@ export default function ShiftApp() {
               e.preventDefault();
               if (modal === 'approve')
                 void command('swapDecision', { ...form, action: 'approve' });
-              else if (isBulk)
-                void command('shiftUpdate', {
-                  ids: bulkIds.join(','),
-                  start: form.start,
-                  end: form.end,
-                  area: form.area,
-                });
               else if (modal === 'detail') {
                 setModal('swap');
                 setForm({ shiftId: form.id, to: '' });
@@ -1863,7 +1798,7 @@ export default function ShiftApp() {
                 {areaPick(t('업무 / 장소'))}
               </>
             )}
-            {modal === 'shiftUpdate' && !isBulk && (
+            {modal === 'shiftUpdate' && (
               <>
                 {box(emp(data.shifts.find((s) => s.id === form.ids)?.employeeId || ''))}
                 {input('date', t('근무일'), 'date')}
@@ -1875,95 +1810,6 @@ export default function ShiftApp() {
                   {t('퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.')}
                 </p>
                 {areaPick(t('업무 / 장소'))}
-              </>
-            )}
-            {isBulk && (
-              <>
-                <Pick
-                  label={t('직원')}
-                  value={form.employee || 'all'}
-                  onChange={(v) => putBulkFilter('employee', v)}
-                  options={[{ value: 'all', label: t('모든 직원') }, ...options]}
-                />
-                <div className="formgrid">
-                  <label className="field">
-                    {t('시작일')}
-                    <input
-                      type="date"
-                      required
-                      value={form.from || ''}
-                      onChange={(e) => putBulkFilter('from', e.target.value)}
-                    />
-                  </label>
-                  <label className="field">
-                    {t('종료일')}
-                    <input
-                      type="date"
-                      required
-                      min={form.from}
-                      value={form.to || ''}
-                      onChange={(e) => putBulkFilter('to', e.target.value)}
-                    />
-                  </label>
-                </div>
-                <fieldset className="recipients shiftpick">
-                  <legend>
-                    {t('수정할 근무 ({n}/{total}개)', {
-                      n: bulkIds.length,
-                      total: bulkShifts.length,
-                    })}
-                  </legend>
-                  {bulkShifts.length ? (
-                    <>
-                      <label className="recipient all">
-                        <Checkbox
-                          checked={bulkAll}
-                          disabled={!bulkOptions.length}
-                          onCheckedChange={(on) =>
-                            put('ids', on ? bulkOptions.join(',') : '')
-                          }
-                        />
-                        {t('전체 선택')}
-                      </label>
-                      <div className="recipientlist">
-                        {bulkShifts.map((s) => {
-                          const locked = swapLocked.has(s.id);
-                          return (
-                            <label
-                              className={'recipient' + (locked ? ' locked' : '')}
-                              key={s.id}
-                            >
-                              <Checkbox
-                                checked={bulkIds.includes(s.id)}
-                                disabled={locked}
-                                onCheckedChange={(on) => toggleBulk(s.id, on)}
-                              />
-                              <span>
-                                {s.date.slice(5).replace('-', '.')} (
-                                {days[new Date(s.date + 'T12:00:00Z').getUTCDay()]})
-                              </span>
-                              {form.employee === 'all' && box(emp(s.employeeId))}
-                              <small>
-                                {s.start}–{s.end} · {s.area}
-                                {locked ? ' · ' + t('대체 요청 진행 중') : ''}
-                              </small>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </>
-                  ) : (
-                    <p className="hint">{t('이 기간에 등록된 근무가 없습니다.')}</p>
-                  )}
-                </fieldset>
-                <div className="formgrid">
-                  {input('start', t('새 출근'), 'time', false)}
-                  {input('end', t('새 퇴근'), 'time', false)}
-                </div>
-                {areaPick(t('새 업무 / 장소'), t('기존 값 유지'))}
-                <p className="hint">
-                  {t('비워 둔 항목은 기존 값을 그대로 유지합니다. 퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.')}
-                </p>
               </>
             )}
             {modal === 'timeOffRequest' && (
@@ -2202,28 +2048,6 @@ export default function ShiftApp() {
                         >
                           {t('시간 수정')}
                         </button>
-                        <button
-                          type="button"
-                          className="button"
-                          disabled={busy}
-                          onClick={() => {
-                            const values = {
-                              bulk: '1',
-                              employee: s.employeeId,
-                              from: weekStart(s.date),
-                              to: addDays(weekStart(s.date), 6),
-                              start: '',
-                              end: '',
-                              area: '',
-                            };
-                            open('shiftUpdate', {
-                              ...values,
-                              ids: bulkSelectable(values).join(','),
-                            });
-                          }}
-                        >
-                          {t('여러 날 한번에 수정')}
-                        </button>
                       </div>
                     )}
                   </div>
@@ -2248,7 +2072,6 @@ export default function ShiftApp() {
                 disabled={
                   busy ||
                   (modal === 'rain' && !rainTargets.length) ||
-                  (isBulk && !bulkIds.length) ||
                   (modal === 'detail' &&
                     !canSwap(
                       data.shifts.find((s) => s.id === form.id)?.date || '',
@@ -2264,9 +2087,7 @@ export default function ShiftApp() {
                       ? rainAll
                         ? t('전 직원에게 공지 저장')
                         : t('선택한 {n}명에게 공지 저장', { n: rainTargets.length })
-                      : isBulk
-                        ? t('선택한 {n}개 근무 수정', { n: bulkIds.length })
-                        : t('저장')}
+                      : t('저장')}
               </button>
             )}
           </form>
@@ -2559,13 +2380,6 @@ export default function ShiftApp() {
                         onClick={() => command('publish')}
                       >
                         {t('직원에게 공개')}
-                      </button>
-                      <button
-                        disabled={busy || setup}
-                        className="button"
-                        onClick={openBulk}
-                      >
-                        {t('여러 날 한번에 수정')}
                       </button>
                       <button
                         className="button primary"
@@ -3147,15 +2961,6 @@ export default function ShiftApp() {
                       }
                     >
                       <CloudRain size={18} />
-                    </button>
-                    <button
-                      disabled={busy || setup}
-                      className="button toolbutton"
-                      title={t('여러 날 한번에 수정')}
-                      aria-label={t('여러 날 한번에 수정')}
-                      onClick={openBulk}
-                    >
-                      <CalendarRange size={18} />
                     </button>
                   </div>
                 )}
