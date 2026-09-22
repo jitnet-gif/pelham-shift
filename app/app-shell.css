@@ -47,7 +47,7 @@
 .collapsed .sidebar-account{justify-content:center;padding:4px 0}
 .collapsed .sidebar-tools{justify-content:center;padding:0}
 .collapsed .sidebar-tools .iconbutton{margin:0}
-.sidebar-scrim,.mobilebar{display:none}
+.sidebar-scrim,.mobilebar,.tabbar{display:none}
 
 /* Work area */
 .workarea{min-width:0;display:flex;flex-direction:column;background:#fff}
@@ -69,8 +69,6 @@
 .daterange-field input{min-height:42px!important;min-width:180px}
 .sched-top>.button{min-height:42px;font-weight:600;color:var(--ink)}
 .sched-actions{margin-left:auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.warnpill{display:inline-flex;align-items:center;gap:7px;border:1px solid #f1c3c0;background:#fde4e2;color:#8f2d27;border-radius:999px;padding:7px 14px;font-size:14px;font-weight:600}
-.warnpill:hover{background:#fbd6d3}
 .sched-actions .draft{font-size:12px;color:#9a7837;white-space:nowrap}
 .sched-actions .draft.live{color:#087e6d}
 .button.publish{min-height:42px;padding-inline:18px;font-weight:600;background:#087e6d;border-color:#087e6d;color:#fff}
@@ -132,9 +130,17 @@
   .collapsed .sidenav-heading{display:flex}
   .nav-open .sidebar-scrim{display:block;position:fixed;inset:0;border:0;background:rgb(20 28 30/.35);z-index:35}
   .mobilebar{display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:env(safe-area-inset-top,0px);z-index:30;height:56px;padding:0 12px;background:#fff;border-bottom:1px solid var(--line)}
-  .mobilebar .brand{font-size:19px}
-  .mobilebar .brandmark{width:28px;height:28px;margin-right:6px}
   .mobilebar .iconbutton{padding:8px;border-radius:8px;color:var(--ink)}
+  .mobilebar-me{border:0;background:none;padding:4px;border-radius:50%}
+  .mobilebar-me .avatar{width:32px;height:32px;margin:0;font-size:14px;color:#41524e}
+  .mobilebar-title{flex:1;min-width:0;margin:0;font-size:19px;font-weight:650;letter-spacing:-.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* 하단 탭바. sticky 라서 본문을 가리지 않고, 짧은 화면에서도 맨 아래에 붙습니다. */
+  .tabbar{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));position:sticky;bottom:0;z-index:30;background:#fff;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+  .tabbar-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:56px;padding:7px 2px;border:0;background:none;color:var(--sub);font-size:11px;font-weight:500;line-height:1.2;text-align:center}
+  .tabbar-item.on{color:#087e6d}
+  .tabbar-item:active{background:#f1eee8}
+  .tabbar-icon{position:relative;display:grid;place-items:center}
+  .tabbar-icon em{position:absolute;top:-1px;right:-4px;width:8px;height:8px;border-radius:50%;background:#c0503a}
   .app-shell main{padding:14px 16px 0}
   .sched-actions{margin-left:0;width:100%}
   .sched-actions .button.publish{margin-left:auto}
@@ -185,8 +191,6 @@
 .filterpick.static span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .filterchip{display:inline-flex;align-items:center;gap:6px;border:1px solid #cfd8e8;background:#eef2fb;color:#2d4486;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600}
 .sched-actions{border:1px solid var(--line);border-radius:10px;padding:6px 6px 6px 12px;gap:14px}
-.sched-actions-rule{width:1px;align-self:stretch;background:var(--line)}
-.sched-actions .warnpill{border-radius:10px}
 .roster-day{justify-content:flex-start;padding:8px 10px;gap:0}
 .roster-day span{align-items:flex-start;font-size:14px;gap:1px}
 .roster-day span b{font-size:18px}
@@ -242,7 +246,7 @@
 .soon{display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;padding:70px 24px!important;color:#6a7478}
 .soon h2{margin:4px 0 0;font-size:22px;color:var(--ink)}
 .soon p{max-width:46ch;line-height:1.7;margin:0}
-@media (max-width:900px){.sched-actions{border:0;padding:0}.sched-actions-rule{display:none}}
+@media (max-width:900px){.sched-actions{border:0;padding:0}}
 @media (max-width:600px){.filterpick{min-width:0!important;flex:1 1 calc(50% - 5px)}.filterpick.static{max-width:none}.sched-filters .button.toolbutton{flex:none}.roster-tabs{left:12px}}
 
 .roster-total{position:sticky;flex-wrap:wrap;align-content:center;row-gap:6px}
@@ -262,7 +266,8 @@
 .inapp-alert p{margin:0;font-size:13px;color:#5d6f69;line-height:1.6;max-height:64px;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere}
 .inapp-alert .inapp-actions{display:flex;align-items:center;gap:4px;margin-left:auto;flex-shrink:0}
 .inapp-alert .button{padding:7px 12px;font-size:13px}
-@media(max-width:600px){.inapp-alert{left:12px;right:12px;bottom:12px;width:auto;max-width:none}}
+@media(max-width:900px){.inapp-alert{bottom:calc(68px + env(safe-area-inset-bottom,0px))}}
+@media(max-width:600px){.inapp-alert{left:12px;right:12px;width:auto;max-width:none}}
 
 /* 급여 표의 줄을 누르면 열리는 날짜별 상세 */
 .rowlink{cursor:pointer}

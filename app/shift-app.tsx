@@ -111,6 +111,21 @@ import { useLang } from './use-lang';
 import { useIsMobile } from '@/hooks/use-mobile';
 import PhoneSchedule from './phone-schedule';
 import { LAYOUT_KEY, readLayout, type Layout } from './layout-choice';
+// 폰 상단 바는 브랜드 대신 지금 보고 있는 화면 이름을 띄웁니다. 사이드바와 같은 말을 씁니다.
+const TAB_LABELS: Record<string, string> = {
+  dashboard: '대시보드',
+  working: '근무 현황',
+  schedule: '스케줄',
+  timeoff: '휴무',
+  availability: '근무 가능 시간',
+  swaps: '대체 근무',
+  team: '팀',
+  logbook: '업무일지',
+  messages: '메시지',
+  attendance: '출근 기록',
+  payroll: '급여 관리',
+  help: '도움말',
+};
 function Pick({
   label,
   value,
@@ -3261,6 +3276,19 @@ export default function ShiftApp() {
     </TabsContent>
   );
   // 필터 줄은 데스크톱과 폰이 같은 JSX 를 씁니다. 폰에서는 보기 설정 버튼으로 펼칩니다.
+  // 하단 탭바 네 칸. 관리자와 직원이 자주 쓰는 화면이 달라 목록도 갈립니다.
+  const tabBarItems = [
+    { key: 'schedule', label: '스케줄', Icon: CalendarDays, count: 0 },
+    actor.admin
+      ? { key: 'team', label: '팀', Icon: Users, count: 0 }
+      : { key: 'timeoff', label: '휴무', Icon: CalendarX, count: 0 },
+    { key: 'messages', label: '메시지', Icon: MessageSquare, count: unread.length },
+    { key: 'attendance', label: '출근', Icon: Timer, count: 0 },
+  ];
+  // 탭바에 없는 화면에 처리할 일이 남아 있으면 '더보기'에 점을 띄웁니다.
+  const moreCount = actor.admin
+    ? pending.length + pendingOff.length + pendingAvail.length
+    : 0;
   const schedActionsNode = actor.admin ? (
                     <div className="sched-actions">
                       <button
@@ -3434,16 +3462,15 @@ export default function ShiftApp() {
         <div className="workarea">
           <header className="mobilebar">
             <button
-              className="iconbutton"
+              className="mobilebar-me"
               aria-label={t('메뉴 열기')}
               onClick={() => setNavOpen(true)}
             >
-              <Menu size={22} />
+              <span className="avatar">
+                {actor.admin ? 'P' : name(actor.id).slice(0, 1)}
+              </span>
             </button>
-            <a className="brand" href={'/' + query()}>
-              <span className="brandmark" aria-hidden="true" />
-              pelham<span className="brandlight">shift</span>
-            </a>
+            <h1 className="mobilebar-title">{t(TAB_LABELS[tab] || '스케줄')}</h1>
             <button
               aria-label={t('메시지 보기')}
               className="iconbutton bell"
@@ -3930,6 +3957,37 @@ export default function ShiftApp() {
               PELHAM SHIFT <span>{t('팀의 시간, 더 간편하게.')}</span>
             </footer>
           </main>
+          {/* 폰의 기본 이동 수단. 나머지 메뉴는 '더보기'가 여는 서랍에 그대로 있습니다. */}
+          <nav className="tabbar" aria-label={t('주요 메뉴')}>
+            {tabBarItems.map(({ key, label, Icon, count }) => (
+              <button
+                key={key}
+                className={'tabbar-item' + (tab === key ? ' on' : '')}
+                aria-current={tab === key ? 'page' : undefined}
+                onClick={() => {
+                  setTab(key);
+                  setNavOpen(false);
+                }}
+              >
+                <span className="tabbar-icon">
+                  <Icon size={21} />
+                  {count > 0 && <em />}
+                </span>
+                {t(label)}
+              </button>
+            ))}
+            <button
+              className={'tabbar-item' + (navOpen ? ' on' : '')}
+              aria-expanded={navOpen}
+              onClick={() => setNavOpen((v) => !v)}
+            >
+              <span className="tabbar-icon">
+                <Menu size={21} />
+                {moreCount > 0 && <em />}
+              </span>
+              {t('더보기')}
+            </button>
+          </nav>
         </div>
       </Tabs>
       {dialogs}
