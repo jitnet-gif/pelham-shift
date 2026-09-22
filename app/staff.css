@@ -647,3 +647,19 @@
   .stclock-body { padding-bottom: 76px; }
 }
 .stclock-free { color: #3aa76d; }
+
+/* 직원 기록이 없는 계정에게 보여 주는 안내. 카메라를 켜지 않습니다. */
+.nostaff {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 56px 24px;
+  text-align: center;
+}
+.nostaff svg:first-child { color: #087e6d; }
+.nostaff h2 { margin: 0; font-size: 21px; font-weight: 650; letter-spacing: -.5px; }
+.nostaff p { margin: 0; font-size: 15px; line-height: 1.8; color: #6b7a76; }
+.nostaff .button { margin-top: 6px; min-height: 46px; padding: 0 20px; border-radius: 24px; }

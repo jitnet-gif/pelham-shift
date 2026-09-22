@@ -4177,6 +4177,36 @@ export default function ShiftApp({ landing = 'schedule' }: { landing?: string })
             {comingSoon('logbook', BookOpen, '업무일지', '날짜별 운영 메모와 특이사항을 기록하고 팀과 공유하는 기능을 준비하고 있습니다.')}
             {comingSoon('help', CircleQuestionMark, '도움말', '스케줄 작성, 휴무·근무 가능 시간, 대체 근무 사용법 안내를 준비하고 있습니다.')}
             <TabsContent value="home">
+              {/* 고정 '관리자' 계정은 직원 명부에 없습니다. 눌러 봐야 서버가 되돌려 보내니,
+                  카메라를 띄우는 대신 무엇을 해야 하는지 먼저 알려 줍니다. */}
+              {!emp(actor.id) ? (
+                <section className="nostaff">
+                  <UserRound size={34} />
+                  <h2>{t('이 계정은 직원 명부에 없습니다')}</h2>
+                  <p>
+                    {t('출퇴근은 직원 기록이 있어야 찍힙니다. 직원 관리에서 본인을 직원으로 추가하고, 그 이름으로 로그인해 주세요.')}
+                  </p>
+                  {actor.admin && (
+                    <button
+                      className="button primary"
+                      onClick={() => {
+                        setTab('team');
+                        open('employee', {
+                          name: '',
+                          phone: '',
+                          email: '',
+                          rate: '0',
+                          color: '#087e6d',
+                          role: AREAS[0],
+                          admin: '1',
+                        });
+                      }}
+                    >
+                      <UserPlus size={16} /> {t('나를 직원으로 추가')}
+                    </button>
+                  )}
+                </section>
+              ) : (
               <StaffClock
                 employee={emp(actor.id)}
                 punch={myPunch}
@@ -4190,6 +4220,7 @@ export default function ShiftApp({ landing = 'schedule' }: { landing?: string })
                 }
                 onBreak={(action) => void command('punchBreak', { action, paid: '1' })}
               />
+              )}
             </TabsContent>
             <TabsContent value="more">
               <StaffMore

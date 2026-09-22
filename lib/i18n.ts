@@ -590,6 +590,10 @@ const en: Record<string, string> = {
   '0 이상의 유효한 금액/시간을 입력하세요.': 'Enter a valid amount or time of 0 or more.',
   '관리자 권한이 필요합니다.': 'Manager permission is required.',
   '등록된 직원을 선택하세요.': 'Choose a registered employee.',
+  '이 계정은 직원 명부에 없습니다': 'This account is not on the staff list',
+  '출퇴근은 직원 기록이 있어야 찍힙니다. 직원 관리에서 본인을 직원으로 추가하고, 그 이름으로 로그인해 주세요.':
+    'Punching needs a staff record. Add yourself on the team screen, then sign in under that name.',
+  '나를 직원으로 추가': 'Add me as staff',
   '직원 계정은 전체 일정, 본인 근태 및 급여를 읽기 전용으로만 볼 수 있습니다.':
     'Staff accounts can only view the full schedule and their own attendance and pay.',
   '직원 색상을 확인하세요.': 'Check the employee color.',
