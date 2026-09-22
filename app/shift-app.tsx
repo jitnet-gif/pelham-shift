@@ -27,8 +27,6 @@ import {
   TriangleAlert,
   UserRound,
   LayoutDashboard,
-  GraduationCap,
-  BriefcaseBusiness,
   BookOpen,
   CircleQuestionMark,
   Timer,
@@ -2754,8 +2752,6 @@ export default function ShiftApp() {
                 navItem('swaps', '대체 근무', ArrowLeftRight, { sub: true, count: pending.length })}
             </div>
             {actor.admin && navItem('team', '팀', Users)}
-            {actor.admin && navItem('training', '교육', GraduationCap)}
-            {actor.admin && navItem('hiring', '채용', BriefcaseBusiness)}
             <hr />
             <a className="sidenav-item" href={'/tasks' + query()}>
               <ClipboardList size={19} />
@@ -3305,8 +3301,6 @@ export default function ShiftApp() {
               </section>
             </TabsContent>
             {comingSoon('dashboard', LayoutDashboard, '대시보드', '오늘 근무자, 이번 주 근무시간과 인건비, 처리할 요청을 한 화면에 모아 보여줄 예정입니다.')}
-            {comingSoon('training', GraduationCap, '교육', '교육 자료를 직원에게 배정하고 이수 여부를 확인하는 기능을 준비하고 있습니다.')}
-            {comingSoon('hiring', BriefcaseBusiness, '채용', '지원자를 등록하고 면접·채용 단계를 관리하는 기능을 준비하고 있습니다.')}
             {comingSoon('logbook', BookOpen, '업무일지', '날짜별 운영 메모와 특이사항을 기록하고 팀과 공유하는 기능을 준비하고 있습니다.')}
             {comingSoon('help', CircleQuestionMark, '도움말', '스케줄 작성, 휴무·근무 가능 시간, 대체 근무 사용법 안내를 준비하고 있습니다.')}
 {otherTabs}
