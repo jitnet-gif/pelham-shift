@@ -1969,15 +1969,20 @@ export default function ShiftApp() {
             {modal === 'shiftUpdate' && (
               <>
                 {box(emp(data.shifts.find((s) => s.id === form.ids)?.employeeId || ''))}
+                {areaPick(t('업무 / 장소'))}
                 {input('date', t('근무일'), 'date')}
                 <div className="formgrid">
                   {input('start', t('출근'), 'time')}
                   {input('end', t('퇴근'), 'time')}
                 </div>
                 <p className="hint">
-                  {t('퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.')}
+                  {shiftHours
+                    ? t('{n}시간 근무 · 퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.', {
+                        n: shiftHours,
+                      })
+                    : t('퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.')}
                 </p>
-                {areaPick(t('업무 / 장소'))}
+                {noteField}
               </>
             )}
             {modal === 'timeOffRequest' && (
@@ -2192,6 +2197,7 @@ export default function ShiftApp() {
                     <p>
                       {s.area} · {t('{n}시간', { n: duration(s.start, s.end) })}
                     </p>
+                    {s.note && <p className="shiftnote">{s.note}</p>}
                     {s.originalId && (
                       <p>
                         {t('원근무자 {from} → 대체자 {to}', {
@@ -2220,6 +2226,7 @@ export default function ShiftApp() {
                               start: s.start,
                               end: s.end,
                               area: s.area,
+                              note: s.note || '',
                             })
                           }
                         >
