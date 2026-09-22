@@ -6,6 +6,7 @@ import './task-launch.css';
 import './schedule-controls.css';
 import './timeline.css';
 import './month-schedule.css';
+import './phone-schedule.css';
 import './day-schedule.css';
 import './whos-working.css';
 import Fresh from './fresh';

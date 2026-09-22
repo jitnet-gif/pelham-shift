@@ -108,6 +108,8 @@ import BirthLogin from './birth-login';
 import PasswordChange from './password-change';
 import LangToggle from './lang-toggle';
 import { useLang } from './use-lang';
+import { useIsMobile } from '@/hooks/use-mobile';
+import PhoneSchedule from './phone-schedule';
 import { LAYOUT_KEY, readLayout, type Layout } from './layout-choice';
 function Pick({
   label,
@@ -201,6 +203,9 @@ export default function ShiftApp() {
   const [navOpen, setNavOpen] = useState(false);
   const [ui, setUi] = useState<Layout>('seven');
   const [offFilter, setOffFilter] = useState('pending');
+  // 폰에서는 주간 표 대신 날짜별 목록을 그립니다. 첫 렌더는 서버와 같게 데스크톱으로 두고 마운트 뒤 바뀝니다.
+  const phone = useIsMobile();
+  const [schedFilters, setSchedFilters] = useState(false);
   const [inapp, setInapp] = useState<Message | null>(null);
   const [payDetail, setPayDetail] = useState('');
   const seenMessages = useRef<Set<string>>(new Set());
@@ -626,19 +631,6 @@ export default function ShiftApp() {
     (m) => m.sender !== actor.id && !m.readBy.includes(actor.id),
   );
   const unreadKey = unread.map((m) => m.id).join(',');
-  const conflicts = data.shifts.filter((s) => s.date >= localDate(new Date()) && blockedBy(data, s));
-  const warnings = [
-    ...pending.map(() => ({ text: t('확인이 필요한 대체근무 요청'), tab: 'swaps' })),
-    ...pendingOff.map(() => ({ text: t('확인이 필요한 휴무 요청'), tab: 'timeoff' })),
-    ...pendingAvail.map(() => ({ text: t('확인이 필요한 근무 불가 시간'), tab: 'availability' })),
-    ...conflicts.map((c) => ({
-      text: t('{name} {date} 근무가 휴무·불가 시간과 겹칩니다', { name: name(c.employeeId), date: c.date }),
-      tab: 'schedule',
-    })),
-    ...staff
-      .filter((e) => !e.rate)
-      .map((e) => ({ text: t('{name} 시급 미설정', { name: e.name }), tab: 'team' })),
-  ];
   // 앱을 열어 둔 동안 새 메시지가 오면 화면 안에 알림을 띄웁니다. 기기 푸시가 꺼져 있어도 보입니다.
   useEffect(() => {
     const fresh = unread.filter((m) => !seenMessages.current.has(m.id));
@@ -3268,6 +3260,68 @@ export default function ShiftApp() {
       </div>
     </TabsContent>
   );
+  // 필터 줄은 데스크톱과 폰이 같은 JSX 를 씁니다. 폰에서는 보기 설정 버튼으로 펼칩니다.
+  const schedActionsNode = actor.admin ? (
+                    <div className="sched-actions">
+                      <button
+                        className="button publish"
+                        disabled={busy || setup || data.published}
+                        onClick={() => command('publish')}
+                        title={data.published ? t('직원 공개 중') : t('작성 중')}
+                      >
+                        <Send size={16} />
+                        {data.published ? t('공개됨') : t('스케줄 공개')}
+                      </button>
+                    </div>
+  ) : null;
+  const schedFiltersNode = staffReadOnly ? null : (
+                  <div className="sched-filters">
+                    <span className="filterpick static" title="Pelham Hills">
+                      <MapPin size={17} />
+                      <span>Pelham Hills</span>
+                      <ChevronDown size={16} />
+                    </span>
+                    {iconPick(Network, t('업무'), dept, setDept, [
+                      { value: 'all', label: t('모든 업무') },
+                      ...roles.map((r) => ({ value: r, label: r })),
+                    ])}
+                    {iconPick(ArrowUpDown, t('정렬'), sort, setSort, [
+                      { value: 'name', label: t('이름순') },
+                      { value: 'id', label: t('직원 ID순') },
+                    ])}
+                    {/* 폰은 보기 종류와 상관없이 날짜별 목록 하나만 씁니다. */}
+                    {!phone &&
+                      iconPick(LayoutGrid, t('보기'), view, setView, [
+                        { value: 'week', label: t('주간') },
+                        { value: 'day', label: t('일간') },
+                        { value: 'today', label: t('오늘') },
+                        { value: 'tomorrow', label: t('내일') },
+                        { value: 'month', label: t('월간') },
+                      ])}
+                    {filter !== 'all' && (
+                      <button className="filterchip" onClick={() => setFilter('all')}>
+                        {name(filter)} <X size={14} />
+                      </button>
+                    )}
+                    <span className="sched-filters-gap" />
+                    <InstallQr team={setup ? '' : team} compact />
+                    <button
+                      className="button toolbutton"
+                      title={t('우천 근무 종료')}
+                      aria-label={t('우천 근무 종료')}
+                      onClick={() =>
+                        open('rain', {
+                          date: localDate(new Date()),
+                          end: '15:00',
+                          body: t('안전하게 장비를 정리하고 퇴근 기록을 남겨주세요.'),
+                          targets: staff.map((e) => e.id).join(','),
+                        })
+                      }
+                    >
+                      <CloudRain size={18} />
+                    </button>
+                  </div>
+  );
   // Shifts this request would block if approved (or already blocks).
   return (
     <div
@@ -3437,6 +3491,7 @@ export default function ShiftApp() {
             ))}
             <TabsContent value="schedule">
               <section className="sched">
+                {!phone && (
                 <div className="sched-top">
                   {staffReadOnly ? (
                     <h1 className="sched-title">{t('전체 월간 일정 · 읽기 전용')}</h1>
@@ -3484,78 +3539,46 @@ export default function ShiftApp() {
                       {longDate(timelineDate)}
                     </span>
                   )}
-                  {actor.admin && (
-                    <div className="sched-actions">
-                      {warnings.length > 0 && (
-                        <button
-                          className="warnpill"
-                          title={warnings.map((w) => w.text).join('\n')}
-                          onClick={() => setTab(warnings[0].tab)}
-                        >
-                          <TriangleAlert size={16} />
-                          {t('경고 {n}건', { n: warnings.length })}
-                        </button>
-                      )}
-                      <span className="sched-actions-rule" />
-                      <button
-                        className="button publish"
-                        disabled={busy || setup || data.published}
-                        onClick={() => command('publish')}
-                        title={data.published ? t('직원 공개 중') : t('작성 중')}
-                      >
-                        <Send size={16} />
-                        {data.published ? t('공개됨') : t('스케줄 공개')}
-                      </button>
-                    </div>
-                  )}
+                {!phone && schedActionsNode}
                 </div>
-                {!staffReadOnly && (
-                  <div className="sched-filters">
-                    <span className="filterpick static" title="Pelham Hills">
-                      <MapPin size={17} />
-                      <span>Pelham Hills</span>
-                      <ChevronDown size={16} />
-                    </span>
-                    {iconPick(Network, t('업무'), dept, setDept, [
-                      { value: 'all', label: t('모든 업무') },
-                      ...roles.map((r) => ({ value: r, label: r })),
-                    ])}
-                    {iconPick(ArrowUpDown, t('정렬'), sort, setSort, [
-                      { value: 'name', label: t('이름순') },
-                      { value: 'id', label: t('직원 ID순') },
-                    ])}
-                    {iconPick(LayoutGrid, t('보기'), view, setView, [
-                      { value: 'week', label: t('주간') },
-                      { value: 'day', label: t('일간') },
-                      { value: 'today', label: t('오늘') },
-                      { value: 'tomorrow', label: t('내일') },
-                      { value: 'month', label: t('월간') },
-                    ])}
-                    {filter !== 'all' && (
-                      <button className="filterchip" onClick={() => setFilter('all')}>
-                        {name(filter)} <X size={14} />
-                      </button>
-                    )}
-                    <span className="sched-filters-gap" />
-                    <InstallQr team={setup ? '' : team} compact />
-                    <button
-                      className="button toolbutton"
-                      title={t('우천 근무 종료')}
-                      aria-label={t('우천 근무 종료')}
-                      onClick={() =>
-                        open('rain', {
-                          date: localDate(new Date()),
-                          end: '15:00',
-                          body: t('안전하게 장비를 정리하고 퇴근 기록을 남겨주세요.'),
-                          targets: staff.map((e) => e.id).join(','),
-                        })
-                      }
-                    >
-                      <CloudRain size={18} />
-                    </button>
-                  </div>
                 )}
-                {!staffReadOnly && view === 'week' ? (
+                {!phone && schedFiltersNode}
+                {phone ? (
+                  <PhoneSchedule
+                    week={week}
+                    day={day}
+                    employees={staffReadOnly ? staff : visibleEmployees}
+                    shifts={data.shifts.filter((shift) =>
+                      (staffReadOnly ? staff : visibleEmployees).some(
+                        (employee) => employee.id === shift.employeeId,
+                      ),
+                    )}
+                    timeOff={timeOff}
+                    availability={availability}
+                    location="Pelham Hills Golf Club"
+                    canEdit={!staffReadOnly}
+                    filtersOpen={schedFilters}
+                    filters={schedFiltersNode}
+                    actions={schedActionsNode}
+                    blockedOf={(shift) => blockedBy(data, shift)}
+                    onWeekChange={setWeek}
+                    onDayChange={setDay}
+                    onShiftSelect={(id) => open('detail', { id })}
+                    onAddShift={(date) =>
+                      open('shift', {
+                        employeeId: filter === 'all' ? '' : filter,
+                        date,
+                        start: '09:00',
+                        end: '17:00',
+                        area: dept === 'all' ? AREAS[0] : dept,
+                        note: '',
+                      })
+                    }
+                    onToggleFilters={() => setSchedFilters((v) => !v)}
+                    onOpenTimeOff={() => setTab('timeoff')}
+                    onOpenAvailability={() => setTab('availability')}
+                  />
+                ) : !staffReadOnly && view === 'week' ? (
                   <div className="roster-wrap">
                     <div className="roster-scroll">
                       <div className="roster">

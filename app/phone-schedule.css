@@ -1,0 +1,252 @@
+/* 폰 스케줄: 날짜별 목록. 주간 표(.roster)를 대신해 390px 에서 가로 스크롤 없이 읽힙니다. */
+.psched {
+  --line: #e3e5e2;
+  --sub: #69767a;
+  display: flex;
+  flex-direction: column;
+  /* main 의 좌우 여백만 되돌려 목록을 화면 끝까지 붙입니다.
+     위쪽 여백은 그대로 둡니다 — 배너나 알림 줄이 있으면 겹치기 때문입니다. */
+  margin: 0 -16px;
+  background: #f4f4f1;
+}
+
+/* 월 선택과 주 이동 */
+.psched-top {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 52px;
+  padding: 0 6px 0 2px;
+  background: #fff;
+}
+.psched-step,
+.psched-new-top {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: #1f2b2e;
+}
+.psched-step:active,
+.psched-new-top:active { background: #f1eee8; }
+.psched-new-top { margin-left: auto; color: #087e6d; }
+.psched-month {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  height: 40px;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -.3px;
+  color: #1f2b2e;
+}
+.psched-month span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.psched-month svg { color: var(--sub); }
+/* 날짜 입력은 화면에서 감추고 탭 영역만 남깁니다. 누르면 기기 달력이 열립니다. */
+.psched-month input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  background: none;
+}
+
+/* 요일 띠 */
+.psched-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  padding: 0 8px 10px;
+  background: #fff;
+}
+.psched-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 52px;
+  padding: 6px 2px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: #1f2b2e;
+}
+.psched-chip small { font-size: 11px; color: var(--sub); }
+.psched-chip b { font-size: 17px; font-weight: 600; letter-spacing: -.3px; }
+.psched-chip.today b { color: #087e6d; }
+.psched-chip.on { background: #087e6d; }
+.psched-chip.on small,
+.psched-chip.on b { color: #fff; }
+
+/* 근무지와 보기 설정 */
+.psched-place {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 46px;
+  padding: 0 6px 0 14px;
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+  color: #3c4b4e;
+}
+.psched-place > svg { color: #087e6d; }
+.psched-place > span {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.psched-filter {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-left: auto;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: #1f2b2e;
+}
+.psched-filter.on { background: #e8f2ef; color: #087e6d; }
+.psched .sched-filters {
+  margin: 0;
+  padding: 12px 14px;
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+}
+.psched .sched-filters .field,
+.psched .sched-filters .button,
+.psched .sched-filters .filterpick { flex: 1 1 calc(50% - 5px); min-width: 0; }
+
+/* 하루 묶음 */
+.psched-dayhead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 0 14px;
+  background: #ecece8;
+  font-size: 13px;
+  color: #3c4b4e;
+}
+.psched-dayhead b { font-weight: 650; }
+.psched-day.today .psched-dayhead { background: #ddeee7; color: #0a6c5e; }
+.psched-dayhead span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  color: var(--sub);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 근무 한 줄 */
+.psched-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  min-height: 64px;
+  padding: 12px 10px 12px 14px;
+  border: 0;
+  border-bottom: 1px solid #eef0ed;
+  background: #fff;
+  text-align: left;
+}
+.psched-row:active { background: #f6f7f5; }
+.psched-avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin-top: 2px;
+  border-radius: 50%;
+  background: #cfd8d4;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.psched-avatar.note { background: #eaeeec; color: #64766f; }
+.psched-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.psched-main b {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2b2e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.psched-time {
+  font-size: 14px;
+  color: #3c4b4e;
+  font-variant-numeric: tabular-nums;
+}
+.psched-role {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.psched-role i {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #9fb0aa;
+}
+.psched-warn { flex: none; margin-top: 11px; color: #b4543a; }
+.psched-go { flex: none; margin-top: 11px; color: #b9c2bd; }
+.psched-empty {
+  margin: 0;
+  padding: 18px 14px;
+  background: #fff;
+  border-bottom: 1px solid #eef0ed;
+  color: #8b9691;
+  font-size: 14px;
+}
+.psched-new {
+  display: block;
+  width: calc(100% - 28px);
+  min-height: 44px;
+  margin: 10px 14px 14px;
+  border: 1px dashed #c5cdc8;
+  border-radius: 10px;
+  background: #fff;
+  color: #5c6b6e;
+  font-size: 14px;
+}
+.psched-new:active { background: #f1eee8; }
+.psched-actions {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+}
+.psched-actions .sched-actions { margin: 0; width: 100%; }
+.psched-actions .button { flex: 1; min-height: 44px; font-weight: 600; }
