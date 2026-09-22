@@ -3976,10 +3976,11 @@ export default function ShiftApp() {
                 {t(label)}
               </button>
             ))}
+            {/* 서랍이 열리면 이 버튼은 가림막 아래로 들어갑니다. 닫는 쪽은 가림막이 맡습니다. */}
             <button
               className={'tabbar-item' + (navOpen ? ' on' : '')}
               aria-expanded={navOpen}
-              onClick={() => setNavOpen((v) => !v)}
+              onClick={() => setNavOpen(true)}
             >
               <span className="tabbar-icon">
                 <Menu size={21} />
