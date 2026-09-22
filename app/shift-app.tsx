@@ -12,7 +12,6 @@ import {
   Plus,
   CloudRain,
   Bell,
-  Upload,
   Download,
   Check,
   RefreshCw,
@@ -74,6 +73,7 @@ import {
   localDate,
   duration,
   payroll,
+  paidRecords,
   lateBy,
   scheduledFor,
   wholeWeeks,
@@ -84,26 +84,15 @@ import {
   leadDate,
   blockedBy,
   weekdayOf,
-  nameKey,
   payPeriodStart,
+  LOCATION,
   AREAS,
   SHIFT_AREAS,
   type Employee,
   type Message,
   type State,
 } from '@/lib/domain';
-import {
-  readAttendanceFile,
-  mapRows,
-  fields,
-  downloadTemplate,
-  download,
-  parseTimecard,
-  nameCandidates,
-  NAME_MATCH_MIN,
-  type Timecard,
-} from '@/lib/importer';
-import { translate } from '@/lib/i18n';
+import { download } from '@/lib/importer';
 import InstallQr from './install-qr';
 import MonthSchedule from './month-schedule';
 import DaySchedule from './day-schedule';
@@ -114,6 +103,8 @@ import LangToggle from './lang-toggle';
 import { useLang } from './use-lang';
 import { useIsMobile } from '@/hooks/use-mobile';
 import PhoneSchedule from './phone-schedule';
+import PhoneTeam from './phone-team';
+import PunchLog from './punch-log';
 import StaffSchedule from './staff-schedule';
 import StaffMessaging from './staff-messaging';
 import StaffTimesheets from './staff-timesheets';
@@ -121,8 +112,6 @@ import StaffClock from './staff-clock';
 import StaffMore, { type MoreItem } from './staff-more';
 import TimePicker from './time-picker';
 import { LAYOUT_KEY, readLayout, type Layout } from './layout-choice';
-// 근무지 이름. 직원 화면이 근무·근무표·출퇴근 줄에 같은 이름을 씁니다.
-const LOCATION = 'Pelham Hills Golf Club';
 const minutesOf = (v: string) => Number(v.slice(0, 2)) * 60 + Number(v.slice(3, 5));
 // 폰 상단 바는 브랜드 대신 지금 보고 있는 화면 이름을 띄웁니다. 사이드바와 같은 말을 씁니다.
 const TAB_LABELS: Record<string, string> = {
@@ -221,13 +210,7 @@ export default function ShiftApp() {
   const [status, setStatus] = useState('');
   const [modal, setModal] = useState('');
   const [form, setForm] = useState<Record<string, string>>({});
-  const [rows, setRows] = useState<string[][]>([]);
-  const [timecard, setTimecard] = useState<Timecard | null>(null);
   const [presets, setPresets] = useState(false);
-  const [mapping, setMapping] = useState<Record<string, string>>({});
-  const [filename, setFilename] = useState('');
-  // 승인 전에 관리자가 고른 직원. 승인한 연결은 서버 상태(clockNames)에만 두고 여기에는 남기지 않습니다.
-  const [clockPick, setClockPick] = useState<Record<string, string>>({});
   // 생년월일 달력. 열림 여부와 보고 있는 달은 모달을 열 때마다 초기화합니다.
   const [birthOpen, setBirthOpen] = useState(false);
   const [birthMonth, setBirthMonth] = useState<Date | undefined>();
@@ -246,6 +229,8 @@ export default function ShiftApp() {
   // 폰에서는 주간 표 대신 날짜별 목록을 그립니다. 첫 렌더는 서버와 같게 데스크톱으로 두고 마운트 뒤 바뀝니다.
   const phone = useIsMobile();
   const [schedFilters, setSchedFilters] = useState(false);
+  // 폰에서는 팀이 목록과 한 사람 화면으로 갈립니다. 빈 값이면 목록입니다.
+  const [teamPick, setTeamPick] = useState('');
   const [inapp, setInapp] = useState<Message | null>(null);
   const [payDetail, setPayDetail] = useState('');
   const seenMessages = useRef<Set<string>>(new Set());
@@ -259,7 +244,6 @@ export default function ShiftApp() {
     await fetch('/api/birth-login', { method: 'DELETE' }).catch(() => 0);
     window.location.assign('/' + query());
   };
-  const fileRef = useRef<HTMLInputElement>(null);
   const [push, setPush] = useState<{ on: boolean; tickUrl?: string }>({
     on: false,
   });
@@ -284,6 +268,8 @@ export default function ShiftApp() {
     // 근무표 안에서 보고 있는 급여 기간. 뒤로 가기는 기간 목록으로 먼저 돌아갑니다.
     sheet: '',
     clock: false,
+    // 팀에서 보고 있는 한 사람. 뒤로 가기는 이름 목록으로 먼저 돌아갑니다.
+    teamPick: '',
     // 지나온 화면. 뒤로 가기로 옮긴 걸음은 다시 쌓지 않습니다.
     trail: [] as string[],
     popping: false,
@@ -295,6 +281,7 @@ export default function ShiftApp() {
     back.current.payDetail = payDetail;
     back.current.passwordDialog = passwordDialog;
     back.current.sheet = sheet;
+    back.current.teamPick = teamPick;
     back.current.clock = !!clockField;
   });
   useEffect(() => {
@@ -316,6 +303,8 @@ export default function ShiftApp() {
       if (state.clock) return setClockField(null);
       if (state.modal) return setModal('');
       if (state.sheet) return setSheet('');
+      // 팀 화면에 있을 때만 한 걸음으로 칩니다. 다른 화면에서는 헛걸음이 됩니다.
+      if (state.tab === 'team' && state.teamPick) return setTeamPick('');
       const previous = state.trail.pop();
       if (previous && previous !== state.tab) {
         state.popping = true;
@@ -669,45 +658,6 @@ export default function ShiftApp() {
       )}
     </>
   );
-  // 타임카드는 이름으로만 사람을 알려 주므로, 승인해 둔 이름 연결을 먼저 보고 없으면 명단에서 같은 이름을 찾아 ID 를 붙입니다.
-  const clockNames = data.clockNames ?? [];
-  const clockMatch = (name: string) => {
-    const key = nameKey(name);
-    const saved = clockNames.find((x) => x.name === key);
-    return (
-      (saved ? staff.find((e) => e.id === saved.employeeId) : undefined) ??
-      staff.find((e) => nameKey(e.name) === key)
-    );
-  };
-  const timecardReady = (timecard?.rows ?? []).flatMap((r) => {
-    const person = clockMatch(r.name);
-    return person
-      ? [{ employeeId: person.id, date: r.date, start: r.start, end: r.end, breakMinutes: 0 }]
-      : [];
-  });
-  // 아직 승인되지 않은 이름. 비슷한 이름을 후보로 올려 두되 자동으로 적용하지는 않습니다.
-  // 같은 사람이 대소문자·공백만 다르게 여러 번 찍혔을 수 있어, 다듬은 이름으로 하나로 묶고 표시는 처음 찍힌 표기를 씁니다.
-  const timecardUnknown = [
-    ...[...(timecard?.rows ?? []), ...(timecard?.open ?? [])]
-      .filter((r) => !clockMatch(r.name))
-      .reduce(
-        (seen, r) =>
-          seen.has(nameKey(r.name)) ? seen : seen.set(nameKey(r.name), r.name),
-        new Map<string, string>(),
-      )
-      .values(),
-  ].map((name) => {
-    const ranked = nameCandidates(name, staff);
-    const best = ranked[0];
-    return {
-      name,
-      ranked,
-      guess: best && best.score >= NAME_MATCH_MIN ? best.person.id : '',
-      // 이 이름으로 들어온 기록 수. 퇴근이 안 찍힌 줄은 승인해도 저장되지 않으므로 따로 셉니다.
-      records: (timecard?.rows ?? []).filter((r) => nameKey(r.name) === nameKey(name)).length,
-      open: (timecard?.open ?? []).filter((r) => nameKey(r.name) === nameKey(name)).length,
-    };
-  });
   // 매장 시각으로 본 오늘. 펀치·근무표·달력이 모두 이 날짜를 기준으로 삼습니다.
   const today = localDate(new Date(tick));
   // 오늘 내 펀치. 직원 화면의 출근·퇴근 버튼이 이것을 보고 갈립니다.
@@ -870,8 +820,9 @@ export default function ShiftApp() {
   const statusLabel = (v: string) =>
     t(({ pending: '대기 중', approved: '승인됨', declined: '거절됨' } as Record<string, string>)[v] || v);
   // 급여 상세. 고른 구간의 출근기록을 날짜순으로 펼치고, 그 옆에 예정 근무·지각·그날 금액을 같이 둡니다.
+  // 상세도 합계와 같은 기록을 봐야 합니다. 둘이 다른 데이터를 쓰면 숫자가 어긋납니다.
   const payDays = (employeeId: string) =>
-    data.attendance
+    paidRecords(data)
       .filter((a) => a.employeeId === employeeId && a.date >= from && a.date <= to)
       .slice()
       .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start))
@@ -904,6 +855,14 @@ export default function ShiftApp() {
   }));
   const visibleTotals = totals.filter(
     (row) => actor.admin || row.e.id === actor.id,
+  );
+  // 화면에 뜬 사람들 몫을 합친 확인 현황.
+  const payCheck = visibleTotals.reduce(
+    (n, r) => ({
+      unconfirmed: n.unconfirmed + r.unconfirmed,
+      disputed: n.disputed + r.disputed,
+    }),
+    { unconfirmed: 0, disputed: 0 },
   );
   const input = (
     key: string,
@@ -1082,38 +1041,6 @@ export default function ShiftApp() {
     } catch {}
     return () => lifecycle.abort();
   }, [data.employees]);
-  async function loadFile(file: File) {
-    setBusy(true);
-    try {
-      const r = await readAttendanceFile(file);
-      setFilename(file.name);
-      // 출근기계의 Timecard Report 는 직원별 블록이라 열을 연결할 것이 없습니다. 바로 읽습니다.
-      const card = parseTimecard(r);
-      if (card) {
-        setTimecard(card);
-        setRows([]);
-        setStatus('읽은 내용을 확인하고 저장하세요.');
-        return;
-      }
-      setTimecard(null);
-      setRows(r);
-      const m: Record<string, string> = {};
-      // Accept headers from either language's template.
-      fields.forEach(([key, label], i) => {
-        const match = r[0].findIndex(
-          (h) => h === label || h === key || h === translate('en', label),
-        );
-        m[key] =
-          match >= 0 ? String(match) : key === 'breakMinutes' ? '' : String(i);
-      });
-      setMapping(m);
-      setStatus('열을 연결하고 검토한 다음 저장하세요.');
-    } catch (e) {
-      setStatus((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
   function exportPayroll() {
     const safe = (s: string) =>
       '"' + (/^[=+@-]/.test(s) ? "'" : '') + s.replaceAll('"', '""') + '"';
@@ -1513,23 +1440,13 @@ export default function ShiftApp() {
             <div className="panel contentpanel">
               <div className="sectionhead">
                 <div>
-                  <h2>{actor.admin ? t('출근기록 가져오기') : t('내 출근 기록')}</h2>
+                  <h2>{actor.admin ? t('출근 기록') : t('내 출근 기록')}</h2>
                   <p>
                     {actor.admin
-                      ? t('직원 ID로 연결합니다. 중복·겹치는 기록은 저장하지 않습니다.')
+                      ? t('단말에서 찍힌 출퇴근과 그때 찍힌 사진을 봅니다.')
                       : t('출근기계 기록을 읽기 전용으로 확인합니다.')}
                   </p>
                 </div>
-                {actor.admin && (
-                  <button
-                    className="button"
-                    onClick={() =>
-                      downloadTemplate(t).catch((e) => setStatus(e.message))
-                    }
-                  >
-                    <Download size={16} /> {t('엑셀 양식')}
-                  </button>
-                )}
               </div>
               {!actor.admin && (
                 <div className="punchcard">
@@ -1560,210 +1477,15 @@ export default function ShiftApp() {
                   </button>
                 </div>
               )}
-              {actor.admin && (
-                <>
-                  <input
-                    hidden
-                    type="file"
-                    accept=".xlsx,.csv"
-                    ref={fileRef}
-                    onChange={(e) => {
-                      if (e.target.files?.[0]) void loadFile(e.target.files[0]);
-                      e.target.value = '';
-                    }}
-                  />
-                  <button
-                    disabled={busy}
-                    className="uploadzone"
-                    onClick={() => fileRef.current?.click()}
-                  >
-                    <Upload size={28} />
-                    <b>{filename || t('출근기계에서 내보낸 엑셀·CSV 파일을 선택하세요')}</b>
-                    <span>{t('.xlsx · .csv · 최대 5MB / 3,000행')}</span>
-                  </button>
-                  {timecard && (
-                    <div className="importreview">
-                      <h3>
-                        {t('출근기계 타임카드 · 기록 {n}건', { n: timecard.rows.length })}
-                      </h3>
-                      <p className="hint">
-                        {t('이 형식은 열을 연결할 필요가 없습니다. 이름으로 직원을 찾아 넣습니다.')}
-                      </p>
-                      {timecardUnknown.length > 0 && (
-                        <div className="namematch">
-                          <h4>
-                            {t('직원을 찾지 못한 이름 {n}개 · 확인하고 승인하세요', {
-                              n: timecardUnknown.length,
-                            })}
-                          </h4>
-                          <p className="hint">
-                            {t('비슷한 이름을 미리 골라 두었습니다. 승인하면 이 이름은 다음 임포트부터 같은 직원으로 자동 연결됩니다.')}
-                          </p>
-                          {timecardUnknown.map((u) => (
-                            <div className="namematch-row" key={u.name}>
-                              <div className="namematch-name">
-                                <b>{u.name}</b>
-                                <small>
-                                  {u.open > 0
-                                    ? t('기록 {n}건 · 퇴근 미기록 {open}건', {
-                                        n: u.records,
-                                        open: u.open,
-                                      })
-                                    : t('기록 {n}건', { n: u.records })}
-                                </small>
-                              </div>
-                              <Pick
-                                label={t('연결할 직원')}
-                                value={clockPick[u.name] ?? u.guess}
-                                onChange={(v) =>
-                                  setClockPick((m) => ({ ...m, [u.name]: v }))
-                                }
-                                options={[
-                                  { value: '', label: t('선택하세요') },
-                                  ...u.ranked.map(({ person, score }) => ({
-                                    value: person.id,
-                                    label:
-                                      person.name +
-                                      ' · ' +
-                                      person.id +
-                                      (score > 0
-                                        ? ' · ' + Math.round(score * 100) + '%'
-                                        : ''),
-                                  })),
-                                ]}
-                              />
-                              <button
-                                className="button"
-                                disabled={busy || setup || !(clockPick[u.name] ?? u.guess)}
-                                onClick={() =>
-                                  void command('clockName', {
-                                    name: u.name,
-                                    employeeId: clockPick[u.name] ?? u.guess,
-                                  })
-                                }
-                              >
-                                <Check size={16} /> {t('승인')}
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {clockNames.length > 0 && (
-                        <details className="namematch-saved">
-                          <summary>
-                            {t('승인해 둔 이름 연결 {n}개', { n: clockNames.length })}
-                          </summary>
-                          {clockNames.map((link) => (
-                            <div className="namematch-row" key={link.name}>
-                              <span>
-                                {link.raw || link.name} → {name(link.employeeId)}
-                              </span>
-                              <button
-                                className="linklike"
-                                disabled={busy || setup}
-                                onClick={() =>
-                                  void command('clockNameRemove', { name: link.name })
-                                }
-                              >
-                                <X size={14} /> {t('연결 해제')}
-                              </button>
-                            </div>
-                          ))}
-                        </details>
-                      )}
-                      {timecard.open.length > 0 && (
-                        <p className="hint">
-                          {t('퇴근이 찍히지 않아 건너뛴 기록 {n}건: {rows}', {
-                            n: timecard.open.length,
-                            rows: timecard.open
-                              .map((r) => `${r.name} ${r.date} ${r.start}`)
-                              .join(' / '),
-                          })}
-                        </p>
-                      )}
-                      <div className="rawpreview">
-                        {timecardReady.slice(0, 6).map((r, i) => (
-                          <div key={i}>
-                            {r.employeeId} | {r.date} | {r.start} | {r.end}
-                          </div>
-                        ))}
-                      </div>
-                      <button
-                        className="button primary"
-                        disabled={busy || setup || !timecardReady.length}
-                        onClick={async () => {
-                          try {
-                            if (await command('attendance', { rows: timecardReady })) {
-                              setTimecard(null);
-                              setFilename('');
-                            }
-                          } catch (e) {
-                            setStatus((e as Error).message);
-                          }
-                        }}
-                      >
-                        {t('검토한 출근기록 {n}건 저장', { n: timecardReady.length })}
-                      </button>
-                    </div>
-                  )}
-                  {rows.length > 0 && (
-                    <div className="importreview">
-                      <h3>{t('1. 열 연결')}</h3>
-                      <div className="formgrid">
-                        {fields.map(([key, label]) => (
-                          <Pick
-                            key={key}
-                            label={t(label)}
-                            value={mapping[key] ?? ''}
-                            onChange={(v) =>
-                              setMapping((m) => ({ ...m, [key]: v }))
-                            }
-                            options={[
-                              {
-                                value: '',
-                                label:
-                                  key === 'breakMinutes'
-                                    ? t('없음 · 0분')
-                                    : t('선택하세요'),
-                              },
-                              ...rows[0].map((h, i) => ({
-                                value: String(i),
-                                label: h || t('열 {n}', { n: i + 1 }),
-                              })),
-                            ]}
-                          />
-                        ))}
-                      </div>
-                      <h3>{t('2. 미리보기 · {n}개 기록', { n: rows.length - 1 })}</h3>
-                      <div className="rawpreview">
-                        {rows.slice(0, 6).map((r, i) => (
-                          <div key={i}>{r.join('  |  ')}</div>
-                        ))}
-                      </div>
-                      <button
-                        className="button primary"
-                        disabled={busy || setup}
-                        onClick={async () => {
-                          try {
-                            if (
-                              await command('attendance', {
-                                rows: mapRows(rows, mapping),
-                              })
-                            ) {
-                              setRows([]);
-                              setFilename('');
-                            }
-                          } catch (e) {
-                            setStatus((e as Error).message);
-                          }
-                        }}
-                      >
-                        {t('검토한 출근기록 저장')}
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
+              <h3 className="punchlog-head">{t('찍힌 출퇴근')}</h3>
+              <PunchLog
+                punches={(data.punches ?? []).filter(
+                  (p) => actor.admin || p.employeeId === actor.id,
+                )}
+                employees={data.employees}
+                isAdmin={actor.admin}
+              />
+              <h3 className="punchlog-head">{t('출근기계에서 가져온 기록')}</h3>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1863,9 +1585,28 @@ export default function ShiftApp() {
                   {money(visibleTotals.reduce((n, r) => n + r.total, 0))}
                 </strong>
               </div>
+              {/* 지급 전에 알아야 할 숫자입니다. 아직 본 사람이 없는 기록과, 직원이 틀렸다고 한 기록은 뜻이 다릅니다. */}
+              {(payCheck.unconfirmed > 0 || payCheck.disputed > 0) && (
+                <div className="statusbar payreview">
+                  <span>
+                    {payCheck.disputed > 0 &&
+                      t('직원이 이의를 제기한 근무 {n}건이 이 금액에 들어 있습니다. ', {
+                        n: payCheck.disputed,
+                      })}
+                    {payCheck.unconfirmed > 0 &&
+                      t('아직 아무도 확인하지 않은 근무 {n}건이 있습니다. ', {
+                        n: payCheck.unconfirmed,
+                      })}
+                    {t('지급 전에 출근 기록에서 확인하세요.')}
+                  </span>
+                  <button className="button" onClick={() => setTab('attendance')}>
+                    {t('출근 기록 보기')}
+                  </button>
+                </div>
+              )}
               <div className="policy">
                 {t(
-                  '초과근무는 하루 {d}시간 초과분과 한 주(일요일 시작) {w}시간 초과분 중 큰 쪽만 {m}배로 가산합니다. 지각은 예정 출근 시각을 넘긴 분만큼 시급으로 차감하며, 예정 근무가 없는 출근기록은 지각으로 보지 않습니다. 세금·유급휴가를 제외한 예상 금액이고, 시급 0인 직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급 대상이 아니며 실제 출근기록만 지급합니다.',
+                  '지급액은 단말에서 찍힌 출퇴근을 기준으로 계산합니다. 유급 휴게는 근무로 치고 무급 휴게만 뺍니다. 그 사람 그 날짜에 찍힌 기록이 없을 때만 예전에 가져온 기록을 씁니다. 초과근무는 하루 {d}시간 초과분과 한 주(일요일 시작) {w}시간 초과분 중 큰 쪽만 {m}배로 가산합니다. 지각은 예정 출근 시각을 넘긴 분만큼 시급으로 차감하며, 예정 근무가 없는 출근기록은 지각으로 보지 않습니다. 세금·유급휴가를 제외한 예상 금액이고, 시급 0인 직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급 대상이 아니며 실제 출근기록만 지급합니다.',
                   { d: OT_DAILY_HOURS, w: OT_WEEKLY_HOURS, m: OT_MULTIPLIER },
                 )}
                 {/* 주 단위로 끊기지 않은 구간은 걸쳐 있는 주의 초과근무가 적게 잡힙니다. */}
@@ -2196,6 +1937,53 @@ export default function ShiftApp() {
             )}
           </TabsContent>
           <TabsContent value="team">
+            {phone ? (
+              <PhoneTeam
+                employees={staff}
+                archived={data.employees.filter((e) => e.archived)}
+                location={LOCATION}
+                meId={actor.id}
+                busy={busy}
+                teamLink={
+                  setup || typeof window === 'undefined'
+                    ? ''
+                    : window.location.origin + '/?team=' + encodeURIComponent(team)
+                }
+                money={money}
+                picked={teamPick}
+                onPick={setTeamPick}
+                onAdd={() =>
+                  open('employee', {
+                    name: '',
+                    phone: '',
+                    email: '',
+                    rate: '0',
+                    color: '#087e6d',
+                    role: AREAS[0],
+                  })
+                }
+                onEdit={(e) =>
+                  open('employee', {
+                    ...e,
+                    rate: String(e.rate),
+                    taskManager: e.taskManager ? '1' : '',
+                    admin: e.admin ? '1' : '',
+                    archived: e.archived ? '1' : '',
+                  })
+                }
+                onMessage={(e) => open('message', { to: e.id, body: '' })}
+                onRemove={(e) => {
+                  if (
+                    confirm(
+                      t('{name} 직원을 삭제할까요? 지난 근무·급여 기록은 그대로 남고 목록에서만 사라집니다.', { name: e.name }),
+                    )
+                  ) {
+                    setTeamPick('');
+                    void command('employeeRemove', { id: e.id });
+                  }
+                }}
+              />
+            ) : (
             <div className="panel contentpanel">
               <div className="sectionhead">
                 <div>
@@ -2316,6 +2104,7 @@ export default function ShiftApp() {
               </Table>
               </div>
             </div>
+            )}
           </TabsContent>
     </>
   );

@@ -1,0 +1,187 @@
+/* 단말에서 찍힌 출퇴근 기록. 표가 아니라 카드라 좁은 화면에서도 옆으로 밀 일이 없습니다. */
+.punchlog {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(288px, 1fr));
+  gap: 12px;
+  margin: 4px 0 8px;
+}
+.punchlog-empty {
+  margin: 8px 0 0;
+  padding: 26px 0;
+  color: #8b9691;
+  font-size: 14px;
+}
+.punchlog-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 15px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}
+.punchlog-when {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  color: #69767a;
+}
+.punchlog-when b { font-size: 14px; font-weight: 650; color: #1f2b2e; }
+.punchlog-who {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.punchlog-who i { flex: none; width: 9px; height: 9px; border-radius: 2px; background: #9fb0aa; }
+
+.punchlog-times {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.punchlog-stamp { display: flex; flex-direction: column; gap: 1px; }
+.punchlog-stamp small { font-size: 11px; color: #8b9691; }
+.punchlog-stamp b {
+  font-size: 17px;
+  font-weight: 650;
+  color: #1f2b2e;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.punchlog-times em { font-style: normal; color: #b0bcb7; padding-bottom: 2px; }
+.punchlog-worked {
+  margin-left: auto;
+  padding-bottom: 2px;
+  font-size: 13px;
+  color: #087e6d;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.punchlog-meta { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 12px; }
+.punchlog-area, .punchlog-rest, .punchlog-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #f1f3f2;
+  color: #5c6a6c;
+}
+.punchlog-mark.pending { background: #f7efdc; color: #8a6a2c; }
+.punchlog-mark.approved { background: #e2f0eb; color: #0a6f60; }
+.punchlog-mark.disputed { background: #f9e8e1; color: #a44b31; }
+.punchlog-note {
+  margin: 0;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: #f9e8e1;
+  color: #7d4630;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+/* 사진 두 장 */
+.punchlog-shots { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.punchlog-shot {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  min-width: 0;
+}
+.punchlog-shot img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #eceeec;
+}
+.punchlog-shot > span { font-size: 11px; color: #8b9691; }
+.punchlog-shot.none {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  aspect-ratio: 4 / 3;
+  border: 1px dashed #d5dad6;
+  border-radius: 8px;
+  color: #a8b3ae;
+  text-align: center;
+}
+.punchlog-shot.none > span { font-size: 11px; }
+
+/* 크게 보기 */
+.punchlog-view {
+  /* dialog 기본 모양(테두리·여백·흰 배경·크기 제한)은 지우고 화면 전체를 덮습니다. */
+  border: 0;
+  width: 100%;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  background: none;
+  color: inherit;
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: safe center;
+  overflow-y: auto;
+  padding: 16px;
+}
+.punchlog-viewscrim { position: absolute; inset: 0; border: 0; background: rgb(14 20 22 / .78); }
+.punchlog-view figure {
+  position: relative;
+  margin: 0;
+  max-width: min(560px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.punchlog-view img {
+  display: block;
+  width: 100%;
+  max-height: calc(100dvh - 110px);
+  object-fit: contain;
+  border-radius: 12px;
+  background: #1a2321;
+}
+.punchlog-view figcaption { color: #eaf1ee; font-size: 14px; text-align: center; }
+.punchlog-close {
+  position: absolute;
+  top: calc(10px + env(safe-area-inset-top, 0px));
+  right: 10px;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(255 255 255 / .16);
+  color: #fff;
+}
+
+@media (max-width: 700px) {
+  .punchlog { grid-template-columns: 1fr; gap: 10px; }
+  .punchlog-row { padding: 13px 14px; }
+}
+
+/* 급여 화면의 확인 안내. 지급 전에 눈에 걸리라고 노란 줄을 씁니다. */
+.payreview { align-items: flex-start; gap: 14px; line-height: 1.6; }
+.payreview .button { flex: none; white-space: nowrap; }
+@media (max-width: 700px) {
+  .payreview { flex-direction: column; }
+  .payreview .button { width: 100%; }
+}

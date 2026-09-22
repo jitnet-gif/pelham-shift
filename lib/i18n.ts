@@ -676,6 +676,34 @@ const en: Record<string, string> = {
   '공지가 없습니다.': 'No announcements yet.',
   '오늘 고마웠던 동료: ': 'Shout-out to: ',
 
+  // 출퇴근 단말 · /attendance kiosk
+  '출퇴근 단말': 'Time clock',
+  'pad::지우기': 'Clear',
+  'start::출근 찍기': 'Start shift',
+  '출근 전': 'Not punched in',
+  '예정된 근무가 없습니다': 'No scheduled shift',
+  '출근·퇴근은 사진이 찍혀야 기록됩니다.': 'A photo is required to start or end a shift.',
+  '카메라를 켜는 중입니다…': 'Starting the camera…',
+  '카메라를 켤 수 없습니다. 기기 설정에서 카메라 권한을 허용해 주세요.':
+    'The camera is not available. Allow camera access in this device’s settings.',
+  '화면이 너무 어둡거나 가려져 있습니다. 카메라를 보고 다시 눌러주세요.':
+    'The picture is too dark or the lens is covered. Face the camera and try again.',
+  '사진을 만들지 못했습니다. 다시 눌러주세요.': 'The photo could not be taken. Try again.',
+  '사진이 찍히지 않았습니다.': 'No photo was taken.',
+  '사진을 찍을 수 없어 기록하지 않았습니다.': 'No photo could be taken, so nothing was recorded.',
+  '사진이 찍히지 않아 출퇴근을 기록하지 않았습니다. 카메라를 확인하고 다시 눌러주세요.':
+    'No shift was recorded because the photo failed. Check the camera and try again.',
+  '사진이 너무 큽니다. 다시 찍어주세요.': 'That photo is too large. Take it again.',
+  '자리를 비운 것 같아 로그아웃했습니다.': 'Signed out after a period of inactivity.',
+  '이 기기가 로그인되어 있지 않습니다. 관리자 계정으로 먼저 로그인하세요.':
+    'This device is not signed in. Sign in with a manager account first.',
+  '관리자 계정으로 로그인된 기기에서만 쓸 수 있습니다.':
+    'Only a device signed in with a manager account can use this screen.',
+  '동시에 다른 변경이 있었습니다. 잠시 후 다시 눌러주세요.':
+    'Something else changed at the same time. Try again in a moment.',
+  '로그인하러 가기': 'Go to sign in',
+  '열 수 없습니다.': 'This screen could not be opened.',
+
   // 출퇴근 · time clock
   'Punch ID (숫자 4~8자리, 선택)': 'Punch ID (4–8 digits, optional)',
   'Punch ID는 숫자 4~8자리로 입력하세요.': 'Enter a Punch ID of 4 to 8 digits.',

@@ -1,0 +1,322 @@
+/* 폰에서 보는 팀. 이름 목록과 한 사람 화면으로 나누고, 흰 칸을 회색 바탕이 갈라 줍니다. */
+.pteam {
+  --line: #e3e5e2;
+  --sub: #69767a;
+  display: flex;
+  flex-direction: column;
+  /* main 의 좌우 여백만 되돌려 화면 끝까지 붙입니다. */
+  margin: 0 -16px;
+  background: #f4f4f1;
+  min-height: 60vh;
+}
+
+/* ── 목록 ───────────────────────────── */
+.pteam-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px 10px 14px;
+  background: #fff;
+}
+.pteam-switch {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: #f1f0ec;
+}
+.pteam-switch button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: #5c6a6c;
+  font-size: 15px;
+  font-weight: 600;
+}
+.pteam-switch button.on { background: #1f2b2e; color: #fff; }
+.pteam-switch em {
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #ded9cf;
+  color: #4b5557;
+}
+.pteam-switch button.on em { background: #3f4d4f; color: #fff; }
+.pteam-add {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: #087e6d;
+}
+.pteam-add:active { background: #eaf3f0; }
+
+.pteam-find {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 14px 12px;
+  padding: 0 13px;
+  border: 1px solid #d9dcd8;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--sub);
+}
+.pteam-find input {
+  flex: 1;
+  min-width: 0;
+  min-height: 46px;
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  font-size: 16px;
+  color: #1f2b2e;
+}
+.pteam-find input:focus { outline: none; }
+.pteam-find:focus-within { border-color: #087e6d; box-shadow: 0 0 0 2px #d9ece6; }
+
+.pteam-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 68px;
+  padding: 10px 12px 10px 14px;
+  border: 0;
+  border-bottom: 1px solid #eef0ed;
+  background: #fff;
+  text-align: left;
+}
+.pteam-row:active { background: #f6f7f5; }
+.pteam-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: #1f2b2e;
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.pteam-name::-webkit-scrollbar { display: none; }
+.pteam-row > svg { flex: none; color: #b9c2bd; }
+.pteam-empty {
+  margin: 0;
+  padding: 26px 14px;
+  background: #fff;
+  color: #8b9691;
+  font-size: 15px;
+}
+
+/* 이름 동그라미 */
+.pteam-face {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #cfd8d4;
+  color: #fff;
+  font-size: 28px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.pteam-face.small { width: 42px; height: 42px; font-size: 17px; }
+
+/* ── 한 사람 ────────────────────────── */
+.pteam-onebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 52px;
+  padding: 0 8px;
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+}
+.pteam-back {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: #1f2b2e;
+}
+.pteam-back:active { background: #f1eee8; }
+.pteam-edit {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: #087e6d;
+  font-size: 16px;
+  font-weight: 600;
+}
+.pteam-edit:active { background: #eaf3f0; }
+
+.pteam-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 22px 16px 20px;
+  background: #fbfaf8;
+  border-bottom: 1px solid var(--line);
+}
+.pteam-hero b { font-size: 21px; font-weight: 650; letter-spacing: -.3px; text-align: center; }
+.pteam-hero small { font-size: 14px; color: var(--sub); }
+.pteam-message {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 46px;
+  margin-top: 10px;
+  border: 1px solid #d3dfd9;
+  border-radius: 10px;
+  background: #fff;
+  color: #1f2b2e;
+  font-size: 15px;
+  font-weight: 600;
+}
+.pteam-message:active { background: #eef5f2; }
+
+.pteam-contact {
+  margin: 0;
+  padding: 4px 16px;
+  list-style: none;
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+}
+.pteam-contact li {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 46px;
+  font-size: 15px;
+  color: #1f2b2e;
+}
+.pteam-contact li + li { border-top: 1px solid #f0f2ef; }
+.pteam-contact svg { flex: none; color: var(--sub); }
+.pteam-contact a { color: #1f2b2e; text-decoration: underline; word-break: break-all; }
+.pteam-contact .none, .pteam-facts .none { color: #9aa6a2; }
+
+.pteam-block {
+  padding: 16px;
+  margin-top: 10px;
+  background: #fff;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.pteam-block h3 { margin: 0; font-size: 16px; font-weight: 650; }
+.pteam-blockhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pteam-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: #087e6d;
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: underline;
+}
+.pteam-block input {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 10px;
+  padding: 0 11px;
+  border: 1px solid #d9dcd8;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  font-size: 14px;
+  color: #3c4b4e;
+}
+.pteam-note { margin: 10px 0 0; font-size: 13px; line-height: 1.6; color: var(--sub); }
+
+.pteam-assign {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+.pteam-assign i {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #cfd8d4;
+  color: #fff;
+  font-style: normal;
+  font-size: 15px;
+  font-weight: 600;
+}
+.pteam-assign span { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pteam-assign b { font-size: 15px; font-weight: 600; }
+.pteam-assign small { font-size: 13px; color: var(--sub); line-height: 1.45; }
+.pteam-assign > svg { flex: none; color: #b9c2bd; }
+
+.pteam-facts {
+  margin: 10px 0 0;
+  padding: 4px 16px;
+  background: #fff;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.pteam-facts > div { padding: 13px 0; }
+.pteam-facts > div + div { border-top: 1px solid #f0f2ef; }
+.pteam-facts dt { font-size: 13px; color: var(--sub); }
+.pteam-facts dd {
+  margin: 3px 0 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2b2e;
+  font-variant-numeric: tabular-nums;
+}
+
+.pteam-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: calc(100% - 32px);
+  min-height: 46px;
+  margin: 18px 16px 24px;
+  border: 1px solid #e6cfc6;
+  border-radius: 10px;
+  background: #fff;
+  color: #b4543a;
+  font-size: 15px;
+  font-weight: 600;
+}
+.pteam-remove:active { background: #fbf1ed; }

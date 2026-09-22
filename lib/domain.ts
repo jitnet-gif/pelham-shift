@@ -13,7 +13,7 @@ export type Availability = {id:string;employeeId:string;weekday:number;allDay:bo
 // 직원이 그 자리에서 찍은 실제 출퇴근. 나중에 올리는 출근기계 기록(Attendance)과 달리 지금 이 순간을 말합니다.
 export type PunchBreak = {start:string;end?:string;paid:boolean};
 // 직원이 그 자리에서 찍은 실제 출퇴근. status 는 급여 기간이 닫히기 전 직원 본인이 확인한 결과입니다.
-export type Punch = {id:string;employeeId:string;date:string;in:string;out?:string;area?:string;breaks?:PunchBreak[];status?:'pending'|'approved'|'disputed';disputeNote?:string;editedBy?:string;reviewedAt?:string};
+export type Punch = {id:string;employeeId:string;date:string;in:string;out?:string;area?:string;breaks?:PunchBreak[];photoAt?:string;outPhotoAt?:string;status?:'pending'|'approved'|'disputed';disputeNote?:string;editedBy?:string;reviewedAt?:string};
 // 출근기계 타임카드는 사람을 이름으로만 알려 줍니다. 한 번 승인한 이름은 이 목록에 남아 다음 임포트부터 자동으로 이어집니다.
 export type ClockName = {name:string;raw:string;employeeId:string};
 // name 은 비교용으로 다듬은 값, raw 는 출근기계에 찍힌 그대로의 표기입니다.
@@ -61,7 +61,25 @@ export function lateBy(state:State,a:Attendance){const shift=scheduledFor(state,
 // 조회 구간이 주(일요일 시작) 경계에 맞지 않으면 걸쳐 있는 주의 초과근무가 실제보다 적게 잡힙니다.
 export function wholeWeeks(from:string,to:string){return weekStart(from)===from&&weekStart(addDays(to,1))===addDays(to,1)}
 // 실근무시간을 정규·초과로 나눠 시급을 곱하고, 승인된 대체 추가수당을 더한 뒤 지각한 만큼 차감합니다.
-export function payroll(state:State,employeeId:string,from:string,to:string){const e=state.employees.find(e=>e.id===employeeId)!;const records=state.attendance.filter(a=>a.employeeId===employeeId&&a.date>=from&&a.date<=to);const worked=(a:Attendance)=>duration(a.start,a.end,a.breakMinutes);const hours=records.reduce((s,a)=>s+worked(a),0);
+// 급여가 보는 근무 기록. 단말에서 찍힌 출퇴근(punches)이 기준입니다.
+// 그 사람 그 날짜에 찍힌 기록이 하나도 없을 때만, 예전에 엑셀로 가져온 기록을 씁니다.
+// 같은 날을 두 번 세지 않으려는 규칙입니다 — 둘 다 세면 하루치가 두 번 지급됩니다.
+// 퇴근까지 찍힌 것만 셉니다. 아직 근무 중인 기록은 끝 시각이 없어 계산할 수 없습니다.
+export function paidRecords(state:State):Attendance[]{
+ const punched=(state.punches??[]).filter(p=>p.out);
+ const punchedDays=new Set(punched.map(p=>p.employeeId+'|'+p.date));
+ // 유급 휴게는 일한 시간으로 칩니다. 근무시간에서 빠지는 건 무급 휴게뿐이고, 그것도 끝까지 찍힌 것만입니다.
+ const unpaid=(p:Punch)=>(p.breaks??[]).reduce((n,b)=>n+(!b.paid&&b.end?Math.round(duration(b.start,b.end)*60):0),0);
+ return [...punched.map(p=>({id:p.id,employeeId:p.employeeId,date:p.date,start:p.in,end:p.out!,breakMinutes:unpaid(p)})),
+  ...state.attendance.filter(a=>!punchedDays.has(a.employeeId+'|'+a.date))];
+}
+// 아직 아무도 보지 않은 기록과, 직원이 틀렸다고 한 기록. 지급 전에 관리자가 알아야 할 숫자라 따로 셉니다.
+export function punchReviewCounts(state:State,employeeId:string,from:string,to:string){
+ const mine=(state.punches??[]).filter(p=>p.employeeId===employeeId&&p.date>=from&&p.date<=to&&p.out);
+ return {unconfirmed:mine.filter(p=>p.status!=='approved'&&p.status!=='disputed').length,
+  disputed:mine.filter(p=>p.status==='disputed').length};
+}
+export function payroll(state:State,employeeId:string,from:string,to:string){const e=state.employees.find(e=>e.id===employeeId)!;const records=paidRecords(state).filter(a=>a.employeeId===employeeId&&a.date>=from&&a.date<=to);const worked=(a:Attendance)=>duration(a.start,a.end,a.breakMinutes);const hours=records.reduce((s,a)=>s+worked(a),0);
  // 날짜별로 합친 뒤 주(일요일 시작)별로 묶어 가산 시간을 구합니다.
  const byDay=new Map<string,number>();for(const a of records)byDay.set(a.date,(byDay.get(a.date)??0)+worked(a));const byWeek=new Map<string,number[]>();for(const [day,h] of byDay){const w=weekStart(day);byWeek.set(w,[...(byWeek.get(w)??[]),h])}
  const otHours=[...byWeek.values()].reduce((s,days)=>{const daily=days.reduce((n,h)=>n+Math.max(0,h-OT_DAILY_HOURS),0);const weekly=Math.max(0,days.reduce((n,h)=>n+h,0)-OT_WEEKLY_HOURS);return s+Math.max(daily,weekly)},0);const regularHours=hours-otHours;
@@ -70,7 +88,9 @@ export function payroll(state:State,employeeId:string,from:string,to:string){con
  const base=regularHours*e.rate,otPay=otHours*e.rate*OT_MULTIPLIER,earned=base+otPay+bonus,cents=(n:number)=>Math.round(n*100)/100;
  // 지각 차감은 그 구간에 번 금액까지만. 엑셀 열을 잘못 연결해도 지급액이 마이너스로 내려가지 않습니다.
  const lateDeduction=Math.min(earned,(lateMinutes/60)*e.rate);
- return {hours,regularHours,otHours,lateMinutes,lateDays,base:cents(base),otPay:cents(otPay),bonus,lateDeduction:cents(lateDeduction),total:cents(earned-lateDeduction)}}
+ return {hours,regularHours,otHours,lateMinutes,lateDays,base:cents(base),otPay:cents(otPay),bonus,lateDeduction:cents(lateDeduction),total:cents(earned-lateDeduction),...punchReviewCounts(state,employeeId,from,to)}}
+// 근무지 이름. 직원 화면과 출퇴근 단말이 같은 이름을 씁니다.
+export const LOCATION='Pelham Hills Golf Club';
 // 근무지 장소. 새 직원·새 근무의 기본값이자 시범 데이터의 배정 기준입니다.
 export const AREAS=['Proshop','Workshop'] as const;
 // 근무를 추가·수정할 때 고를 수 있는 장소. 나머지 업무는 목록에서 감춥니다.
