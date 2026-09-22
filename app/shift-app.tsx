@@ -106,6 +106,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import PhoneSchedule from './phone-schedule';
 import PhoneTeam from './phone-team';
 import PunchLog from './punch-log';
+import { savePunchPhoto } from './punch-photo-store';
 import StaffSchedule from './staff-schedule';
 import StaffMessaging from './staff-messaging';
 import StaffTimesheets from './staff-timesheets';
@@ -208,7 +209,7 @@ export default function ShiftApp() {
   // 근무지를 지정하는 동안 기기에 자리를 물어보는 중인지.
   const [locating, setLocating] = useState(false);
   // 근무지를 지정해 둔 곳에서는 앱을 여는 동안 위치를 계속 지켜봅니다.
-  const gps = useGps(!!data.workplace);
+  const gps = useGps(!!data.workplace, true);
   const [version, setVersion] = useState(0);
   const [team, setTeam] = useState('');
   const [actor, setActor] = useState({ id: 'admin', admin: true });
@@ -407,7 +408,7 @@ export default function ShiftApp() {
       setStatus(
         '먼저 워크스페이스를 생성하세요. 샘플 데이터는 저장되지 않습니다.',
       );
-      return false;
+      return null;
     }
     setBusy(true);
     setStatus('');
@@ -417,15 +418,15 @@ export default function ShiftApp() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type, payload, version }),
       });
-      const json = (await r.json()) as { error?: string };
+      const json = (await r.json()) as { error?: string; state?: State };
       if (!r.ok) throw Error(json.error);
       ingest(json);
       setModal('');
       setStatus('저장했습니다.');
-      return true;
+      return json.state ?? null;
     } catch (e) {
       setStatus(e instanceof Error ? e.message : '저장하지 못했습니다.');
-      return false;
+      return null;
     } finally {
       setBusy(false);
     }
@@ -4157,9 +4158,21 @@ export default function ShiftApp() {
                 needsLocation={!!data.workplace}
                 spot={gps.spot}
                 needsPunchId={!!emp(actor.id)?.punchId}
-                onPunch={(action, photo, place, punchId) =>
-                  void command(action, { photo, punchId: punchId ?? '', ...place })
-                }
+                onPunch={async (action, photo, place, punchId) => {
+                  const next = await command(action, {
+                    photo,
+                    punchId: punchId ?? '',
+                    ...place,
+                  });
+                  // 사진은 이 기기에만 남깁니다. 방금 남은 기록에 묶어 두어야 나중에 찾습니다.
+                  if (next) {
+                    const mine = (next.punches ?? [])
+                      .filter((x) => x.employeeId === actor.id)
+                      .at(-1);
+                    if (mine)
+                      void savePunchPhoto(mine.id, action === 'punchIn' ? 'in' : 'out', photo);
+                  }
+                }}
                 onBreak={(action) => void command('punchBreak', { action, paid: '1' })}
               />
               )}

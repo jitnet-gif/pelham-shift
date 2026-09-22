@@ -7,12 +7,16 @@ export type Spot = { lat: number; lng: number; accuracy: number };
 // 앱을 쓰는 동안 위치를 계속 지켜봅니다.
 // 출퇴근을 찍을 때만 잠깐 켜고 끄면, 찍는 순간에만 근무지에 있는 척할 수 있습니다.
 // 그래서 근무지를 지정해 둔 곳에서는 앱을 여는 동안 위치가 켜져 있어야 합니다.
-export function useGps(required: boolean) {
+// required: 근무지를 지정한 곳. 위치가 꺼져 있으면 화면을 덮고 출퇴근도 막습니다.
+// alsoWatch: 근무지를 지정하지 않았어도 자리를 기록에 남기려고 위치는 지켜봅니다.
+//   이때는 화면을 덮지 않습니다 — 위치를 막아 둔 기기도 출퇴근은 그대로 찍혀야 합니다.
+export function useGps(required: boolean, alsoWatch = false) {
+  const watching = required || alsoWatch;
   const [spot, setSpot] = useState<Spot | null>(null);
   const [state, setState] = useState<'off' | 'asking' | 'on' | 'blocked'>('off');
   const watch = useRef<number | null>(null);
   const start = useCallback(() => {
-    if (!required) return;
+    if (!watching) return;
     if (!navigator.geolocation) {
       setState('blocked');
       return;
@@ -32,9 +36,9 @@ export function useGps(required: boolean) {
       () => setState('blocked'),
       { enableHighAccuracy: true, timeout: 20000, maximumAge: 15000 },
     );
-  }, [required]);
+  }, [watching]);
   useEffect(() => {
-    if (!required) {
+    if (!watching) {
       setState('off');
       setSpot(null);
       return;
@@ -44,15 +48,16 @@ export function useGps(required: boolean) {
       if (watch.current !== null) navigator.geolocation?.clearWatch(watch.current);
       watch.current = null;
     };
-  }, [required, start]);
+  }, [watching, start]);
   // 화면을 다시 보게 되면 한 번 더 확인합니다 — 그 사이 위치를 꺼 두었을 수 있습니다.
   useEffect(() => {
-    if (!required) return;
+    if (!watching) return;
     const again = () => document.visibilityState === 'visible' && start();
     document.addEventListener('visibilitychange', again);
     return () => document.removeEventListener('visibilitychange', again);
-  }, [required, start]);
-  return { spot, state, retry: start };
+  }, [watching, start]);
+  // 근무지를 지정하지 않은 곳에서는 덮개가 뜨지 않도록 'off' 로 알립니다.
+  return { spot, state: required ? state : ('off' as const), retry: start };
 }
 
 // 위치가 꺼져 있는 동안 앱을 덮는 화면. 관리자는 덮지 않습니다 —

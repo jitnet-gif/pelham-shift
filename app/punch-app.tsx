@@ -1,5 +1,6 @@
 'use client';
 import './punch-app.css';
+import { savePunchPhoto } from './punch-photo-store';
 import { useEffect, useState } from 'react';
 import { Bell, BellRing, CalendarDays, LogOut, UserRound } from 'lucide-react';
 import { LOCATION, localDate, seed, type State } from '@/lib/domain';
@@ -38,7 +39,7 @@ export default function PunchApp() {
   const [code, setCode] = useState('');
   const [codeError, setCodeError] = useState('');
   // 근무지를 지정해 둔 곳에서는 앱을 여는 동안 위치를 계속 지켜봅니다.
-  const gps = useGps(!!data.workplace);
+  const gps = useGps(!!data.workplace, true);
   const query = () => (typeof window === 'undefined' ? '' : window.location.search);
 
   const ingest = (r: Payload) => {
@@ -97,7 +98,7 @@ export default function PunchApp() {
   const command = async (type: string, payload: Record<string, unknown> = {}) => {
     if (setup) {
       setStatus('아직 워크스페이스가 없습니다. 관리자가 먼저 만들어야 기록이 남습니다.');
-      return false;
+      return null;
     }
     setBusy(true);
     setStatus('');
@@ -113,10 +114,10 @@ export default function PunchApp() {
       if (!r.ok) throw Error(json.error);
       ingest(json);
       setStatus('기록했습니다.');
-      return true;
+      return json.state ?? null;
     } catch (e) {
       setStatus(e instanceof Error ? e.message : '기록하지 못했습니다.');
-      return false;
+      return null;
     } finally {
       setBusy(false);
     }
@@ -226,14 +227,19 @@ export default function PunchApp() {
             // 번호를 대고 들어온 사람에게 같은 번호를 한 번 더 묻지 않습니다.
             needsPunchId={me ? !!me.punchId : false}
             onPunch={async (action, photo, place, punchId) => {
-              const done = await command(action, {
+              const next = await command(action, {
                 employeeId: chosen.id,
                 photo,
                 punchId: punchId ?? '',
                 ...place,
               });
-              // 공용 단말은 다음 사람을 위해 비워 둡니다.
-              if (done && !me) { setWho(''); setCode(''); }
+              if (next) {
+                // 사진은 이 기기에만 남깁니다. 방금 남은 기록에 묶어 두어야 나중에 찾습니다.
+                const mine = (next.punches ?? []).filter((x) => x.employeeId === chosen.id).at(-1);
+                if (mine) void savePunchPhoto(mine.id, action === 'punchIn' ? 'in' : 'out', photo);
+                // 공용 단말은 다음 사람을 위해 비워 둡니다.
+                if (!me) { setWho(''); setCode(''); }
+              }
             }}
             onBreak={(action) =>
               void command('punchBreak', { employeeId: chosen.id, action, paid: '1' })

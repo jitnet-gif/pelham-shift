@@ -2,10 +2,12 @@
 // next/image 를 쓰지 않습니다. 그 파이프라인은 이미지를 서버에 캐시하는데,
 // 이 사진은 사람 얼굴이라 no-store 로 내보내고 있습니다. 캐시하면 그 뜻이 사라집니다.
 // oxlint-disable next/no-img-element
-import { Camera, Coffee, MapPin } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Camera, Coffee, MapPin, X } from 'lucide-react';
 import type { Employee, Punch, PunchSpot } from '@/lib/domain';
 import { duration } from '@/lib/domain';
 import { useLang } from './use-lang';
+import { prunePunchPhotos, readPunchPhoto } from './punch-photo-store';
 
 // 단말에서 찍힌 출퇴근 기록. 사진은 서버에 남지 않으므로, 찍은 자리와 확인 여부만 보여 줍니다.
 const mapLink = (spot: PunchSpot) =>
@@ -26,6 +28,31 @@ export default function PunchLog({
   isAdmin: boolean;
 }) {
   const { t, locale } = useLang();
+  // 사진은 서버에 없습니다. 찍은 기기 안에만 있어, 그 기기에서 볼 때만 뜹니다.
+  const [mine, setMine] = useState<Record<string, string>>({});
+  const [big, setBig] = useState<{ src: string; who: string } | null>(null);
+  // 찾아볼 사진 목록. punches 는 렌더마다 새 배열이라 그대로 의존성에 쓰면 effect 가 끝없이 돕니다.
+  // 내용이 같으면 같은 문자열이 나오도록 만들어 그것을 기준으로 삼습니다.
+  const wanted = punches
+    .flatMap((p) => [p.photoAt ? p.id + ':in' : '', p.outPhotoAt ? p.id + ':out' : ''])
+    .filter(Boolean)
+    .join(',');
+  useEffect(() => {
+    let alive = true;
+    void prunePunchPhotos();
+    void (async () => {
+      const found: Record<string, string> = {};
+      for (const key of wanted ? wanted.split(',') : []) {
+        const [punchId, kind] = key.split(':');
+        const photo = await readPunchPhoto(punchId, kind === 'out' ? 'out' : 'in');
+        if (photo) found[key] = photo;
+      }
+      if (alive) setMine(found);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [wanted]);
   const of = (id: string) => employees.find((e) => e.id === id);
   const dayLabel = (date: string) =>
     new Intl.DateTimeFormat(locale, {
@@ -130,12 +157,29 @@ export default function PunchLog({
                       {at ? t('위치 없음') : t('기록 없음')}
                     </span>
                   )}
-                  {at && (
-                    <span className="punchlog-seen">
-                      <Camera size={13} />
-                      {t('사진 확인됨')}
-                    </span>
-                  )}
+                  {at &&
+                    (mine[p.id + ':' + kind] ? (
+                      <button
+                        className="punchlog-mine"
+                        onClick={() =>
+                          setBig({
+                            src: mine[p.id + ':' + kind],
+                            who: (who?.name ?? '') + ' · ' + t(caption),
+                          })
+                        }
+                      >
+                        <img src={mine[p.id + ':' + kind]} alt={t(caption)} />
+                        <span>
+                          <Camera size={13} />
+                          {t('사진 보기')}
+                        </span>
+                      </button>
+                    ) : (
+                      <span className="punchlog-seen">
+                        <Camera size={13} />
+                        {t('사진 확인됨')}
+                      </span>
+                    ))}
                 </div>
               ))}
             </div>
@@ -143,6 +187,22 @@ export default function PunchLog({
         );
       })}
 
+      {big && (
+        <dialog className="punchlog-view" open aria-label={big.who}>
+          <button
+            className="punchlog-viewscrim"
+            aria-label={t('닫기')}
+            onClick={() => setBig(null)}
+          />
+          <figure>
+            <img src={big.src} alt={big.who} />
+            <figcaption>{big.who}</figcaption>
+          </figure>
+          <button className="punchlog-close" aria-label={t('닫기')} onClick={() => setBig(null)}>
+            <X size={22} />
+          </button>
+        </dialog>
+      )}
     </div>
   );
 }
