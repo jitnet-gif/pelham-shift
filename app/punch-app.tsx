@@ -32,6 +32,11 @@ export default function PunchApp() {
   const [status, setStatus] = useState('');
   const [tick, setTick] = useState(() => Date.now());
   const [push, setPush] = useState(false);
+  // 이 기기에 로그인한 계정이 직원이 아니면(고정 관리자 계정), 누가 찍는지 먼저 고릅니다.
+  // 기기를 관리자가 열어 두는 공용 단말이라, 여기서 대는 번호는 '누구인지' 알리는 것이지 권한 확인이 아닙니다.
+  const [who, setWho] = useState('');
+  const [code, setCode] = useState('');
+  const [codeError, setCodeError] = useState('');
   // 근무지를 지정해 둔 곳에서는 앱을 여는 동안 위치를 계속 지켜봅니다.
   const gps = useGps(!!data.workplace);
   const query = () => (typeof window === 'undefined' ? '' : window.location.search);
@@ -92,7 +97,7 @@ export default function PunchApp() {
   const command = async (type: string, payload: Record<string, unknown> = {}) => {
     if (setup) {
       setStatus('아직 워크스페이스가 없습니다. 관리자가 먼저 만들어야 기록이 남습니다.');
-      return;
+      return false;
     }
     setBusy(true);
     setStatus('');
@@ -108,8 +113,10 @@ export default function PunchApp() {
       if (!r.ok) throw Error(json.error);
       ingest(json);
       setStatus('기록했습니다.');
+      return true;
     } catch (e) {
       setStatus(e instanceof Error ? e.message : '기록하지 못했습니다.');
+      return false;
     } finally {
       setBusy(false);
     }
@@ -159,11 +166,16 @@ export default function PunchApp() {
   // 매장 시각으로 본 오늘. 찍힌 기록과 근무표가 모두 이 날짜를 기준으로 삼습니다.
   const today = localDate(new Date(tick));
   const me = data.employees.find((e) => e.id === actor.id);
+  const roster = data.employees.filter((e) => !e.archived);
+  // Punch ID 를 나눠 준 곳이면 번호로, 아니면 이름으로 고릅니다. 둘 다 띄우지는 않습니다 —
+  // 아무에게도 번호가 없는데 번호를 물으면 아무도 찍을 수 없습니다.
+  const byPunchId = roster.some((e) => e.punchId);
+  const chosen = me ?? roster.find((e) => e.id === who);
   const myPunch = [...(data.punches ?? [])]
     .reverse()
-    .find((p) => p.employeeId === actor.id && p.date === today);
+    .find((p) => p.employeeId === chosen?.id && p.date === today);
   const myShiftToday = data.shifts
-    .filter((s) => s.employeeId === actor.id && s.date === today)
+    .filter((s) => s.employeeId === chosen?.id && s.date === today)
     .sort((a, b) =>
       myPunch
         ? Math.abs(minutesOf(a.start) - minutesOf(myPunch.in)) -
@@ -195,21 +207,87 @@ export default function PunchApp() {
           <LogOut size={16} />
         </button>
       </div>
-      {me ? (
-        <StaffClock
-          employee={me}
-          punch={myPunch}
-          shift={myShiftToday}
-          location={LOCATION}
-          busy={busy}
-          needsLocation={!!data.workplace}
-          spot={gps.spot}
-          needsPunchId={!!me.punchId}
-          onPunch={(action, photo, place, punchId) =>
-            void command(action, { photo, punchId: punchId ?? '', ...place })
-          }
-          onBreak={(action) => void command('punchBreak', { action, paid: '1' })}
-        />
+      {chosen ? (
+        <>
+          {!me && (
+            <button className="pickwho-back" onClick={() => { setWho(''); setCode(''); }}>
+              <UserRound size={15} />
+              {t('{name} 이(가) 아니신가요?', { name: chosen.name })}
+            </button>
+          )}
+          <StaffClock
+            employee={chosen}
+            punch={myPunch}
+            shift={myShiftToday}
+            location={LOCATION}
+            busy={busy}
+            needsLocation={!!data.workplace}
+            spot={gps.spot}
+            // 번호를 대고 들어온 사람에게 같은 번호를 한 번 더 묻지 않습니다.
+            needsPunchId={me ? !!me.punchId : false}
+            onPunch={async (action, photo, place, punchId) => {
+              const done = await command(action, {
+                employeeId: chosen.id,
+                photo,
+                punchId: punchId ?? '',
+                ...place,
+              });
+              // 공용 단말은 다음 사람을 위해 비워 둡니다.
+              if (done && !me) { setWho(''); setCode(''); }
+            }}
+            onBreak={(action) =>
+              void command('punchBreak', { employeeId: chosen.id, action, paid: '1' })
+            }
+          />
+        </>
+      ) : actor.admin ? (
+        // 로그인한 계정이 직원이 아닙니다. 이 기기를 공용 단말로 씁니다.
+        <section className="pickwho">
+          <UserRound size={30} />
+          <h2>{t('누가 찍나요?')}</h2>
+          {byPunchId ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const found = roster.find((x) => x.punchId && x.punchId === code.trim());
+                if (!found) { setCodeError('Punch ID가 맞지 않습니다.'); return; }
+                setCodeError('');
+                setWho(found.id);
+              }}
+            >
+              <label className="stclock-code">
+                <span>{t('Punch ID')}</span>
+                <input
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={8}
+                  value={code}
+                  placeholder="••••"
+                  aria-label={t('Punch ID')}
+                  onChange={(e) => { setCode(e.target.value.replace(/\D/g, '').slice(0, 8)); setCodeError(''); }}
+                />
+              </label>
+              {codeError && <p role="alert" className="stclock-error">{t(codeError)}</p>}
+              <button className="pickwho-go" type="submit" disabled={!code.trim()}>
+                {t('다음')}
+              </button>
+            </form>
+          ) : (
+            <ul className="pickwho-list">
+              {roster.map((e) => (
+                <li key={e.id}>
+                  <button onClick={() => setWho(e.id)}>
+                    <i style={{ background: e.color }}>{e.name.slice(0, 1)}</i>
+                    <span>{e.name}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {!roster.length && (
+            <p className="pickwho-none">{t('아직 직원이 없습니다. 스케줄 앱에서 먼저 직원을 추가하세요.')}</p>
+          )}
+        </section>
       ) : (
         // 고정 '관리자' 계정은 직원 명부에 없습니다. 카메라를 띄워 봐야 서버가 되돌려 보냅니다.
         <section className="nostaff">

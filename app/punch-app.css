@@ -66,3 +66,80 @@
 }
 
 .punchapp .nostaff { padding: 48px 24px; }
+
+/* 공용 단말: 로그인한 계정이 직원이 아닐 때 누가 찍는지 먼저 고릅니다. */
+.pickwho {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 16px;
+  padding: 26px 18px;
+  border: 1px solid var(--line, #e3e5e2);
+  border-radius: 14px;
+  background: #fff;
+  text-align: center;
+}
+.pickwho > svg { color: #087e6d; }
+.pickwho h2 { margin: 0 0 4px; font-size: 20px; font-weight: 650; }
+.pickwho form { width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 10px; }
+.pickwho .stclock-code { margin: 0; text-align: left; }
+.pickwho-go {
+  width: 100%;
+  min-height: 50px;
+  border: 0;
+  border-radius: 10px;
+  background: #087e6d;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+}
+.pickwho-go:disabled { opacity: .45; }
+.pickwho-list { width: 100%; max-width: 380px; margin: 4px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.pickwho-list button {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  min-height: 62px;
+  padding: 10px 6px;
+  border: 0;
+  border-bottom: 1px solid #eef0ed;
+  background: none;
+  text-align: left;
+  font-size: 17px;
+  font-weight: 600;
+  color: #1f2b2e;
+}
+.pickwho-list li:last-child button { border-bottom: 0; }
+.pickwho-list button:active { background: #f6f7f5; }
+.pickwho-list i {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #cfd8d4;
+  color: #fff;
+  font-style: normal;
+  font-size: 17px;
+  text-transform: uppercase;
+}
+.pickwho-list span { min-width: 0; overflow-x: auto; white-space: nowrap; scrollbar-width: none; }
+.pickwho-list span::-webkit-scrollbar { display: none; }
+.pickwho-none { margin: 4px 0 0; font-size: 14px; color: #8b9691; line-height: 1.6; }
+.pickwho-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 10px 16px 0;
+  padding: 8px 12px;
+  border: 1px solid #d9dcd8;
+  border-radius: 999px;
+  background: #fff;
+  color: #5c6a6c;
+  font-size: 13px;
+  align-self: flex-start;
+  width: max-content;
+}
