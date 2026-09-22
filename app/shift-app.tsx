@@ -163,7 +163,8 @@ export default function ShiftApp() {
   const [data, setData] = useState<State>(seed);
   const [week, setWeek] = useState(weekStart(localDate(new Date())));
   const [tab, setTab] = useState('schedule');
-  const [view, setView] = useState('week');
+  // 스케줄은 오늘 하루부터 보여줍니다. 주간은 보기 메뉴에서 고릅니다.
+  const [view, setView] = useState('day');
   const [version, setVersion] = useState(0);
   const [team, setTeam] = useState('');
   const [actor, setActor] = useState({ id: 'admin', admin: true });
@@ -420,6 +421,23 @@ export default function ShiftApp() {
     label: e.name + ' · ' + e.id,
   }));
   // 대체 신청은 근무일 7일 전까지만 받습니다. 가까운 날짜만 남아 있으면 고를 근무가 하나도 없습니다.
+  // 근무 길이를 대화상자에서 바로 보여 줍니다. 7shifts 의 (4 hrs) 표시와 같은 자리입니다.
+  const shiftHours =
+    /^\d{2}:\d{2}$/.test(form.start || '') && /^\d{2}:\d{2}$/.test(form.end || '')
+      ? duration(form.start, form.end)
+      : 0;
+  const noteField = (
+    <label className="field">
+      {t('직원에게 남길 메모')}
+      <textarea
+        maxLength={250}
+        value={form.note || ''}
+        onChange={(e) => put('note', e.target.value)}
+        placeholder={t('이 근무에서 알아야 할 내용을 적어주세요.')}
+      />
+      <small className="notecount">{(form.note || '').length}/250</small>
+    </label>
+  );
   // 타임카드는 이름으로만 사람을 알려 주므로, 직원 명단에서 같은 이름을 찾아 ID 를 붙입니다.
   const nameKey = (v: string) => v.toLowerCase().replace(/\s+/g, ' ').trim();
   const timecardReady = (timecard?.rows ?? []).flatMap((r) => {
@@ -1932,15 +1950,20 @@ export default function ShiftApp() {
                   onChange={(v) => put('employeeId', v)}
                   options={options}
                 />
+                {areaPick(t('업무 / 장소'))}
                 {input('date', t('근무일'), 'date')}
                 <div className="formgrid">
                   {input('start', t('출근'), 'time')}
                   {input('end', t('퇴근'), 'time')}
                 </div>
                 <p className="hint">
-                  {t('퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.')}
+                  {shiftHours
+                    ? t('{n}시간 근무 · 퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.', {
+                        n: shiftHours,
+                      })
+                    : t('퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.')}
                 </p>
-                {areaPick(t('업무 / 장소'))}
+                {noteField}
               </>
             )}
             {modal === 'shiftUpdate' && (
@@ -3373,15 +3396,19 @@ export default function ShiftApp() {
                     canEdit={!staffReadOnly}
                     onDateChange={setDay}
                     onShiftSelect={(id) => open('detail', { id })}
-                    onAddShift={(employeeId, date) =>
+                    onAddShift={(employeeId, date, start) => {
+                      // 누른 시각부터 네 시간을 기본으로 채워 둡니다. 7shifts 도 같은 길이로 엽니다.
+                      const from = start || '09:00';
+                      const end = (Number(from.slice(0, 2)) + 4) % 24;
                       open('shift', {
                         employeeId,
                         date,
-                        start: '09:00',
-                        end: '17:00',
+                        start: from,
+                        end: String(end).padStart(2, '0') + from.slice(2),
                         area: emp(employeeId)?.role || AREAS[0],
-                      })
-                    }
+                        note: '',
+                      });
+                    }}
                     onPublish={() => void command('publish')}
                   />
                 ) : staffReadOnly || view === 'month' ? (

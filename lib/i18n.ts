@@ -411,6 +411,10 @@ const en: Record<string, string> = {
   '종료 시각 (뉴욕)': 'End time (New York)',
   '받는 직원 ({n}/{total}명)': 'Recipients ({n}/{total})',
   '안내 내용': 'Message',
+  '{n}시간 근무 · 퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.':
+    '{n} hour shift · an end time earlier than the start counts as the next day.',
+  '직원에게 남길 메모': 'Note for the employee',
+  '이 근무에서 알아야 할 내용을 적어주세요.': 'Anything the employee should know about this shift.',
   '퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.':
     'If the end time is earlier than the start time, the shift ends the next day.',
   '업무 / 장소': 'Role / location',

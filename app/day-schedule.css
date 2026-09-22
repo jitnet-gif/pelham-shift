@@ -242,6 +242,9 @@
   flex: 1;
   min-width: calc(var(--dv-hour) * 20);
 }
+.dv-track.clickable {
+  cursor: copy;
+}
 .dv-line {
   position: absolute;
   top: 0;

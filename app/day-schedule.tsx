@@ -54,7 +54,7 @@ export default function DaySchedule({
   canEdit: boolean;
   onDateChange: (date: string) => void;
   onShiftSelect: (id: string) => void;
-  onAddShift: (employeeId: string, date: string) => void;
+  onAddShift: (employeeId: string, date: string, start?: string) => void;
   onPublish: () => void;
 }) {
   const { t, lang } = useLang();
@@ -185,7 +185,26 @@ export default function DaySchedule({
                       </button>
                     )}
                   </div>
-                  <div className="dv-track">
+                  <div
+                    className={'dv-track' + (canEdit ? ' clickable' : '')}
+                    onClick={(event) => {
+                      // 빈 자리를 누르면 그 시각부터 근무를 새로 만듭니다. 30분 단위로 맞춥니다.
+                      if (!canEdit) return;
+                      const box = event.currentTarget.getBoundingClientRect();
+                      const raw = FROM + ((event.clientX - box.left) / box.width) * SPAN;
+                      const snapped = Math.min(
+                        Math.max(Math.round(raw / 30) * 30, FROM),
+                        TO - 60,
+                      );
+                      onAddShift(
+                        e.id,
+                        date,
+                        String(Math.floor(snapped / 60) % 24).padStart(2, '0') +
+                          ':' +
+                          String(snapped % 60).padStart(2, '0'),
+                      );
+                    }}
+                  >
                     {HOURS.map((h) => (
                       <i key={h} className="dv-line" style={{ left: ((h * 60 - FROM) / SPAN) * 100 + '%' }} />
                     ))}
@@ -202,7 +221,10 @@ export default function DaySchedule({
                             width: ((end - start) / SPAN) * 100 + '%',
                             background: e.color,
                           }}
-                          onClick={() => onShiftSelect(s.id)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onShiftSelect(s.id);
+                          }}
                           title={`${clock(s.start)} - ${clock(s.end)} · ${s.area}`}
                         >
                           <b>{clock(s.start)} - {clock(s.end)}</b>
