@@ -978,9 +978,10 @@ export default function ShiftApp() {
         context.registerTool(
           {
             name: 'show_staff_schedule',
-            title: '직원 스케줄 보기',
+            // MCP 도구 설명은 t() 를 거치지 않고 클라이언트에 그대로 전달됩니다.
+            title: 'Show staff schedule',
             description:
-              '선택한 직원의 주간 스케줄 화면으로 이동합니다. 저장된 데이터는 변경하지 않습니다.',
+              'Opens the weekly schedule view for the chosen employee. It changes no saved data.',
             inputSchema: {
               type: 'object',
               properties: { employeeId: { type: 'string' } },
@@ -990,7 +991,7 @@ export default function ShiftApp() {
             annotations: { readOnlyHint: true },
             execute: (input: any) => {
               if (!data.employees.some((e) => e.id === input.employeeId))
-                throw Error('직원 ID가 없습니다.');
+                throw Error('No such employee ID.');
               setFilter(input.employeeId);
               setTab('schedule');
               return { employeeId: input.employeeId, view: 'schedule' };
@@ -2281,7 +2282,10 @@ export default function ShiftApp() {
           onCancel={() => setClockField(null)}
           onPick={(value) => {
             put(clockField.key, value);
-            setClockField(null);
+            // 근무 추가에서는 시작 시간을 고르자마자 종료 시간 시계를 이어서 엽니다.
+            if (modal === 'shift' && clockField.key === 'start')
+              setClockField({ key: 'end', label: t('종료 시간'), step: clockField.step });
+            else setClockField(null);
           }}
         />
       )}
@@ -2407,7 +2411,10 @@ export default function ShiftApp() {
                   options={options}
                 />
                 {areaPick('area', t('업무 / 장소'), '', SHIFT_AREAS)}
-                {input('date', t('근무일'), 'date')}
+                {/* 근무일은 열던 자리에서 정해져 있어 고르지 않고 보여만 줍니다. */}
+                <p className="hint">
+                  {t('근무일 · {date}', { date: form.date ? longDate(form.date) : '' })}
+                </p>
                 {shiftTimes}
                 <p className="hint">
                   {t('퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.')}
@@ -3037,7 +3044,13 @@ export default function ShiftApp() {
                         onClick={() =>
                           open('shift', {
                             employeeId: staff[0]?.id || '',
-                            date: week,
+                            // 근무일은 폼에서 고르지 않으므로 지금 보고 있는 날을 그대로 씁니다.
+                            date:
+                              view === 'week'
+                                ? week
+                                : view === 'month'
+                                  ? day || localDate(new Date())
+                                  : timelineDate,
                             start: '09:00',
                             end: '17:00',
                             area: AREAS[0],
@@ -3330,7 +3343,9 @@ export default function ShiftApp() {
   );
   // 필터 줄은 데스크톱과 폰이 같은 JSX 를 씁니다. 폰에서는 보기 설정 버튼으로 펼칩니다.
   // 하단 탭바 네 칸. 관리자와 직원이 자주 쓰는 화면이 달라 목록도 갈립니다.
-  const tabBarItems = actor.admin
+  // 고정 '관리자' 계정은 직원 명부에 없습니다. 찍을 것이 없는 탭을 길에 두지 않습니다.
+  const canPunch = !!emp(actor.id);
+  const tabBarItems = (actor.admin
     ? [
         { key: 'home', label: 'tab::출퇴근', Icon: House, count: 0 },
         { key: 'schedule', label: '스케줄', Icon: CalendarDays, count: 0 },
@@ -3341,7 +3356,8 @@ export default function ShiftApp() {
         { key: 'home', label: 'tab::출퇴근', Icon: House, count: 0 },
         { key: 'schedule', label: '스케줄', Icon: CalendarDays, count: 0 },
         { key: 'messages', label: '메시지', Icon: MessageSquare, count: unread.length },
-      ];
+      ]
+  ).filter((i) => i.key !== 'home' || canPunch);
   // 탭바에 없는 화면에 처리할 일이 남아 있으면 '더보기'에 점을 띄웁니다.
   const myPending = (data.punches ?? []).filter(
     (r) =>
@@ -3512,7 +3528,7 @@ export default function ShiftApp() {
             </button>
           </div>
           <TabsList className="sidenav">
-            {navItem('home', 'tab::출퇴근', House)}
+            {canPunch && navItem('home', 'tab::출퇴근', House)}
             {actor.admin && navItem('dashboard', '대시보드', LayoutDashboard)}
             {actor.admin && navItem('working', '근무 현황', Radar, { sub: true })}
             <div className={'sidenav-group' + (scheduleTabs.includes(tab) ? ' current' : '')}>
@@ -3724,7 +3740,7 @@ export default function ShiftApp() {
                     week={week}
                     day={day}
                     scope={scope}
-                    employees={staff}
+                    employees={data.employees}
                     shifts={data.shifts}
                     location={LOCATION}
                     onScopeChange={setScope}
@@ -4115,34 +4131,12 @@ export default function ShiftApp() {
             {comingSoon('logbook', BookOpen, '업무일지', '날짜별 운영 메모와 특이사항을 기록하고 팀과 공유하는 기능을 준비하고 있습니다.')}
             {comingSoon('help', CircleQuestionMark, '도움말', '스케줄 작성, 휴무·근무 가능 시간, 대체 근무 사용법 안내를 준비하고 있습니다.')}
             <TabsContent value="home">
-              {/* 고정 '관리자' 계정은 직원 명부에 없습니다. 눌러 봐야 서버가 되돌려 보내니,
-                  카메라를 띄우는 대신 무엇을 해야 하는지 먼저 알려 줍니다. */}
-              {!emp(actor.id) ? (
+              {/* 이 탭은 직원 기록이 있을 때만 길에 놓입니다. 주소를 직접 열어 들어온 경우에만 이 줄을 봅니다. */}
+              {!canPunch ? (
                 <section className="nostaff">
                   <UserRound size={34} />
                   <h2>{t('이 계정은 직원 명부에 없습니다')}</h2>
-                  <p>
-                    {t('출퇴근은 직원 기록이 있어야 찍힙니다. 직원 관리에서 본인을 직원으로 추가하고, 그 이름으로 로그인해 주세요.')}
-                  </p>
-                  {actor.admin && (
-                    <button
-                      className="button primary"
-                      onClick={() => {
-                        setTab('team');
-                        open('employee', {
-                          name: '',
-                          phone: '',
-                          email: '',
-                          rate: '0',
-                          color: '#087e6d',
-                          role: AREAS[0],
-                          admin: '1',
-                        });
-                      }}
-                    >
-                      <UserPlus size={16} /> {t('나를 직원으로 추가')}
-                    </button>
-                  )}
+                  <p>{t('출퇴근은 직원 명부에 있는 사람만 찍습니다.')}</p>
                 </section>
               ) : (
               <StaffClock

@@ -682,3 +682,9 @@
   font-variant-numeric: tabular-nums;
 }
 .stclock-code input:focus-visible { outline: none; border-color: #087e6d; box-shadow: 0 0 0 2px #d9ece6; }
+
+/* '내 근무'에서 남의 근무는 흐리게. 눌러서 자세히 보는 것은 그대로 됩니다. */
+.stsched-shift.dim { opacity: .42; }
+.stsched-shift.dim b { font-weight: 400; }
+/* 내 근무가 없는 날에도 그날 나오는 사람은 아래에 남습니다. */
+.stsched-none.inline { flex: none; align-self: flex-start; margin-bottom: 2px; font-size: 15px; }
