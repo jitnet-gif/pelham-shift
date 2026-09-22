@@ -357,6 +357,12 @@ const en: Record<string, string> = {
   '우천 근무 종료 공지': 'Rain closure notice',
   '직원 설정': 'Employee settings',
   '작업 지시': 'Assigns tasks',
+  '관리자 권한': 'Administrator',
+  '켜면 이 직원이 본인 생년월일과 비밀번호로 관리자 화면에 들어옵니다. 스케줄·급여·직원 정보를 모두 보고 고칠 수 있으니, 전 직원의 생년월일·연락처·시급이 함께 보인다는 점을 염두에 두세요.':
+    "When this is on, the employee signs in to the admin screens with their own birth date and password. They can see and change the schedule, payroll and staff records, which includes every employee's birth date, phone number and hourly rate.",
+  '{name} 직원을 삭제할까요? 지난 근무·급여 기록은 그대로 남고 목록에서만 사라집니다.':
+    'Remove {name}? Their past shifts and payroll records stay as they are; they only disappear from the lists.',
+  '본인 계정은 삭제할 수 없습니다.': 'You cannot remove your own account.',
   '작업 지시 권한': 'Can assign tasks',
   '켜면 이 직원이 작업 수신함에서 다른 직원에게 작업을 보내고 전체 작업 진행 상황을 볼 수 있습니다. 스케줄·급여·직원 정보는 계속 읽기 전용입니다.':
     'When on, this employee can send tasks to other staff from the task inbox and see the progress of every task. Schedules, payroll and staff details stay read-only.',

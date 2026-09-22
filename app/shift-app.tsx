@@ -407,15 +407,17 @@ export default function ShiftApp() {
       <span>{t('관리자')}</span>
     );
   const emp = (id: string) => data.employees.find((e) => e.id === id);
+  // 삭제한 직원은 지난 기록을 위해 데이터에 남기고, 고르는 자리에서만 감춥니다.
+  const staff = data.employees.filter((e) => !e.archived);
   const name = (id: string) => emp(id)?.name || t('관리자');
-  const options = data.employees.map((e) => ({
+  const options = staff.map((e) => ({
     value: e.id,
     label: e.name + ' · ' + e.id,
   }));
-  const roles = [...new Set(data.employees.map((e) => e.role))].sort((a, b) =>
+  const roles = [...new Set(staff.map((e) => e.role))].sort((a, b) =>
     a.localeCompare(b),
   );
-  const visibleEmployees = data.employees
+  const visibleEmployees = staff
     .filter(
       (e) =>
         (filter === 'all' || e.id === filter) &&
@@ -474,7 +476,7 @@ export default function ShiftApp() {
       text: t('{name} {date} 근무가 휴무·불가 시간과 겹칩니다', { name: name(c.employeeId), date: c.date }),
       tab: 'schedule',
     })),
-    ...data.employees
+    ...staff
       .filter((e) => !e.rate)
       .map((e) => ({ text: t('{name} 시급 미설정', { name: e.name }), tab: 'team' })),
   ];
@@ -614,12 +616,11 @@ export default function ShiftApp() {
   };
   const rainTargets = (form.targets || '').split(',').filter(Boolean);
   const rainAll =
-    data.employees.length > 0 &&
-    data.employees.every((e) => rainTargets.includes(e.id));
+    staff.length > 0 && staff.every((e) => rainTargets.includes(e.id));
   const toggleRain = (id: string, on: boolean) =>
     put(
       'targets',
-      data.employees
+      staff
         .map((e) => e.id)
         .filter((v) => (v === id ? on : rainTargets.includes(v)))
         .join(','),
@@ -798,10 +799,10 @@ export default function ShiftApp() {
         s.employeeId === r.employeeId &&
         blockedBy({ ...data, timeOff: [{ ...r, status: 'approved' }], availability: [] }, s),
     );
-  const staffList = actor.admin ? data.employees : data.employees.filter((e) => e.id === actor.id);
+  const staffList = actor.admin ? staff : staff.filter((e) => e.id === actor.id);
   const openTimeOff = () =>
     open('timeOffRequest', {
-      employeeId: actor.admin ? data.employees[0]?.id || '' : actor.id,
+      employeeId: actor.admin ? staff[0]?.id || '' : actor.id,
       from: leadDate(),
       to: leadDate(),
       allDay: '1',
@@ -811,7 +812,7 @@ export default function ShiftApp() {
     });
   const openAvailability = (weekday = '1', employeeId = '') =>
     open('availabilitySet', {
-      employeeId: employeeId || (actor.admin ? data.employees[0]?.id || '' : actor.id),
+      employeeId: employeeId || (actor.admin ? staff[0]?.id || '' : actor.id),
       weekday,
       allDay: '1',
       start: '09:00',
@@ -1502,11 +1503,11 @@ export default function ShiftApp() {
                           {t('확인 {read} / {total}명 · {names} 미확인', {
                             read: m.readBy.filter(
                               (id) =>
-                                data.employees.some((e) => e.id === id) &&
+                                staff.some((e) => e.id === id) &&
                                 (m.recipients?.includes(id) ?? true),
                             ).length,
-                            total: m.recipients?.length ?? data.employees.length,
-                            names: data.employees
+                            total: m.recipients?.length ?? staff.length,
+                            names: staff
                               .filter(
                                 (e) =>
                                   (m.recipients?.includes(e.id) ?? true) &&
@@ -1629,12 +1630,15 @@ export default function ShiftApp() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.employees.map((e) => (
+                  {staff.map((e) => (
                     <TableRow key={e.id}>
                       <TableCell>{box(e)}</TableCell>
                       <TableCell>{e.id}</TableCell>
                       <TableCell>
                         {e.role}
+                        {e.admin && (
+                          <span className="badge taskbadge">{t('관리자')}</span>
+                        )}
                         {e.taskManager && (
                           <span className="badge taskbadge">{t('작업 지시')}</span>
                         )}
@@ -1651,10 +1655,22 @@ export default function ShiftApp() {
                               ...e,
                               rate: String(e.rate),
                               taskManager: e.taskManager ? '1' : '',
+                              admin: e.admin ? '1' : '',
+                              archived: e.archived ? '1' : '',
                             })
                           }
                         >
                           {t('수정')}
+                        </button>
+                        <button
+                          className="button"
+                          disabled={busy || e.id === actor.id}
+                          onClick={() => {
+                            if (confirm(t('{name} 직원을 삭제할까요? 지난 근무·급여 기록은 그대로 남고 목록에서만 사라집니다.', { name: e.name })))
+                              void command('employeeRemove', { id: e.id });
+                          }}
+                        >
+                          {t('삭제')}
                         </button>
                       </TableCell>
                     </TableRow>
@@ -1749,7 +1765,7 @@ export default function ShiftApp() {
                   <legend>
                     {t('받는 직원 ({n}/{total}명)', {
                       n: rainTargets.length,
-                      total: data.employees.length,
+                      total: staff.length,
                     })}
                   </legend>
                   <label className="recipient all">
@@ -1758,14 +1774,14 @@ export default function ShiftApp() {
                       onCheckedChange={(on) =>
                         put(
                           'targets',
-                          on ? data.employees.map((e) => e.id).join(',') : '',
+                          on ? staff.map((e) => e.id).join(',') : '',
                         )
                       }
                     />
                     {t('전 직원')}
                   </label>
                   <div className="recipientlist">
-                    {data.employees.map((e) => (
+                    {staff.map((e) => (
                       <label className="recipient" key={e.id}>
                         <Checkbox
                           checked={rainTargets.includes(e.id)}
@@ -1929,6 +1945,16 @@ export default function ShiftApp() {
                   )}
                 </div>
                 {input('role', t('업무'))}
+                <label className="recipient all">
+                  <Checkbox
+                    checked={form.admin === '1'}
+                    onCheckedChange={(on) => put('admin', on ? '1' : '')}
+                  />
+                  {t('관리자 권한')}
+                </label>
+                <p className="hint">
+                  {t('켜면 이 직원이 본인 생년월일과 비밀번호로 관리자 화면에 들어옵니다. 스케줄·급여·직원 정보를 모두 보고 고칠 수 있으니, 전 직원의 생년월일·연락처·시급이 함께 보인다는 점을 염두에 두세요.')}
+                </p>
                 <label className="recipient all">
                   <Checkbox
                     checked={form.taskManager === '1'}
@@ -2189,7 +2215,7 @@ export default function ShiftApp() {
                       date: localDate(new Date()),
                       end: '15:00',
                       body: t('안전하게 장비를 정리하고 퇴근 기록을 남겨주세요.'),
-                      targets: data.employees.map((e) => e.id).join(','),
+                      targets: staff.map((e) => e.id).join(','),
                     })
                   }
                 >
@@ -2259,7 +2285,7 @@ export default function ShiftApp() {
                 </strong>
                 <p>
                   {t('{n}명의 직원과 함께하는 한 주', {
-                    n: data.employees.length,
+                    n: staff.length,
                   })}
                 </p>
               </div>
@@ -2385,7 +2411,7 @@ export default function ShiftApp() {
                         className="button primary"
                         onClick={() =>
                           open('shift', {
-                            employeeId: data.employees[0]?.id || '',
+                            employeeId: staff[0]?.id || '',
                             date: week,
                             start: '09:00',
                             end: '17:00',
@@ -2517,9 +2543,9 @@ export default function ShiftApp() {
               ) : view === 'month' ? (
                 <MonthSchedule
                   date={day}
-                  employees={staffReadOnly ? data.employees : visibleEmployees}
+                  employees={staffReadOnly ? staff : visibleEmployees}
                   shifts={data.shifts.filter((shift) =>
-                    (staffReadOnly ? data.employees : visibleEmployees).some(
+                    (staffReadOnly ? staff : visibleEmployees).some(
                       (employee) => employee.id === shift.employeeId,
                     ),
                   )}
@@ -2956,7 +2982,7 @@ export default function ShiftApp() {
                           date: localDate(new Date()),
                           end: '15:00',
                           body: t('안전하게 장비를 정리하고 퇴근 기록을 남겨주세요.'),
-                          targets: data.employees.map((e) => e.id).join(','),
+                          targets: staff.map((e) => e.id).join(','),
                         })
                       }
                     >
@@ -3206,9 +3232,9 @@ export default function ShiftApp() {
                 ) : staffReadOnly || view === 'month' ? (
                   <MonthSchedule
                     date={day}
-                    employees={staffReadOnly ? data.employees : visibleEmployees}
+                    employees={staffReadOnly ? staff : visibleEmployees}
                     shifts={data.shifts.filter((shift) =>
-                      (staffReadOnly ? data.employees : visibleEmployees).some(
+                      (staffReadOnly ? staff : visibleEmployees).some(
                         (employee) => employee.id === shift.employeeId,
                       ),
                     )}
