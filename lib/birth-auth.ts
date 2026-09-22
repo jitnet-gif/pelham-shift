@@ -2,11 +2,17 @@ import { env } from '@/lib/db';
 import type { State } from '@/lib/domain';
 
 const SESSION_COOKIE = 'pelham_birth_session';
-// 로그인 목록 맨 앞에 서는 관리자들. 직원 id(E001…) 와 겹치지 않는 id 를 씁니다.
-const ADMINS = [{ id: 'admin', name: '관리자' }];
+// 관리자 번호이자 비밀번호입니다. 직원과 같은 규칙 — 번호 하나가 곧 이름이자 비밀번호입니다.
+// 이 저장소는 공개되어 있어, 여기 적어 두면 누구나 읽고 주인 계정으로 들어옵니다.
+// 그래서 값은 코드에 두지 않고 환경변수로만 받습니다. 없으면 관리자 로그인은 아예 닫힙니다 —
+// 조용히 옛 값으로 열려 있는 것보다, 막혀서 눈에 띄는 편이 낫습니다.
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+// 로그인 화면에서 관리자도 직원처럼 번호를 칩니다. 그러면 이 이름이 윗칸에 떠 그대로 들어갑니다.
+// id 'admin' 은 번호가 직원 번호와 겹쳐 막혔을 때 돌아갈 길로 남겨 둡니다.
+const ADMINS = [
+  { id: 'admin', name: process.env.ADMIN_NAME || 'hwang sunjae', punchId: ADMIN_PASSWORD },
+];
 const adminFor = (actor: string) => ADMINS.find((entry) => entry.id === actor) || null;
-// 관리자 비밀번호는 모두 같은 값을 쓰고, 직원처럼 바꿀 수 없습니다.
-const ADMIN_PASSWORD = '2222';
 // 직원은 본인 직원 ID 로 로그인합니다. 아래 값은 아직 직원 ID 가 없는 사람만 쓰는 옛 기본값입니다.
 const DEFAULT_PASSWORD = '1111';
 const SESSION_DAYS = 30;
@@ -62,8 +68,9 @@ const verifyPassword = async (
   punchId = '',
 ) => {
   if (!password) return false;
-  // 고정 명단 관리자의 비밀번호만 코드에 있습니다. 관리자로 지정된 직원은 본인 비밀번호를 씁니다.
-  if (roster) return password === ADMIN_PASSWORD;
+  // 관리자 비밀번호는 환경변수에서만 옵니다. 설정해 두지 않았으면 무엇을 쳐도 열리지 않습니다.
+  // 관리자로 지정된 직원은 이 계정이 아니라 본인 비밀번호를 씁니다.
+  if (roster) return ADMIN_PASSWORD !== '' && password === ADMIN_PASSWORD;
   // 직원 ID 는 언제나 그 사람의 비밀번호입니다. 이름과 번호만 알면 들어올 수 있습니다.
   if (punchId && password === punchId) return true;
   const credential = await credentialFor(workspace, actor);
@@ -135,13 +142,23 @@ export async function findMembers(typed: string, preferredTeam = ''): Promise<Me
     : await env.DB
         .prepare('SELECT id, owner, state, version FROM workspaces LIMIT 100')
         .all<WorkspaceRow>();
-  // 고정 명단 관리자는 직원이 아니라 어느 워크스페이스에도 없습니다. 이름 그대로 칩니다.
-  // 아직 워크스페이스가 없어도 첫 설정을 시작해야 하므로 'master' 로라도 들여보냅니다.
-  const roster = ADMINS.find((entry) => entry.id.toLowerCase() === wanted.toLowerCase());
-  if (roster) {
-    return [{ team: preferredTeam || rows.results[0]?.id || 'master', actor: roster.id, name: roster.name }];
-  }
   const found: MemberMatch[] = [];
+  // 관리자는 직원이 아니라 어느 워크스페이스에도 없습니다. 번호로도, id 로도 불립니다.
+  // 아직 워크스페이스가 없어도 첫 설정을 시작해야 하므로 'master' 로라도 들여보냅니다.
+  const roster = ADMINS.find(
+    (entry) =>
+      entry.id.toLowerCase() === wanted.toLowerCase() ||
+      (entry.punchId !== '' && entry.punchId === wanted),
+  );
+  // 여기서 끝내지 않습니다 — 같은 번호를 쓰는 직원이 있으면 둘 다 담겨, 부르는 쪽이 고를 수 없음을
+  // 알고 막습니다. 관리자가 조용히 이기면 남의 번호를 삼키는 셈입니다.
+  if (roster) {
+    found.push({
+      team: preferredTeam || rows.results[0]?.id || 'master',
+      actor: roster.id,
+      name: roster.name,
+    });
+  }
   for (const row of rows.results) {
     const state = JSON.parse(row.state) as State;
     for (const employee of state.employees) {

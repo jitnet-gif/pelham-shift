@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     // 친 번호가 누구인지 먼저 찾습니다. 비밀번호 확인은 그다음이고, 아래 createBirthSession 이 합니다.
     const found = await findMembers(String(body.employeeId || ''), team);
     // 번호가 여러 팀에 있으면 고르지 않습니다. 팀 주소(?team=)로 열면 그 팀 안에서만 찾습니다.
-    if (found.length > 1) throw Error('이 직원 ID를 쓰는 팀이 여럿입니다. 팀 주소로 열어 다시 로그인하세요.');
+    if (found.length > 1) throw Error('이 번호를 쓰는 사람이 둘 이상입니다. 팀 주소로 열거나 관리자에게 문의하세요.');
     // 없는 번호도 틀린 비밀번호와 같은 말로 돌려보냅니다 — 번호를 넣어 보며 누가 있는지 세지 못하게.
     if (!found.length) throw Error('직원 ID 또는 비밀번호를 확인하세요.');
     const session = await createBirthSession(found[0].team, found[0].actor, String(body.password || ''));

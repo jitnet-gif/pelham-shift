@@ -503,8 +503,8 @@ const en: Record<string, string> = {
   '직원으로 로그인': 'Sign in as staff',
   '직원 ID를 입력하세요.': 'Enter your employee ID.',
   '직원 ID 또는 비밀번호를 확인하세요.': 'Check your employee ID and password.',
-  '이 직원 ID를 쓰는 팀이 여럿입니다. 팀 주소로 열어 다시 로그인하세요.':
-    'More than one team uses this employee ID. Open your team’s link and sign in there.',
+  '이 번호를 쓰는 사람이 둘 이상입니다. 팀 주소로 열거나 관리자에게 문의하세요.':
+    'More than one account uses this number. Open your team’s link, or ask a manager.',
   '확인 중…': 'Checking…',
   '비밀번호 변경': 'Change password',
   '새 비밀번호가 일치하지 않습니다.': 'The new passwords do not match.',
@@ -535,8 +535,9 @@ const en: Record<string, string> = {
 
   // Login screen QR
   '휴대폰으로 열기': 'Open on your phone',
-  '휴대폰 카메라로 QR을 비추면 그 앱이 열립니다. 앱은 두 개, 주소도 두 개입니다.':
-    'Point your phone camera at a code to open that app. There are two apps, and two links.',
+  '휴대폰 카메라로 QR을 비추면 앱이 열립니다. 아래 주소를 복사해 보내도 됩니다.':
+    'Point your phone camera at the code to open the app, or copy the link below and send it.',
+  '앱 주소': 'App link',
   '앱 주소 QR 코드: ': 'QR code for the app link: ',
 
   // Install QR
