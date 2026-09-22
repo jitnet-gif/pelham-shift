@@ -1,4 +1,5 @@
 'use client';
+import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Search, TriangleAlert, Send } from 'lucide-react';
 import type { Employee, Shift } from '@/lib/domain';
 import { useLang } from './use-lang';
@@ -58,6 +59,16 @@ export default function DaySchedule({
   onPublish: () => void;
 }) {
   const { t, lang } = useLang();
+  // 빈 칸 위에 마우스를 올리면 그 자리에 + 를 띄웁니다. 누르면 그 시각으로 근무가 열립니다.
+  const [hover, setHover] = useState<{ id: string; at: number } | null>(null);
+  // 가로 위치를 30분 단위 시각으로 바꿉니다. 클릭과 + 표시가 같은 값을 씁니다.
+  const slotAt = (event: { clientX: number; currentTarget: Element }) => {
+    const box = event.currentTarget.getBoundingClientRect();
+    const raw = FROM + ((event.clientX - box.left) / box.width) * SPAN;
+    return Math.min(Math.max(Math.round(raw / 30) * 30, FROM), TO - 30);
+  };
+  const asTime = (m: number) =>
+    String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
   const today = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/New_York',
     year: 'numeric',
@@ -186,28 +197,33 @@ export default function DaySchedule({
                     )}
                   </div>
                   <div
+                    // 마우스로 시각을 집는 보조 수단입니다. 키보드로는 옆의 + 버튼을 씁니다.
+                    role="presentation"
                     className={'dv-track' + (canEdit ? ' clickable' : '')}
+                    onMouseMove={(event) =>
+                      canEdit && setHover({ id: e.id, at: slotAt(event) })
+                    }
+                    onMouseLeave={() => setHover(null)}
                     onClick={(event) => {
                       // 빈 자리를 누르면 그 시각부터 근무를 새로 만듭니다. 30분 단위로 맞춥니다.
                       if (!canEdit) return;
-                      const box = event.currentTarget.getBoundingClientRect();
-                      const raw = FROM + ((event.clientX - box.left) / box.width) * SPAN;
-                      const snapped = Math.min(
-                        Math.max(Math.round(raw / 30) * 30, FROM),
-                        TO - 60,
-                      );
-                      onAddShift(
-                        e.id,
-                        date,
-                        String(Math.floor(snapped / 60) % 24).padStart(2, '0') +
-                          ':' +
-                          String(snapped % 60).padStart(2, '0'),
-                      );
+                      onAddShift(e.id, date, asTime(slotAt(event)));
                     }}
                   >
                     {HOURS.map((h) => (
                       <i key={h} className="dv-line" style={{ left: ((h * 60 - FROM) / SPAN) * 100 + '%' }} />
                     ))}
+                    {hover?.id === e.id && (
+                      <span
+                        className="dv-ghost"
+                        style={{
+                          left: ((hover.at - FROM) / SPAN) * 100 + '%',
+                          width: (30 / SPAN) * 100 + '%',
+                        }}
+                      >
+                        <Plus size={15} />
+                      </span>
+                    )}
                     {mine(e.id).map((s) => {
                       const start = Math.max(minutes(s.start), FROM);
                       const end = Math.min(endOf(s), TO);

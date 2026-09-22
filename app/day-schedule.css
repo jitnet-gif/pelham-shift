@@ -185,7 +185,13 @@
 .dv-row {
   display: flex;
   min-height: 56px;
-  border-bottom: 1px solid #eef2f0;
+  border-bottom: 1px solid #e4eae7;
+}
+.dv-row:hover {
+  background: #fbfdfc;
+}
+.dv-row:hover .dv-staff {
+  background: #fbfdfc;
 }
 .dv-staff {
   position: sticky;
@@ -245,12 +251,27 @@
 .dv-track.clickable {
   cursor: copy;
 }
+/* 빈 칸을 지날 때 그 자리에 뜨는 + 자국 */
+.dv-ghost {
+  position: absolute;
+  top: 9px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed #9ec0b0;
+  border-radius: 5px;
+  background: #f1f8f4;
+  color: #2f7f68;
+  pointer-events: none;
+  z-index: 1;
+}
 .dv-line {
   position: absolute;
   top: 0;
   bottom: 0;
   width: 1px;
-  background: #eef2f0;
+  background: #e4eae7;
 }
 .dv-shift {
   position: absolute;
