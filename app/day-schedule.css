@@ -1,0 +1,346 @@
+/* 7shifts Day 보기: 왼쪽 직원 칸은 고정, 오른쪽은 오전 5시부터 자정까지의 시간 눈금입니다. */
+.dayview {
+  --dv-staff: 250px;
+  --dv-hour: 78px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+.dayview-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.dayview-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dayview-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid #d7e0db;
+  border-radius: 8px;
+  background: #fff;
+  color: #46615a;
+}
+.dayview-date {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid #d7e0db;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #21362e;
+  cursor: pointer;
+}
+.dayview-date input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  cursor: pointer;
+}
+.dayview-today {
+  min-height: 34px;
+  padding: 0 15px;
+  border: 1px solid #d7e0db;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 14px;
+  color: #21362e;
+}
+.dayview-state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.dayview-pub {
+  font-size: 13px;
+  color: #7a8c80;
+  text-decoration: underline;
+}
+.dayview-pub.on {
+  color: #087e6d;
+}
+.dayview-warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  border-radius: 20px;
+  background: #f2f6f4;
+  color: #7a8c80;
+  font-size: 13px;
+}
+.dayview-warn.on {
+  background: #fdeee8;
+  color: #b4543a;
+}
+.dayview-publish {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 15px;
+  border: 0;
+  border-radius: 8px;
+  background: #087e6d;
+  color: #fff;
+  font-size: 14px;
+}
+.dayview-publish:disabled {
+  background: #dfe7e3;
+  color: #8ba096;
+}
+.dayview-scroll {
+  overflow: auto;
+  max-height: min(72vh, 820px);
+  overscroll-behavior: contain;
+}
+.dayview-grid {
+  min-width: calc(var(--dv-staff) + var(--dv-hour) * 20);
+}
+/* 시간 머리줄 */
+.dv-corner,
+.dv-hours {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  background: #fff;
+}
+.dv-corner {
+  left: 0;
+  z-index: 14;
+  float: left;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  width: var(--dv-staff);
+  height: 62px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  box-shadow: 1px 0 0 #e7ecea;
+}
+.dv-corner-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+  color: #33564a;
+}
+.dv-corner small,
+.dv-staff small {
+  font-size: 12px;
+  color: #8a9a92;
+}
+.dv-hours {
+  display: grid;
+  grid-template-columns: repeat(20, minmax(var(--dv-hour), 1fr));
+  margin-left: var(--dv-staff);
+  height: 62px;
+  border-bottom: 1px solid var(--border);
+}
+.dv-hours span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border-left: 1px solid #eef2f0;
+  font-size: 12px;
+}
+.dv-hours b {
+  font-weight: 600;
+  color: #4a6359;
+}
+.dv-hours small {
+  color: #8a9a92;
+}
+/* 부서 묶음 */
+.dv-group {
+  clear: both;
+  padding: 9px 16px;
+  background: #33413c;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  position: sticky;
+  left: 0;
+}
+.dv-row {
+  display: flex;
+  min-height: 56px;
+  border-bottom: 1px solid #eef2f0;
+}
+.dv-staff {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: var(--dv-staff);
+  min-width: var(--dv-staff);
+  padding: 0 12px 0 16px;
+  background: #fff;
+  box-shadow: 1px 0 0 #e7ecea;
+}
+.dv-staff i {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  flex: none;
+}
+.dv-staff span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.dv-staff b {
+  font-size: 14px;
+  font-weight: 500;
+  color: #21362e;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dv-add {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px dashed #c6d4cd;
+  border-radius: 7px;
+  background: #fff;
+  color: #6f8a80;
+  opacity: 0;
+}
+.dv-row:hover .dv-add,
+.dv-add:focus-visible {
+  opacity: 1;
+}
+.dv-track {
+  position: relative;
+  flex: 1;
+  min-width: calc(var(--dv-hour) * 20);
+}
+.dv-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #eef2f0;
+}
+.dv-shift {
+  position: absolute;
+  top: 9px;
+  height: 38px;
+  min-width: 26px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 5px;
+  color: #fff;
+  text-align: left;
+  overflow: hidden;
+}
+.dv-shift b {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.dv-shift span {
+  font-size: 11px;
+  opacity: 0.9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 합계 줄 */
+.dv-foot {
+  display: flex;
+  min-height: 54px;
+  border-top: 1px solid var(--border);
+  background: #f8faf9;
+}
+.dv-foot-label {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  width: var(--dv-staff);
+  min-width: var(--dv-staff);
+  padding: 0 16px;
+  background: #f8faf9;
+  box-shadow: 1px 0 0 #e7ecea;
+}
+.dv-foot-label b {
+  font-size: 14px;
+  color: #21362e;
+}
+.dv-foot-label small,
+.dv-foot-hours small {
+  font-size: 12px;
+  color: #8a9a92;
+}
+.dv-foot-hours {
+  display: grid;
+  grid-template-columns: repeat(20, minmax(var(--dv-hour), 1fr));
+  flex: 1;
+}
+.dv-foot-hours span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  border-left: 1px solid #eef2f0;
+}
+.dv-foot-hours b {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4a6359;
+}
+@media (max-width: 700px) {
+  .dayview {
+    --dv-staff: 170px;
+    --dv-hour: 64px;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+  }
+  .dayview-bar {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+  .dayview-scroll {
+    max-height: 68vh;
+  }
+  .dv-staff {
+    padding-left: 12px;
+  }
+}

@@ -94,6 +94,7 @@ import {
 import { translate } from '@/lib/i18n';
 import InstallQr from './install-qr';
 import MonthSchedule from './month-schedule';
+import DaySchedule from './day-schedule';
 import BirthLogin from './birth-login';
 import PasswordChange from './password-change';
 import LangToggle from './lang-toggle';
@@ -2950,6 +2951,7 @@ export default function ShiftApp() {
                     ])}
                     {iconPick(LayoutGrid, t('보기'), view, setView, [
                       { value: 'week', label: t('주간') },
+                      { value: 'day', label: t('일간') },
                       { value: 'today', label: t('오늘') },
                       { value: 'tomorrow', label: t('내일') },
                       { value: 'month', label: t('월간') },
@@ -3217,6 +3219,32 @@ export default function ShiftApp() {
                       </div>
                     </div>
                   </div>
+                ) : view === 'day' ? (
+                  <DaySchedule
+                    date={day}
+                    employees={staffReadOnly ? staff : visibleEmployees}
+                    shifts={data.shifts.filter((shift) =>
+                      (staffReadOnly ? staff : visibleEmployees).some(
+                        (employee) => employee.id === shift.employeeId,
+                      ),
+                    )}
+                    rateOf={(id) => emp(id)?.rate || 0}
+                    money={money}
+                    published={data.published}
+                    canEdit={!staffReadOnly}
+                    onDateChange={setDay}
+                    onShiftSelect={(id) => open('detail', { id })}
+                    onAddShift={(employeeId, date) =>
+                      open('shift', {
+                        employeeId,
+                        date,
+                        start: '09:00',
+                        end: '17:00',
+                        area: emp(employeeId)?.role || AREAS[0],
+                      })
+                    }
+                    onPublish={() => void command('publish')}
+                  />
                 ) : staffReadOnly || view === 'month' ? (
                   <MonthSchedule
                     date={day}

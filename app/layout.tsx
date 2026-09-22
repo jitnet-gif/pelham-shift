@@ -6,6 +6,7 @@ import './task-launch.css';
 import './schedule-controls.css';
 import './timeline.css';
 import './month-schedule.css';
+import './day-schedule.css';
 import './birth-login.css';
 import './password-change.css';
 import './app-shell.css';
