@@ -43,8 +43,9 @@ export default function BirthLogin() {
       });
       const result = (await response.json()) as { error?: string; team?: string };
       if (!response.ok) throw Error(result.error || '로그인하지 못했습니다.');
-      const target = result.team ? '/?team=' + encodeURIComponent(result.team) : '/';
-      window.location.assign(target);
+      // 로그인한 주소에 그대로 머뭅니다. '/' 로 보내면 출퇴근 앱으로 들어온 사람이 스케줄 앱으로 새어 나갑니다.
+      const here = window.location.pathname;
+      window.location.assign(result.team ? here + '?team=' + encodeURIComponent(result.team) : here);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '로그인하지 못했습니다.');
     } finally {

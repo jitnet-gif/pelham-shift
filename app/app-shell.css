@@ -300,3 +300,12 @@
 .workplace{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:2px 0 4px}
 .workplace label{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:#50685b}
 .workplace input{width:90px;border:1px solid #d3dfd9;border-radius:6px;padding:8px}
+
+/* 위치가 꺼져 있는 동안 앱을 덮는 화면. 관리자에게는 줄 하나로만 알립니다. */
+.gps-block{position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:24px;background:rgb(247 249 250/.97)}
+.gps-block>div{display:flex;flex-direction:column;align-items:center;gap:14px;max-width:360px;text-align:center}
+.gps-block svg:first-child{color:#087e6d}
+.gps-block h2{margin:0;font-size:22px;font-weight:650;letter-spacing:-.5px}
+.gps-block p{margin:0;font-size:15px;line-height:1.8;color:#6b7a76}
+.gps-block .button{margin-top:6px;min-height:46px;padding:0 22px;border-radius:24px}
+.gps-note{display:flex;align-items:center;gap:9px;position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:60;max-width:calc(100vw - 32px);padding:11px 16px;border:1px solid #ebdcb6;border-radius:24px;background:#fff5df;color:#7a6326;font-size:13px;line-height:1.5}

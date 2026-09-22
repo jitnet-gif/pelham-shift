@@ -112,6 +112,7 @@ import StaffTimesheets from './staff-timesheets';
 import StaffClock from './staff-clock';
 import StaffMore, { type MoreItem } from './staff-more';
 import TimePicker from './time-picker';
+import GpsGuard, { useGps } from './gps-guard';
 import { LAYOUT_KEY, readLayout, type Layout } from './layout-choice';
 const minutesOf = (v: string) => Number(v.slice(0, 2)) * 60 + Number(v.slice(3, 5));
 // 폰 상단 바는 브랜드 대신 지금 보고 있는 화면 이름을 띄웁니다. 사이드바와 같은 말을 씁니다.
@@ -189,11 +190,13 @@ const employeeNav = new Set([
   'availability',
   'help',
 ]);
-export default function ShiftApp() {
+// landing 은 홈 화면 아이콘이 어느 탭에서 시작할지 정합니다.
+// '/' 는 스케줄에서, 따로 설치하는 출퇴근 앱('/attendance')은 출퇴근 탭에서 엽니다.
+export default function ShiftApp({ landing = 'schedule' }: { landing?: string }) {
   const { t, lang, days, locale } = useLang();
   const [data, setData] = useState<State>(seed);
   const [week, setWeek] = useState(weekStart(localDate(new Date())));
-  const [tab, setTab] = useState('schedule');
+  const [tab, setTab] = useState(landing);
   // 스케줄은 오늘 하루부터 보여줍니다. 주간은 보기 메뉴에서 고릅니다.
   const [view, setView] = useState('day');
   // 직원 폰 화면의 상태: 스케줄의 '내 근무/전체', 메시지 탭, 지금 보고 있는 급여 기간.
@@ -204,6 +207,8 @@ export default function ShiftApp() {
   const [clockField, setClockField] = useState<{ key: string; label: string; step: number } | null>(null);
   // 근무지를 지정하는 동안 기기에 자리를 물어보는 중인지.
   const [locating, setLocating] = useState(false);
+  // 근무지를 지정해 둔 곳에서는 앱을 여는 동안 위치를 계속 지켜봅니다.
+  const gps = useGps(!!data.workplace);
   const [version, setVersion] = useState(0);
   const [team, setTeam] = useState('');
   const [actor, setActor] = useState({ id: 'admin', admin: true });
@@ -245,7 +250,7 @@ export default function ShiftApp() {
   };
   const logout = async () => {
     await fetch('/api/birth-login', { method: 'DELETE' }).catch(() => 0);
-    window.location.assign('/' + query());
+    window.location.assign(window.location.pathname + query());
   };
   const [push, setPush] = useState<{ on: boolean; tickUrl?: string }>({
     on: false,
@@ -278,7 +283,7 @@ export default function ShiftApp() {
     popping: false,
   });
   useEffect(() => {
-    back.current.home = staffPhone ? 'home' : 'schedule';
+    back.current.home = landing === 'home' ? (actor.admin ? 'attendance' : 'home') : staffPhone ? 'home' : 'schedule';
     back.current.modal = modal;
     back.current.navOpen = navOpen;
     back.current.payDetail = payDetail;
@@ -305,7 +310,8 @@ export default function ShiftApp() {
       if (state.payDetail) return setPayDetail('');
       if (state.clock) return setClockField(null);
       if (state.modal) return setModal('');
-      if (state.sheet) return setSheet('');
+      // 근무표 화면에 있을 때만 한 걸음으로 칩니다. 다른 화면에서는 보이지 않는 값을 소비해 헛걸음이 됩니다.
+      if (state.tab === 'timesheets' && state.sheet) return setSheet('');
       // 팀 화면에 있을 때만 한 걸음으로 칩니다. 다른 화면에서는 헛걸음이 됩니다.
       if (state.tab === 'team' && state.teamPick) return setTeamPick('');
       const previous = state.trail.pop();
@@ -389,6 +395,14 @@ export default function ShiftApp() {
     }, 30000);
     return () => clearInterval(timer);
   }, []);
+  // 출퇴근 앱을 관리자가 열면 시계 대신 출근 기록을 띄웁니다. 관리자에게는 찍을 자기 근무가 없습니다.
+  // 로그인이 끝나야 관리자인지 알 수 있어 한 번만, 그때 옮깁니다.
+  const landed = useRef(false);
+  useEffect(() => {
+    if (landed.current || auth !== 'in' || landing !== 'home') return;
+    landed.current = true;
+    if (actor.admin) setTab('attendance');
+  }, [auth, actor.admin, landing]);
   useEffect(() => {
     if (!actor.admin) {
       setFilter('all');
@@ -2314,6 +2328,7 @@ export default function ShiftApp() {
           </DialogContent>
         </Dialog>
       )}
+      <GpsGuard state={gps.state} admin={actor.admin} onRetry={gps.retry} />
       {clockField && (
         <TimePicker
           key={clockField.key}
@@ -4166,6 +4181,7 @@ export default function ShiftApp() {
                 location={LOCATION}
                 busy={busy}
                 needsLocation={!!data.workplace}
+                spot={gps.spot}
                 onPunch={(action, photo, place) =>
                   void command(action, { photo, ...place })
                 }

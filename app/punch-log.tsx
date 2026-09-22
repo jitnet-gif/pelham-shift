@@ -146,7 +146,9 @@ export default function PunchLog({
                     <Camera size={16} />
                     <span>
                       {t(caption)}{' '}
-                      {at ? t('보관 기간 지남') : t('없음')}
+                      {/* 왜 못 불러왔는지는 화면에서 알 수 없습니다 — 보관 기간이 지났을 수도,
+                          저장이 실패했을 수도 있어 단정하지 않습니다. */}
+                      {at ? t('불러오지 못함') : t('없음')}
                     </span>
                   </span>
                 ),

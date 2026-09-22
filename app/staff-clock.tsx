@@ -30,6 +30,7 @@ export default function StaffClock({
   location,
   busy,
   needsLocation,
+  spot,
   onPunch,
   onBreak,
 }: {
@@ -40,6 +41,8 @@ export default function StaffClock({
   busy: boolean;
   // 근무지를 지정해 둔 곳이면, 사진과 함께 지금 서 있는 자리도 보냅니다.
   needsLocation: boolean;
+  // 앱이 내내 지켜보고 있는 자리. 찍는 순간에만 위치를 켜는 일이 없도록 이 값을 씁니다.
+  spot: { lat: number; lng: number } | null;
   onPunch: (
     action: 'punchIn' | 'punchOut',
     photo: string,
@@ -142,8 +145,12 @@ export default function StaffClock({
     }
     let place: { lat: number; lng: number } | undefined;
     if (needsLocation) {
-      setProblem('위치를 확인하는 중입니다…');
-      place = (await locate()) ?? undefined;
+      // 지켜보던 값이 있으면 그대로 쓰고, 아직 첫 값을 못 받았을 때만 한 번 더 물어봅니다.
+      place = spot ?? undefined;
+      if (!place) {
+        setProblem('위치를 확인하는 중입니다…');
+        place = (await locate()) ?? undefined;
+      }
       if (!place) {
         setProblem('위치를 확인하지 못했습니다. 위치 권한을 허용하고 다시 눌러주세요.');
         return;

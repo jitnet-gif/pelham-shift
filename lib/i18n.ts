@@ -678,6 +678,14 @@ const en: Record<string, string> = {
   '오늘 고마웠던 동료: ': 'Shout-out to: ',
 
   // 출퇴근 가능 위치 · geofence
+  '위치 확인 필요': 'Location needed',
+  '위치를 켜주세요': 'Turn on location',
+  '잠시만 기다려 주세요.': 'One moment.',
+  '근무지에서 일하는 동안에만 앱이 열립니다. 기기 설정에서 위치를 켜고, 이 앱에 위치 권한을 허용해 주세요.':
+    'The app opens only while you are at work. Turn on location in your device settings and allow this app to use it.',
+  '이 기기에서 위치가 꺼져 있습니다. 직원은 위치를 켜야 앱을 쓸 수 있습니다.':
+    'Location is off on this device. Staff need it on to use the app.',
+  '다시 확인': 'Check again',
   '출퇴근 가능 위치': 'Where shifts can be punched',
   '지금 내 위치로 지정': 'Use my location',
   '위치를 확인하는 중입니다…': 'Checking your location…',

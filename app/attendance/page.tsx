@@ -1,18 +1,7 @@
-import { redirect } from 'next/navigation';
+import ShiftApp from '../shift-app';
 
-// 출퇴근은 앱 안 홈 탭으로 합쳤습니다. 이 주소는 홈 화면에 추가해 둔 사람이나 북마크가 있을 수 있어,
-// 없는 주소로 두지 않고 앱 첫 화면으로 넘깁니다. team 같은 주소 뒤 값은 그대로 들고 갑니다.
-export const dynamic = 'force-dynamic';
-
-export default async function AttendanceMoved({
-  searchParams,
-}: {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
-  const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(await searchParams)) {
-    if (typeof value === 'string') query.set(key, value);
-  }
-  const rest = query.toString();
-  redirect('/' + (rest ? '?' + rest : ''));
+// 홈 화면의 주황 아이콘이 여는 자리입니다. 스케줄 앱과 같은 화면이지만 출퇴근 탭에서 시작합니다.
+// 예전에는 이 주소가 '/' 로 넘기기만 했습니다. 이제 설치되는 앱의 start_url 이라 실제 화면이 있어야 합니다.
+export default function Attendance() {
+  return <ShiftApp landing="home" />;
 }

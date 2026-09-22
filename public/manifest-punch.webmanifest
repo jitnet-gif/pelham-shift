@@ -1,0 +1,16 @@
+{
+  "id": "/attendance",
+  "name": "Pelham Punch",
+  "short_name": "Punch In",
+  "description": "출근·퇴근과 휴게 시간을 폰에서 바로 찍습니다",
+  "start_url": "/attendance",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fff3e8",
+  "theme_color": "#e2650f",
+  "icons": [
+    { "src": "/icons/punch-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/punch-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/punch-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
