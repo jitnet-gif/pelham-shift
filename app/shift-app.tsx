@@ -126,9 +126,6 @@ const TAB_LABELS: Record<string, string> = {
   dashboard: '대시보드',
   working: '근무 현황',
   schedule: '스케줄',
-  timeoff: '휴무',
-  availability: '근무 가능 시간',
-  swaps: '대체 근무',
   team: '팀',
   logbook: '업무일지',
   messages: '메시지',
@@ -173,11 +170,8 @@ function Pick({
 const nav = [
   { key: 'schedule', label: '근무 스케줄', Icon: CalendarDays },
   { key: 'working', label: '근무 현황', Icon: Radar },
-  { key: 'timeoff', label: '휴무', Icon: CalendarX },
-  { key: 'availability', label: '근무 가능 시간', Icon: CalendarClock },
   { key: 'attendance', label: '출근 기록', Icon: Clock3 },
   { key: 'payroll', label: '급여 관리', Icon: Wallet },
-  { key: 'swaps', label: '대체 근무', Icon: ArrowLeftRight },
   { key: 'messages', label: '메시지', Icon: MessageSquare },
   { key: 'team', label: '직원 관리', Icon: Users },
 ];
@@ -189,8 +183,6 @@ const employeeNav = new Set([
   'attendance',
   'payroll',
   'messages',
-  'timeoff',
-  'availability',
   'help',
 ]);
 export default function ShiftApp() {
@@ -3305,7 +3297,6 @@ export default function ShiftApp() {
       {count > 0 && <em className="sidenav-count">{count}</em>}
     </TabsTrigger>
   );
-  const scheduleTabs = ['schedule', 'timeoff', 'availability', 'swaps'];
   const iconPick = (
     Icon: typeof CalendarDays,
     label: string,
@@ -3362,9 +3353,8 @@ export default function ShiftApp() {
       (r.status ?? 'pending') === 'pending' &&
       payPeriodStart(r.date) === payPeriodStart(today),
   );
-  const moreCount = actor.admin
-    ? pending.length + pendingOff.length + pendingAvail.length
-    : myPending.length;
+  // 더보기 안에서 숫자가 붙는 줄은 '내 근무표' 하나입니다.
+  const moreCount = myPending.length;
   // 직원 폰의 '더보기'에 들어가는 화면들. 탭바에서 밀려난 것들이 여기 모입니다.
   const staffMore: { label?: string; items: MoreItem[] }[] = [
     {
@@ -3379,14 +3369,6 @@ export default function ShiftApp() {
             setTab('timesheets');
           },
         },
-        { key: 'timeoff', label: '휴무', Icon: CalendarX, onSelect: () => setTab('timeoff') },
-        {
-          key: 'availability',
-          label: '근무 가능 시간',
-          Icon: CalendarClock,
-          onSelect: () => setTab('availability'),
-        },
-        { key: 'swaps', label: '대체 근무', Icon: ArrowLeftRight, onSelect: () => setTab('swaps') },
       ],
     },
     {
@@ -3527,23 +3509,7 @@ export default function ShiftApp() {
             {canPunch && navItem('home', 'tab::출퇴근', House)}
             {actor.admin && navItem('dashboard', '대시보드', LayoutDashboard)}
             {actor.admin && navItem('working', '근무 현황', Radar, { sub: true })}
-            <div className={'sidenav-group' + (scheduleTabs.includes(tab) ? ' current' : '')}>
-              <span className="sidenav-heading">
-                <CalendarDays size={19} />
-                <span>{t('스케줄')}</span>
-              </span>
-              {navItem('schedule', '스케줄', CalendarDays, { sub: true })}
-              {navItem('timeoff', '휴무', CalendarX, {
-                sub: true,
-                count: actor.admin ? pendingOff.length : 0,
-              })}
-              {navItem('availability', '근무 가능 시간', CalendarClock, {
-                sub: true,
-                count: actor.admin ? pendingAvail.length : 0,
-              })}
-              {actor.admin &&
-                navItem('swaps', '대체 근무', ArrowLeftRight, { sub: true, count: pending.length })}
-            </div>
+            {navItem('schedule', '스케줄', CalendarDays)}
             {actor.admin && navItem('team', '팀', Users)}
             <hr />
             <a className="sidenav-item" href={'/tasks' + query()}>
