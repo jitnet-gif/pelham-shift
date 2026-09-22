@@ -136,12 +136,13 @@ export default function PhoneSchedule({
           </button>
         )}
       </header>
-      <div className="psched-week" role="tablist" aria-label={t('요일 고르기')}>
+      <div className="psched-week">
         {weekDates.map((date, i) => (
           <button
             key={date}
-            role="tab"
-            aria-selected={date === from}
+            // 화면에는 '화 22' 만 보이지만, 읽어 줄 때는 무슨 날인지 온전히 들립니다.
+            aria-label={dayLabel(date)}
+            aria-pressed={date === from}
             className={
               'psched-chip' +
               (date === from ? ' on' : '') +
@@ -157,14 +158,16 @@ export default function PhoneSchedule({
       <div className="psched-place">
         <MapPin size={16} />
         <span>{location}</span>
-        <button
-          className={'psched-filter' + (filtersOpen ? ' on' : '')}
-          aria-label={t('보기 설정')}
-          aria-expanded={filtersOpen}
-          onClick={onToggleFilters}
-        >
-          <SlidersHorizontal size={18} />
-        </button>
+        {filters && (
+          <button
+            className={'psched-filter' + (filtersOpen ? ' on' : '')}
+            aria-label={t('보기 설정')}
+            aria-expanded={filtersOpen}
+            onClick={onToggleFilters}
+          >
+            <SlidersHorizontal size={18} />
+          </button>
+        )}
       </div>
       {filtersOpen && filters}
       {actions && <div className="psched-actions">{actions}</div>}
