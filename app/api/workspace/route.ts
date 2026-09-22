@@ -1,6 +1,6 @@
 import {after} from 'next/server';
 import {env} from '@/lib/db';
-import {seed,PAY_PERIOD_DAYS,addDays,distanceMeters,localDate,payPeriodStart} from '@/lib/domain';
+import {seed,distanceMeters} from '@/lib/domain';
 import {photoBytes} from '@/lib/punch-photo';
 import {applyCommand,type Command} from '@/lib/operations';
 import {context,visible,json,sameOrigin} from '@/lib/workspace';
@@ -22,16 +22,8 @@ export async function POST(req:Request){try{if(!sameOrigin(req))return json({err
   const away=Math.round(distanceMeters(place,{lat,lng}));
   if(away>place.radius)
    return json({error:`근무지에서 약 ${away}m 떨어져 있어 출퇴근을 기록하지 않았습니다. 근무지에서 다시 눌러주세요.`},400)}
- // 사진 자체는 state 에 넣지 않습니다 — 찍힌 시각만 남고 사진은 punch_photos 표로 갑니다.
- if(photo){const p=body.payload as Record<string,unknown>;delete p.photo;delete p.lat;delete p.lng;delete p.accuracy;p.photoAt=new Date().toISOString()}
+ // 사진은 그 자리에서 찍었는지 확인하는 데에만 씁니다. 확인이 끝나면 버리고 서버 어디에도 남기지 않습니다.
+ // 남는 것은 '언제 찍었는지'와 '어디서 찍었는지'뿐입니다.
+ if(photo){const p=body.payload as Record<string,unknown>;delete p.photo;p.photoAt=new Date().toISOString()}
  const state=applyCommand(c.state,body,c.actor);const result=await env.DB.prepare('UPDATE workspaces SET state = ?, version = version + 1 WHERE id = ? AND version = ?').bind(JSON.stringify(state),c.team,c.row.version).run();if(result.meta.changes!==1)return json({error:'동시 변경이 감지되었습니다. 다시 불러오세요.'},409);
- if(photo){
-  // 사진은 기록이 남은 뒤에 붙입니다. 사진 저장이 실패해도 찍힌 출퇴근은 그대로 남습니다.
-  const today=localDate(new Date());
-  const target=(state.punches??[]).filter(p=>p.employeeId===c.actor.id).at(-1);
-  if(target){
-   await env.DB.prepare('INSERT INTO punch_photos (punch_id,kind,workspace,taken_on,photo) VALUES (?,?,?,?,?) ON CONFLICT (punch_id,kind) DO UPDATE SET taken_on=excluded.taken_on, photo=excluded.photo')
-    .bind(target.id,body.type==='punchIn'?'in':'out',c.team,today,photo).run().catch(()=>0);
-   // 지지난 급여 기간보다 오래된 사진은 함께 지웁니다.
-   await env.DB.prepare('DELETE FROM punch_photos WHERE workspace = ? AND taken_on < ?')
-    .bind(c.team,addDays(payPeriodStart(today),-2*PAY_PERIOD_DAYS)).run().catch(()=>0)}}if(body.type==='message'){const m=state.messages.at(-1);const to=m?.to==='all'?state.employees.map(e=>e.id):[m?.to||''];after(()=>notify(c.team,to.filter(id=>id&&id!==c.actor.id),{title:c.actor.admin?'관리자 메시지':'직원 메시지',body:(c.actor.admin?'':(state.employees.find(e=>e.id===c.actor.id)?.name||'')+': ')+(m?.body||''),tag:'message'},new URL(req.url).origin).catch(()=>0))}if(body.type==='rain'){const m=state.messages.at(-1);after(()=>notify(c.team,m?.recipients??state.employees.map(e=>e.id),{title:'우천 근무 종료',body:m?.body||'',tag:'rain'},new URL(req.url).origin).catch(()=>0))}return json({state:visible(state,c.actor),version:c.row.version+1,team:c.team,actor:c.actor})}catch(e){return json({error:e instanceof Error?e.message:'저장하지 못했습니다.'},400)}}
+if(body.type==='message'){const m=state.messages.at(-1);const to=m?.to==='all'?state.employees.map(e=>e.id):[m?.to||''];after(()=>notify(c.team,to.filter(id=>id&&id!==c.actor.id),{title:c.actor.admin?'관리자 메시지':'직원 메시지',body:(c.actor.admin?'':(state.employees.find(e=>e.id===c.actor.id)?.name||'')+': ')+(m?.body||''),tag:'message'},new URL(req.url).origin).catch(()=>0))}if(body.type==='rain'){const m=state.messages.at(-1);after(()=>notify(c.team,m?.recipients??state.employees.map(e=>e.id),{title:'우천 근무 종료',body:m?.body||'',tag:'rain'},new URL(req.url).origin).catch(()=>0))}return json({state:visible(state,c.actor),version:c.row.version+1,team:c.team,actor:c.actor})}catch(e){return json({error:e instanceof Error?e.message:'저장하지 못했습니다.'},400)}}

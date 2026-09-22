@@ -12,8 +12,11 @@ export type TimeOff = {id:string;employeeId:string;from:string;to:string;allDay:
 export type Availability = {id:string;employeeId:string;weekday:number;allDay:boolean;start?:string;end?:string;note:string;effectiveFrom?:string;status:Decision;createdAt:string;decidedAt?:string};
 // 직원이 그 자리에서 찍은 실제 출퇴근. 나중에 올리는 출근기계 기록(Attendance)과 달리 지금 이 순간을 말합니다.
 export type PunchBreak = {start:string;end?:string;paid:boolean};
+// 출퇴근을 찍은 자리. 사진은 서버에 남기지 않고, 어디서 찍었는지만 기록합니다.
+// 위치 권한을 막아 둔 기기도 있어 없을 수 있습니다 — 없으면 그냥 비워 둡니다.
+export type PunchSpot = {lat:number;lng:number;accuracy?:number};
 // 직원이 그 자리에서 찍은 실제 출퇴근. status 는 급여 기간이 닫히기 전 직원 본인이 확인한 결과입니다.
-export type Punch = {id:string;employeeId:string;date:string;in:string;out?:string;area?:string;breaks?:PunchBreak[];photoAt?:string;outPhotoAt?:string;status?:'pending'|'approved'|'disputed';disputeNote?:string;editedBy?:string;reviewedAt?:string};
+export type Punch = {id:string;employeeId:string;date:string;in:string;out?:string;area?:string;breaks?:PunchBreak[];photoAt?:string;outPhotoAt?:string;spot?:PunchSpot;outSpot?:PunchSpot;status?:'pending'|'approved'|'disputed';disputeNote?:string;editedBy?:string;reviewedAt?:string};
 // 출근기계 타임카드는 사람을 이름으로만 알려 줍니다. 한 번 승인한 이름은 이 목록에 남아 다음 임포트부터 자동으로 이어집니다.
 export type ClockName = {name:string;raw:string;employeeId:string};
 // name 은 비교용으로 다듬은 값, raw 는 출근기계에 찍힌 그대로의 표기입니다.

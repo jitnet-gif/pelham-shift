@@ -2,15 +2,15 @@
 // next/image 를 쓰지 않습니다. 그 파이프라인은 이미지를 서버에 캐시하는데,
 // 이 사진은 사람 얼굴이라 no-store 로 내보내고 있습니다. 캐시하면 그 뜻이 사라집니다.
 // oxlint-disable next/no-img-element
-import { useState } from 'react';
-import { Camera, Coffee, X } from 'lucide-react';
-import type { Employee, Punch } from '@/lib/domain';
+import { Camera, Coffee, MapPin } from 'lucide-react';
+import type { Employee, Punch, PunchSpot } from '@/lib/domain';
 import { duration } from '@/lib/domain';
 import { useLang } from './use-lang';
 
-// 단말에서 찍힌 출퇴근 기록. 사진은 state 에 없고 필요할 때 한 장씩 불러옵니다.
-const photoSrc = (punchId: string, kind: 'in' | 'out') =>
-  '/api/punch-photo?punch=' + encodeURIComponent(punchId) + '&kind=' + kind;
+// 단말에서 찍힌 출퇴근 기록. 사진은 서버에 남지 않으므로, 찍은 자리와 확인 여부만 보여 줍니다.
+const mapLink = (spot: PunchSpot) =>
+  'https://www.google.com/maps/search/?api=1&query=' + spot.lat + ',' + spot.lng;
+const coords = (spot: PunchSpot) => spot.lat.toFixed(5) + ', ' + spot.lng.toFixed(5);
 const clock = (v: string) => {
   const h = Number(v.slice(0, 2));
   return `${h % 12 || 12}:${v.slice(3, 5)} ${h < 12 ? 'AM' : 'PM'}`;
@@ -26,12 +26,6 @@ export default function PunchLog({
   isAdmin: boolean;
 }) {
   const { t, locale } = useLang();
-  // 크게 볼 사진 한 장. 닫으면 다시 비웁니다.
-  const [shown, setShown] = useState<{ id: string; kind: 'in' | 'out'; who: string } | null>(null);
-  // 사진은 두 급여 기간이 지나면 지워지지만 찍힌 시각은 기록에 남습니다.
-  // 지워진 사진을 부르면 깨진 그림이 뜨므로, 한 번 실패한 자리는 안내로 바꿉니다.
-  const [gone, setGone] = useState<string[]>([]);
-  const missing = (id: string, kind: string) => gone.includes(id + ':' + kind);
   const of = (id: string) => employees.find((e) => e.id === id);
   const dayLabel = (date: string) =>
     new Intl.DateTimeFormat(locale, {
@@ -115,69 +109,40 @@ export default function PunchLog({
             </div>
             {p.disputeNote && <p className="punchlog-note">{p.disputeNote}</p>}
 
-            <div className="punchlog-shots">
+            <div className="punchlog-spots">
               {([
-                ['in', p.photoAt, '출근 사진'],
-                ['out', p.outPhotoAt, '퇴근 사진'],
-              ] as const).map(([kind, at, caption]) =>
-                at && !missing(p.id, kind) ? (
-                  <button
-                    className="punchlog-shot"
-                    key={kind}
-                    onClick={() =>
-                      setShown({ id: p.id, kind, who: (who?.name ?? '') + ' · ' + t(caption) })
-                    }
-                  >
-                    <img
-                      src={photoSrc(p.id, kind)}
-                      alt={t(caption)}
-                      loading="lazy"
-                      decoding="async"
-                      onError={() =>
-                        setGone((list) =>
-                          list.includes(p.id + ':' + kind) ? list : [...list, p.id + ':' + kind],
-                        )
-                      }
-                    />
-                    <span>{t(caption)}</span>
-                  </button>
-                ) : (
-                  <span className="punchlog-shot none" key={kind}>
-                    <Camera size={16} />
-                    <span>
-                      {t(caption)}{' '}
-                      {/* 왜 못 불러왔는지는 화면에서 알 수 없습니다 — 보관 기간이 지났을 수도,
-                          저장이 실패했을 수도 있어 단정하지 않습니다. */}
-                      {at ? t('불러오지 못함') : t('없음')}
+                ['in', p.spot, p.photoAt, '출근'],
+                ['out', p.outSpot, p.outPhotoAt, '퇴근'],
+              ] as const).map(([kind, spot, at, caption]) => (
+                <div className="punchlog-spot" key={kind}>
+                  <small>{t(caption)}</small>
+                  {spot ? (
+                    <a href={mapLink(spot)} target="_blank" rel="noreferrer noopener">
+                      <MapPin size={14} />
+                      <span>{coords(spot)}</span>
+                      {spot.accuracy != null && (
+                        <em>{t('±{n}m', { n: spot.accuracy })}</em>
+                      )}
+                    </a>
+                  ) : (
+                    <span className="none">
+                      <MapPin size={14} />
+                      {at ? t('위치 없음') : t('기록 없음')}
                     </span>
-                  </span>
-                ),
-              )}
+                  )}
+                  {at && (
+                    <span className="punchlog-seen">
+                      <Camera size={13} />
+                      {t('사진 확인됨')}
+                    </span>
+                  )}
+                </div>
+              ))}
             </div>
           </article>
         );
       })}
 
-      {shown && (
-        <dialog className="punchlog-view" open aria-label={shown.who}>
-          <button
-            className="punchlog-viewscrim"
-            aria-label={t('닫기')}
-            onClick={() => setShown(null)}
-          />
-          <figure>
-            <img src={photoSrc(shown.id, shown.kind)} alt={shown.who} />
-            <figcaption>{shown.who}</figcaption>
-          </figure>
-          <button
-            className="punchlog-close"
-            aria-label={t('닫기')}
-            onClick={() => setShown(null)}
-          >
-            <X size={22} />
-          </button>
-        </dialog>
-      )}
     </div>
   );
 }
