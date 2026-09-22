@@ -42,8 +42,9 @@ export function distanceMeters(a:{lat:number;lng:number},b:{lat:number;lng:numbe
  const dLat=rad(b.lat-a.lat),dLng=rad(b.lng-a.lng);
  const h=Math.sin(dLat/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLng/2)**2;
  return 2*R*Math.asin(Math.min(1,Math.sqrt(h)))}
-// 기본 반경. 클럽하우스 둘레를 넉넉히 덮으면서 옆 동네까지는 열어 주지 않는 선입니다.
-export const DEFAULT_WORKPLACE_RADIUS=300;
+// 기본 반경. 클럽하우스 앞에서 찍은 것만 통과시키는 선입니다.
+// 코스 안쪽에서도 찍어야 하면 관리자가 팀 워크스페이스 화면에서 늘립니다.
+export const DEFAULT_WORKPLACE_RADIUS=100;
 export const MIN_WORKPLACE_RADIUS=50,MAX_WORKPLACE_RADIUS=2000;
 export const weekdayOf=(date:string)=>new Date(date+'T12:00:00Z').getUTCDay();
 // 급여 기간은 일요일에 시작하는 2주입니다. 기준일 2026-09-20 은 실제 운영 주기(9/20~10/3)에 맞춘 일요일입니다.

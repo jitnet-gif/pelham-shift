@@ -1,4 +1,6 @@
 'use client';
+// next/image 를 쓰지 않습니다. 방금 찍은 사진은 data URL 이라 서버에 보낼 것도 캐시할 것도 없습니다.
+// oxlint-disable next/no-img-element
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Camera, Coffee, Hourglass, LogOut } from 'lucide-react';
 import type { Employee, Punch, Shift } from '@/lib/domain';
@@ -14,6 +16,8 @@ const clock = (v: string) => {
 };
 // 저장할 사진 크기. 얼굴을 알아볼 만하면서 기록이 무거워지지 않는 선입니다.
 const SHOT_WIDTH = 360;
+// 찍힌 사진을 화면에 크게 띄워 두는 시간. 이 뒤에는 다시 카메라가 보입니다.
+const REVIEW_MS = 3000;
 // 매장 시각(뉴욕)의 HH:MM. 찍히는 시각과 같은 기준이어야 '근무한 시간'이 어긋나지 않습니다.
 const hhmm = (d: Date) =>
   new Intl.DateTimeFormat('en-GB', {
@@ -33,7 +37,6 @@ export default function StaffClock({
   spot,
   onPunch,
   onBreak,
-  needsPunchId,
 }: {
   employee?: Employee;
   punch?: Punch;
@@ -48,11 +51,8 @@ export default function StaffClock({
     action: 'punchIn' | 'punchOut',
     photo: string,
     place?: { lat: number; lng: number; accuracy?: number },
-    punchId?: string,
   ) => void;
   onBreak: (action: 'start' | 'end') => void;
-  // 이 직원에게 Punch ID 가 지정돼 있으면, 출근을 찍을 때 그 번호를 함께 확인합니다.
-  needsPunchId: boolean;
 }) {
   const { t, locale } = useLang();
   // 헤더 시계와 '근무한 시간'은 분이 바뀌면 같이 움직입니다.
@@ -63,9 +63,11 @@ export default function StaffClock({
   }, []);
   const [camera, setCamera] = useState<'off' | 'on' | 'denied'>('off');
   const [problem, setProblem] = useState('');
-  // 출근할 때 직접 넣는 Punch ID. 미리 채우지 않습니다 — 채우면 확인하는 뜻이 없어집니다.
-  const [code, setCode] = useState('');
   const [shot, setShot] = useState('');
+  // 방금 찍힌 사진. 누른 자리에서 잠깐 크게 보여 주고 다시 카메라로 돌아갑니다.
+  const [review, setReview] = useState('');
+  const reviewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const audio = useRef<AudioContext | null>(null);
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
   // 마지막으로 잡은 프레임의 시각. 같은 값이 또 나오면 영상이 멈춘 것이고,
@@ -118,6 +120,53 @@ export default function StaffClock({
     document.addEventListener('visibilitychange', again);
     return () => document.removeEventListener('visibilitychange', again);
   }, [start]);
+
+  // 화면을 떠날 때 띄워 둔 사진과 소리 장치를 함께 거둡니다.
+  useEffect(
+    () => () => {
+      if (reviewTimer.current) clearTimeout(reviewTimer.current);
+      void audio.current?.close().catch(() => 0);
+      audio.current = null;
+    },
+    [],
+  );
+
+  // 찰깍. 사진이 찍힌 순간을 소리로 알려 줍니다.
+  // 소리 파일을 받아 두지 않고 그 자리에서 만들어 냅니다 — 기기가 조용하면 소리도 나지 않습니다.
+  const shutter = () => {
+    try {
+      const Maker =
+        window.AudioContext ??
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!Maker) return;
+      const ctx = (audio.current ??= new Maker());
+      void ctx.resume().catch(() => 0);
+      // 짧게 터졌다 바로 잦아드는 소리. 셔터가 열리고 닫히는 두 번입니다.
+      const tick = (at: number, loud: number) => {
+        const length = Math.round(ctx.sampleRate * 0.03);
+        const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+        const wave = buffer.getChannelData(0);
+        for (let i = 0; i < length; i += 1)
+          wave[i] = (Math.random() * 2 - 1) * (1 - i / length) ** 3;
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        const band = ctx.createBiquadFilter();
+        band.type = 'bandpass';
+        band.frequency.value = 2600;
+        band.Q.value = 0.9;
+        const volume = ctx.createGain();
+        volume.gain.value = loud;
+        source.connect(band).connect(volume).connect(ctx.destination);
+        source.start(at);
+      };
+      const at = ctx.currentTime;
+      tick(at, 0.5);
+      tick(at + 0.08, 0.3);
+    } catch {
+      // 소리를 내지 못해도 사진과 기록은 그대로입니다. 다음 번에 다시 만들어 봅니다.
+      audio.current = null;
+    }
+  };
 
   // 지금 보이는 화면을 한 장 잡습니다. 까맣거나 가려져 있으면 사진으로 치지 않습니다.
   const capture = (): { photo?: string; problem?: string } => {
@@ -176,16 +225,17 @@ export default function StaffClock({
     });
   // 출근·퇴근은 사진이 먼저입니다. 사진이 없으면 서버로 보내지도 않습니다.
   const press = async (action: 'punchIn' | 'punchOut') => {
-    // 번호가 비어 있으면 사진부터 찍지 않습니다. 어차피 저장되지 않습니다.
-    if (action === 'punchIn' && needsPunchId && !code.trim()) {
-      setProblem('Punch ID를 넣어주세요.');
-      return;
-    }
     const taken = capture();
     if (!taken.photo) {
       setProblem(taken.problem || '사진이 찍히지 않았습니다.');
       return;
     }
+    // 소리와 사진은 누른 그 자리에서 바로 내보냅니다.
+    // 아래 await 를 지나고 나면 누른 손가락과 이어지지 않아 소리가 나지 않는 기기가 있습니다.
+    shutter();
+    if (reviewTimer.current) clearTimeout(reviewTimer.current);
+    setReview(taken.photo);
+    reviewTimer.current = setTimeout(() => setReview(''), REVIEW_MS);
     // 자리는 근무지를 지정하지 않은 곳에서도 기록에 남깁니다.
     // 다만 '그 자리에서만 찍을 수 있게' 막는 것은 근무지를 지정한 곳에서만입니다.
     let place: { lat: number; lng: number; accuracy?: number } | undefined = spot ?? undefined;
@@ -202,8 +252,7 @@ export default function StaffClock({
     }
     setProblem('');
     setShot(taken.photo);
-    onPunch(action, taken.photo, place, code.trim());
-    setCode('');
+    onPunch(action, taken.photo, place);
   };
 
   const working = punch && !punch.out ? punch : undefined;
@@ -274,7 +323,9 @@ export default function StaffClock({
         {/* 사진 찍는 화면. 누르는 순간 여기 보이는 그대로가 기록에 남습니다. */}
         <div className={'stclock-cam' + (camera === 'on' ? '' : ' off')}>
           <video ref={video} autoPlay muted playsInline />
-          {camera !== 'on' && (
+          {/* 방금 찍힌 사진. 저장되는 그대로라서 거울처럼 뒤집지 않습니다. */}
+          {review && <img className="stclock-still" src={review} alt={t('방금 찍은 사진')} />}
+          {camera !== 'on' && !review && (
             <p>
               <Camera size={26} />
               {camera === 'denied'
@@ -312,21 +363,6 @@ export default function StaffClock({
             {t(problem)}
           </p>
         )}
-        {/* 출근할 때만 물어봅니다. 서버가 확인하는 것도 출근뿐이라, 퇴근에서 묻지 않습니다. */}
-        {!working && needsPunchId && (
-          <label className="stclock-code">
-            <span>{t('Punch ID')}</span>
-            <input
-              inputMode="numeric"
-              autoComplete="off"
-              maxLength={8}
-              value={code}
-              placeholder="••••"
-              aria-label={t('Punch ID')}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
-            />
-          </label>
-        )}
         <div className="stclock-actions">
         {working ? (
           <>
@@ -344,11 +380,7 @@ export default function StaffClock({
             </button>
           </>
         ) : (
-          <button
-            className="stclock-start"
-            disabled={busy || (needsPunchId && !code.trim())}
-            onClick={() => void press('punchIn')}
-          >
+          <button className="stclock-start" disabled={busy} onClick={() => void press('punchIn')}>
             <Camera size={20} />
             {t('start::출근 찍기')}
           </button>

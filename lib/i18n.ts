@@ -27,14 +27,14 @@ const en: Record<string, string> = {
   '미기록': 'Overdue',
   'punch::출근': 'In',
   'punch::퇴근': 'Out',
-  '기록 없음': 'No punch',
+  '기록 없음': 'No check-in',
   '{a} 출근 · {b} 퇴근': 'in {a} · out {b}',
   '{a} 출근': 'in {a}',
-  '출근 찍기': 'Punch in',
-  '퇴근 찍기': 'Punch out',
-  '아직 출근을 찍지 않았습니다.': 'You have not punched in yet.',
-  '출근으로 찍혀 있습니다.': 'You are punched in.',
-  '오늘 퇴근까지 찍었습니다.': 'You are punched out for today.',
+  '출근 찍기': 'Check in',
+  '퇴근 찍기': 'Check out',
+  '아직 출근을 찍지 않았습니다.': 'You have not checked in yet.',
+  '출근으로 찍혀 있습니다.': 'You are checked in.',
+  '오늘 퇴근까지 찍었습니다.': 'You are checked out for today.',
   '일을 시작할 때 눌러주세요. 찍히는 시각은 매장 서버 시각입니다.':
     'Press it when you start. The time comes from the club server, not your phone.',
   ' 출근': ' in',
@@ -89,7 +89,7 @@ const en: Record<string, string> = {
     'From the schedule to actual hours worked, all in one record.',
   '우천 근무 종료': 'Rain closure',
   '안전하게 장비를 정리하고 퇴근 기록을 남겨주세요.':
-    'Please put the equipment away safely and clock out.',
+    'Please put the equipment away safely and check out.',
   '샘플 미리보기 · 실제 운영을 시작하면 샘플 일정은 비워집니다.':
     'Sample preview · The sample schedule is cleared once you start for real.',
   '내 워크스페이스 생성': 'Create my workspace',
@@ -264,10 +264,10 @@ const en: Record<string, string> = {
 
   // Attendance tab
   '단말에서 찍힌 출퇴근과 그때 찍힌 사진을 봅니다.':
-    'The punches taken on the time clock, with the photo from that moment.',
-  '찍힌 출퇴근': 'Punches',
+    'The check-ins taken on the time clock, with the photo from that moment.',
+  '찍힌 출퇴근': 'Check-ins',
   '출근기계에서 가져온 기록': 'Imported from the time clock',
-  '아직 찍힌 출퇴근 기록이 없습니다.': 'No punches have been recorded yet.',
+  '아직 찍힌 출퇴근 기록이 없습니다.': 'No check-ins have been recorded yet.',
   // 'Awaiting review' 는 메시지의 '확인 대기'(Not read yet)와 뜻이 달라 앞가지로 갈라 둡니다.
   'review::확인 대기': 'Awaiting review',
   '확인됨': 'Confirmed',
@@ -295,14 +295,14 @@ const en: Record<string, string> = {
     'The closest name is preselected. Once approved, this name is linked to that employee on every later import.',
   '연결할 직원': 'Link to employee',
   '기록 {n}건': '{n} records',
-  '기록 {n}건 · 퇴근 미기록 {open}건': '{n} records · {open} with no punch out',
+  '기록 {n}건 · 퇴근 미기록 {open}건': '{n} records · {open} with no check-out',
   '승인해 둔 이름 연결 {n}개': '{n} approved name link(s)',
   '연결 해제': 'Unlink',
   '출근기계에 찍힌 이름을 확인하세요.': 'Check the name as the time clock recorded it.',
   '이름 연결은 500개까지 저장할 수 있습니다.': 'Up to 500 name links can be saved.',
   '저장된 이름 연결이 아닙니다.': 'That name link is not saved.',
   '퇴근이 찍히지 않아 건너뛴 기록 {n}건: {rows}':
-    '{n} records were skipped because no one punched out: {rows}',
+    '{n} records were skipped because no one checked out: {rows}',
   '검토한 출근기록 {n}건 저장': 'Save {n} reviewed records',
   '읽은 내용을 확인하고 저장하세요.': 'Check what was read, then save.',
   '1. 열 연결': '1. Match columns',
@@ -338,7 +338,7 @@ const en: Record<string, string> = {
   시작일: 'Start date',
   종료일: 'End date',
   '지급액은 단말에서 찍힌 출퇴근을 기준으로 계산합니다. 유급 휴게는 근무로 치고 무급 휴게만 뺍니다. 그 사람 그 날짜에 찍힌 기록이 없을 때만 예전에 가져온 기록을 씁니다. 초과근무는 하루 {d}시간 초과분과 한 주(일요일 시작) {w}시간 초과분 중 큰 쪽만 {m}배로 가산합니다. 지각은 예정 출근 시각을 넘긴 분만큼 시급으로 차감하며, 예정 근무가 없는 출근기록은 지각으로 보지 않습니다. 세금·유급휴가를 제외한 예상 금액이고, 시급 0인 직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급 대상이 아니며 실제 출근기록만 지급합니다.':
-    "Pay is worked out from the punches taken on the time clock. Paid breaks count as work; only unpaid breaks come off. Imported time clock records are used only when that person has no punch on that date. Overtime pays {m}× on the greater of hours over {d} in a day or hours over {w} in a week (weeks start Sunday), never both. Lateness is deducted at the hourly rate for every minute past the scheduled start; attendance with no scheduled shift is never counted late. Estimates exclude taxes and paid leave, and pay needs checking for anyone whose hourly rate is 0. Only actual attendance is paid, not the original employee's scheduled hours.",
+    "Pay is worked out from the check-ins taken on the time clock. Paid breaks count as work; only unpaid breaks come off. Imported time clock records are used only when that person has no check-in on that date. Overtime pays {m}× on the greater of hours over {d} in a day or hours over {w} in a week (weeks start Sunday), never both. Lateness is deducted at the hourly rate for every minute past the scheduled start; attendance with no scheduled shift is never counted late. Estimates exclude taxes and paid leave, and pay needs checking for anyone whose hourly rate is 0. Only actual attendance is paid, not the original employee's scheduled hours.",
   '직원이 이의를 제기한 근무 {n}건이 이 금액에 들어 있습니다. ':
     'This total includes {n} shift(s) a staff member has disputed. ',
   '아직 아무도 확인하지 않은 근무 {n}건이 있습니다. ': '{n} shift(s) have not been reviewed yet. ',
@@ -363,7 +363,7 @@ const en: Record<string, string> = {
   '급여 상세': 'Pay detail',
   '날짜별 상세 보기': 'Open the day-by-day detail',
   '저장된 출근기록 기준입니다. 예정 시간이 아니라 실제로 찍힌 기록으로 계산합니다.':
-    'Based on saved attendance: what was actually clocked, not what was scheduled.',
+    'Based on saved attendance: the check-ins on record, not what was scheduled.',
   날짜: 'Date',
   '예정 근무': 'Scheduled',
   출퇴근: 'In / Out',
@@ -416,8 +416,8 @@ const en: Record<string, string> = {
     'Color tag · employee ID · phone · hourly rate · login settings',
   '직원 추가': 'Add employee',
   '직원 접속 주소': 'Staff link',
-  '직원은 로그인 화면에서 자기 이름을 골라 로그인합니다. 첫 비밀번호는 본인 직원 ID 이며, 직원이 직접 변경할 수 있습니다.':
-    'Staff sign in by picking their own name on the sign-in screen. Everyone starts with their own employee ID as the password and can change it themselves.',
+  '직원은 로그인 화면에서 본인 직원 ID 를 쳐서 로그인합니다. 첫 비밀번호도 본인 직원 ID 이며, 직원이 직접 변경할 수 있습니다.':
+    'Staff sign in by typing their own employee ID on the sign-in screen. That same ID is also their first password, and they can change it themselves.',
   '출근 알림 자동 점검 주소': 'Shift reminder check URL',
   '앱이 열려 있으면 30초마다 자동 점검합니다. 아무도 앱을 열지 않을 때도 1시간 전 알림을 보내려면 외부 cron(예: cron-job.org)에 이 주소를 5분 간격으로 등록하세요. 비공개 사이트는 외부 호출이 차단될 수 있습니다. 이 주소는 비밀번호처럼 보관하세요.':
     "While the app is open it checks every 30 seconds. To send 1-hour reminders even when nobody has the app open, add this URL to an external cron service (e.g. cron-job.org) every 5 minutes. Private sites may block outside calls. Keep this URL secret, like a password.",
@@ -493,19 +493,22 @@ const en: Record<string, string> = {
   // Sign-in and password
   로그인: 'Sign in',
   '로그인하지 못했습니다.': 'Could not sign in.',
-  '이름을 고르고 비밀번호를 입력하세요. 직원 첫 비밀번호는 본인 직원 ID 입니다.':
-    'Pick your name, then enter your password. Staff start with their own employee ID as the password.',
-  '직원 목록을 불러오지 못했습니다.': 'Could not load the staff list.',
+  '직원 ID와 비밀번호를 입력하세요. 첫 비밀번호는 본인 직원 ID 입니다.':
+    'Enter your employee ID and password. Your first password is your own employee ID.',
+  '직원 ID를 입력하세요.': 'Enter your employee ID.',
+  '직원 ID 또는 비밀번호를 확인하세요.': 'Check your employee ID and password.',
+  '이 직원 ID를 쓰는 팀이 여럿입니다. 팀 주소로 열어 다시 로그인하세요.':
+    'More than one team uses this employee ID. Open your team’s link and sign in there.',
   '확인 중…': 'Checking…',
   '비밀번호 변경': 'Change password',
   '새 비밀번호가 일치하지 않습니다.': 'The new passwords do not match.',
   '비밀번호를 변경하지 못했습니다.': 'Could not change the password.',
   '첫 비밀번호는 본인 직원 ID 입니다. 단말에서 눌러 보이는 번호이니 지금 바꾸는 편이 좋습니다.':
-    'Your initial password is 1111. You can change it now or later.',
+    'Your first password is your own employee ID — the number you press on the time clock, so it is worth changing now.',
   '새 비밀번호를 입력하면 다음 로그인부터 적용됩니다.':
     'The new password applies from your next sign-in.',
   '현재 비밀번호': 'Current password',
-  '첫 비밀번호: 내 직원 ID': 'Initial password: 1111',
+  '첫 비밀번호: 내 직원 ID': 'First password: your employee ID',
   '새 비밀번호': 'New password',
   '새 비밀번호 (4자 이상)': 'New password (4 or more characters)',
   '새 비밀번호 확인': 'Confirm new password',
@@ -520,9 +523,15 @@ const en: Record<string, string> = {
   '기록했습니다.': 'Recorded.',
   '기록하지 못했습니다.': 'Could not record.',
   '아직 워크스페이스가 없습니다. 관리자가 먼저 만들어야 기록이 남습니다.':
-    'There is no workspace yet. An admin has to create one before punches are saved.',
+    'There is no workspace yet. An admin has to create one before check-ins are saved.',
   '출퇴근은 직원 기록이 있어야 찍힙니다. 스케줄 앱의 직원 관리에서 본인을 직원으로 추가하고, 그 이름으로 로그인해 주세요.':
-    'Punching needs an employee record. Add yourself under Team in the Shift app, then sign in with that name.',
+    'Checking in needs an employee record. Add yourself under Team in the Shift app, then sign in with that name.',
+
+  // Login screen QR
+  '휴대폰으로 열기': 'Open on your phone',
+  '휴대폰 카메라로 QR을 비추면 그 앱이 열립니다. 앱은 두 개, 주소도 두 개입니다.':
+    'Point your phone camera at a code to open that app. There are two apps, and two links.',
+  '앱 주소 QR 코드: ': 'QR code for the app link: ',
 
   // Install QR
   '앱 설치 QR': 'Install app (QR)',
@@ -544,7 +553,7 @@ const en: Record<string, string> = {
     'There are two apps. Install them one at a time and you get two icons on your home screen.',
   '설치할 앱': 'App to install',
   '스케줄·근무표·메시지': 'Schedule, timesheets, messages',
-  '출근·퇴근·휴게 찍기': 'Punch in, punch out, breaks',
+  '출근·퇴근·휴게 찍기': 'Check in, check out, breaks',
   '나머지 앱은 위 토글로 바꿔 주소를 열고 같은 방법으로 한 번 더 설치하세요.':
     'For the other app, switch above, open its link, and install it the same way.',
   '이 앱 주소로 이동해 설치하기': 'Go to this app’s link to install it',
@@ -593,17 +602,17 @@ const en: Record<string, string> = {
   '이 기기에서 푸시 알림을 받을 수 있습니다.': 'This device can receive push notifications.',
 
   // Server errors (API routes, lib/operations.ts, lib/birth-auth.ts, lib/push.ts)
-  '본인 출퇴근만 찍을 수 있습니다.': 'You can only punch for yourself.',
+  '본인 출퇴근만 찍을 수 있습니다.': 'You can only check in and out for yourself.',
   '이미 출근으로 찍혀 있습니다. 먼저 퇴근을 찍으세요.':
-    'You are already punched in. Punch out first.',
-  '출근으로 찍힌 기록이 없습니다.': 'There is no open punch-in.',
+    'You are already checked in. Check out first.',
+  '출근으로 찍힌 기록이 없습니다.': 'There is no open check-in.',
   '휴게 중이 아닙니다.': 'You are not on a break.',
   '이미 휴게 중입니다.': 'You are already on a break.',
   '휴게는 하루 12번까지 찍을 수 있습니다.': 'You can take up to 12 breaks a day.',
   '잘못된 휴게 처리입니다.': 'That is not a valid break action.',
-  '근무 기록을 찾을 수 없습니다.': 'That punch record could not be found.',
-  '본인 근무 기록만 확인할 수 있습니다.': 'You can only review your own punch records.',
-  '퇴근까지 찍힌 근무만 확인할 수 있습니다.': 'Only punches with an out time can be reviewed.',
+  '근무 기록을 찾을 수 없습니다.': 'That check-in record could not be found.',
+  '본인 근무 기록만 확인할 수 있습니다.': 'You can only review your own check-in records.',
+  '퇴근까지 찍힌 근무만 확인할 수 있습니다.': 'Only check-ins with a check-out time can be reviewed.',
   '마감된 근무표입니다. 관리자에게 문의하세요.':
     'This timesheet is closed. Ask a manager for help.',
   '급여 기간의 시작일이 아닙니다.': 'That is not the first day of a pay period.',
@@ -624,10 +633,8 @@ const en: Record<string, string> = {
   '점검하지 못했습니다.': 'Could not run the check.',
   '지원하지 않는 요청입니다.': 'Unsupported request.',
   '생년월일 8자리를 입력하세요.': 'Enter an 8-digit birth date.',
-  '직원을 선택하세요.': 'Select your name.',
   '등록되지 않은 직원입니다. 관리자에게 확인하세요.':
     'That staff member is not registered. Check with your manager.',
-  '비밀번호를 확인하세요.': 'Check your password.',
   '새 비밀번호는 4~128자로 입력하세요.': 'The new password must be 4–128 characters.',
   '로그인한 뒤 변경할 수 있습니다.': 'Sign in to change it.',
   '관리자 비밀번호는 변경할 수 없습니다.': 'The manager password cannot be changed.',
@@ -642,7 +649,7 @@ const en: Record<string, string> = {
   '관리자 권한이 필요합니다.': 'Manager permission is required.',
   '등록된 직원을 선택하세요.': 'Choose a registered employee.',
   '이 계정은 직원 명부에 없습니다': 'This account is not on the staff list',
-  '출퇴근은 직원 명부에 있는 사람만 찍습니다.': 'Only people on the staff list punch in and out.',
+  '출퇴근은 직원 명부에 있는 사람만 찍습니다.': 'Only people on the staff list check in and out.',
   '직원 계정은 전체 일정, 본인 근태 및 급여를 읽기 전용으로만 볼 수 있습니다.':
     'Staff accounts can only view the full schedule and their own attendance and pay.',
   '직원 색상을 확인하세요.': 'Check the employee color.',
@@ -714,11 +721,12 @@ const en: Record<string, string> = {
   '변경': 'Change',
   '{money} / 시간': '{money} / hour',
   '출근기계 ID': 'Time clock ID',
-  '직원은 로그인 화면에서 자기 이름을 골라 들어옵니다. 처음 비밀번호는 본인 직원 ID 이고, 직원이 직접 바꿉니다.':
-    'Staff sign in by picking their own name on the login screen. The first password is their own employee ID, and they change it themselves.',
+  '직원은 로그인 화면에서 본인 직원 ID 를 쳐서 들어옵니다. 처음 비밀번호도 본인 직원 ID 이고, 직원이 직접 바꿉니다.':
+    'Staff sign in by typing their own employee ID on the login screen. That same ID is also the first password, and they change it themselves.',
   '직원 삭제': 'Remove employee',
   '재직': 'Active',
-  '보관': 'Archive',
+  // '재직' 과 짝을 이루는 거르개 단추입니다. 누르는 동작이 아니라 보고 있는 목록을 가리킵니다.
+  '보관': 'Archived',
   '이름으로 검색': 'Search by name',
   '찾는 이름이 없습니다.': 'No one matches that name.',
   '아직 직원이 없습니다.': 'No staff yet.',
@@ -739,10 +747,10 @@ const en: Record<string, string> = {
   'approve::확인': 'Approve',
   '이의': 'Dispute',
   '{date} 자세히 보기': 'Show {date} in full',
-  '{from} – {to} 사이에 찍힌 근무가 없습니다.': 'No shifts were punched between {from} and {to}.',
+  '{from} – {to} 사이에 찍힌 근무가 없습니다.': 'No check-ins between {from} and {to}.',
   '근무 기록에 이의': 'Dispute this shift',
   '어디가 다른가요?': "What's different?",
-  '예: 12시가 아니라 12시 30분에 퇴근했습니다.': 'For example: I clocked out at 12:30 PM, not 12:00 PM.',
+  '예: 12시가 아니라 12시 30분에 퇴근했습니다.': 'For example: I checked out at 12:30 PM, not 12:00 PM.',
 
   // 메시지 · messaging
   'title::메시지': 'Messaging',
@@ -769,15 +777,15 @@ const en: Record<string, string> = {
   '이 기기에서 위치가 꺼져 있습니다. 직원은 위치를 켜야 앱을 쓸 수 있습니다.':
     'Location is off on this device. Staff need it on to use the app.',
   '다시 확인': 'Check again',
-  '출퇴근 가능 위치': 'Where shifts can be punched',
+  '출퇴근 가능 위치': 'Where staff can check in and out',
   '지금 내 위치로 지정': 'Use my location',
   '위치를 확인하는 중입니다…': 'Checking your location…',
   '반경(m)': 'Radius (m)',
   '해제': 'Turn off',
   '근무지에서 {n}m 안에서만 출퇴근이 찍힙니다. 위도 {lat}, 경도 {lng}':
-    'Shifts can be punched within {n} m of the workplace. Latitude {lat}, longitude {lng}.',
+    'Staff can check in and out within {n} m of the workplace. Latitude {lat}, longitude {lng}.',
   '아직 지정하지 않았습니다. 근무지에서 이 버튼을 누르면 그 자리가 기준이 되고, 그 뒤로는 근처에서만 출퇴근이 찍힙니다.':
-    'Not set yet. Press this button while at the workplace and that spot becomes the centre; after that, shifts can only be punched nearby.',
+    'Not set yet. Press this button while at the workplace and that spot becomes the centre; after that, staff can only check in and out nearby.',
   '이 기기는 위치를 알려주지 않습니다.': 'This device does not report a location.',
   '위치를 확인하지 못했습니다. 위치 권한을 허용하고 다시 눌러주세요.':
     'Your location could not be checked. Allow location access and try again.',
@@ -794,12 +802,11 @@ const en: Record<string, string> = {
   '직원ID_': 'employee-ids_',
 
   // 출퇴근 단말 · /attendance kiosk
-  '누가 찍나요?': 'Who is punching?',
+  '누가 찍나요?': 'Who is checking in or out?',
   '다음': 'Next',
   '{name} 이(가) 아니신가요?': 'Not {name}?',
   '아직 직원이 없습니다. 스케줄 앱에서 먼저 직원을 추가하세요.':
     'No staff yet. Add staff in the schedule app first.',
-  'Punch ID를 넣어주세요.': 'Enter your Punch ID.',
   '직원 ID를 입력하세요': 'Enter your employee ID',
   '직원 ID가 맞지 않습니다.': 'That employee ID does not match.',
   '직원 ID (숫자 4~8자리)': 'Employee ID (4–8 digits)',
@@ -807,11 +814,12 @@ const en: Record<string, string> = {
   '이미 쓰이고 있는 직원 ID 입니다.': 'That employee ID is already in use.',
   '출퇴근 단말': 'Time clock',
   'pad::지우기': 'Clear',
-  'start::출근 찍기': 'Start shift',
-  '출근 전': 'Not punched in',
+  'start::출근 찍기': 'Check in',
+  '출근 전': 'Not checked in',
   '예정된 근무가 없습니다': 'No scheduled shift',
-  '일정이 없어도 찍을 수 있습니다.': 'You can still punch in.',
-  '출근·퇴근은 사진이 찍혀야 기록됩니다.': 'A photo is required to start or end a shift.',
+  '일정이 없어도 찍을 수 있습니다.': 'You can still check in.',
+  '출근·퇴근은 사진이 찍혀야 기록됩니다.': 'A photo is required to check in or out.',
+  '방금 찍은 사진': 'The photo just taken',
   '카메라를 켜는 중입니다…': 'Starting the camera…',
   '카메라를 켤 수 없습니다. 기기 설정에서 카메라 권한을 허용해 주세요.':
     'The camera is not available. Allow camera access in this device’s settings.',
@@ -820,6 +828,10 @@ const en: Record<string, string> = {
   '사진을 만들지 못했습니다. 다시 눌러주세요.': 'The photo could not be taken. Try again.',
   '사진이 찍히지 않았습니다.': 'No photo was taken.',
   '사진을 찍을 수 없어 기록하지 않았습니다.': 'No photo could be taken, so nothing was recorded.',
+  '카메라가 멈춰 있습니다. 잠시 뒤 다시 눌러주세요.':
+    'The camera has stopped. Wait a moment and press again.',
+  '카메라 화면이 멈춰 있습니다. 잠시 뒤 다시 눌러주세요.':
+    'The camera picture has frozen. Wait a moment and press again.',
   '사진이 찍히지 않아 출퇴근을 기록하지 않았습니다. 카메라를 확인하고 다시 눌러주세요.':
     'No shift was recorded because the photo failed. Check the camera and try again.',
   '사진이 너무 큽니다. 다시 찍어주세요.': 'That photo is too large. Take it again.',
@@ -838,13 +850,13 @@ const en: Record<string, string> = {
   'Punch ID는 숫자 4~8자리로 입력하세요.': 'Enter a Punch ID of 4 to 8 digits.',
   '이미 쓰이고 있는 Punch ID 입니다.': 'That Punch ID is already in use.',
   'Punch ID를 입력하세요': 'Enter your Punch ID',
-  '출근을 찍습니다': 'Start your shift',
+  '출근을 찍습니다': 'Check in',
   '지우기': 'CLEAR',
   '한 자 지우기': 'Delete one digit',
   'Punch ID가 맞지 않습니다.': 'That Punch ID does not match.',
   'signin::출근 찍기': 'Sign in',
-  'endshift::퇴근 찍기': 'End shift',
-  '출근 중': 'Punched-in',
+  'endshift::퇴근 찍기': 'Check out',
+  '출근 중': 'Checked-in',
   '휴게 중': 'On break',
   '{h}시간 {m}분': '{h}h {m}min',
   '근무한 시간': 'time on shift',

@@ -1,4 +1,4 @@
-import { createBirthSession, deleteBirthSession, listMembers, clearSessionCookie, sessionCookie } from '@/lib/birth-auth';
+import { createBirthSession, deleteBirthSession, findMembers, clearSessionCookie, sessionCookie } from '@/lib/birth-auth';
 export const dynamic = 'force-dynamic';
 
 const sameOrigin = (request: Request) => {
@@ -6,32 +6,22 @@ const sameOrigin = (request: Request) => {
   return !origin || origin === new URL(request.url).origin;
 };
 
-// 로그인 화면의 이름 드롭다운을 채웁니다. 로그인 전이라 인증은 없고, 이름 외에는 아무것도 내보내지 않습니다.
-export async function GET(request: Request) {
-  try {
-    const team = new URL(request.url).searchParams.get('team') || '';
-    return Response.json(
-      { members: await listMembers(team) },
-      { headers: { 'Cache-Control': 'no-store' } },
-    );
-  } catch (error) {
-    return Response.json(
-      { error: error instanceof Error ? error.message : '직원 목록을 불러오지 못했습니다.' },
-      { status: 500 },
-    );
-  }
-}
-
 export async function POST(request: Request) {
   try {
     if (!sameOrigin(request)) return Response.json({ error: '허용되지 않은 요청입니다.' }, { status: 403 });
     const body = (await request.json()) as {
       team?: unknown;
-      actor?: unknown;
+      employeeId?: unknown;
       password?: unknown;
     };
     const team = String(body.team || '') || new URL(request.url).searchParams.get('team') || '';
-    const session = await createBirthSession(team, String(body.actor || ''), String(body.password || ''));
+    // 친 번호가 누구인지 먼저 찾습니다. 비밀번호 확인은 그다음이고, 아래 createBirthSession 이 합니다.
+    const found = await findMembers(String(body.employeeId || ''), team);
+    // 번호가 여러 팀에 있으면 고르지 않습니다. 팀 주소(?team=)로 열면 그 팀 안에서만 찾습니다.
+    if (found.length > 1) throw Error('이 직원 ID를 쓰는 팀이 여럿입니다. 팀 주소로 열어 다시 로그인하세요.');
+    // 없는 번호도 틀린 비밀번호와 같은 말로 돌려보냅니다 — 번호를 넣어 보며 누가 있는지 세지 못하게.
+    if (!found.length) throw Error('직원 ID 또는 비밀번호를 확인하세요.');
+    const session = await createBirthSession(found[0].team, found[0].actor, String(body.password || ''));
     return Response.json(
       { team: session.team, actor: session.actor, passwordChanged: session.passwordChanged },
       { headers: { 'Set-Cookie': sessionCookie(session.token, session.expiresAt) } },

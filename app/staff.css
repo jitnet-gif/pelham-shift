@@ -496,6 +496,15 @@
   transform: scaleX(-1);
 }
 .stclock-cam.off video { display: none; }
+/* 방금 찍은 사진. 저장된 그대로를 보여 주므로 영상과 달리 좌우를 뒤집지 않습니다. */
+.stclock-cam .stclock-still {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: none;
+}
 .stclock-cam p {
   position: absolute;
   inset: 0;

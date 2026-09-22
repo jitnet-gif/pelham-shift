@@ -14,7 +14,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   // 이 글은 서버가 그대로 내보내므로 t() 를 거치지 않습니다. 화면 말과 같게 영어로 적어 둡니다.
   title: 'Pelham Punch · Time clock',
-  description: 'Punch in, punch out and take breaks straight from your phone.',
+  description: 'Check in, check out and take breaks straight from your phone.',
   manifest: '/manifest-punch.webmanifest',
   icons: {
     icon: [
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     // 아이폰은 manifest 의 아이콘을 보지 않고 이 태그만 봅니다. 없으면 화면을 찍어 아이콘으로 씁니다.
     apple: [{ url: '/icons/punch-apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
   },
-  appleWebApp: { capable: true, title: 'Punch In', statusBarStyle: 'default' },
+  appleWebApp: { capable: true, title: 'Check In', statusBarStyle: 'default' },
 };
 
 export default function AttendanceLayout({ children }: { children: React.ReactNode }) {

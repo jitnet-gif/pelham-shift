@@ -9,6 +9,7 @@ import { useLang } from './use-lang';
 import GpsGuard, { useGps } from './gps-guard';
 import StaffClock from './staff-clock';
 import BirthLogin from './birth-login';
+import LoginQr from './login-qr';
 
 // 홈 화면의 주황 아이콘이 여는 앱입니다. 스케줄 앱과 데이터는 같지만 화면은 시계 한 장뿐입니다.
 // 일하러 온 사람이 찍기까지 한 번도 길을 고르지 않게 하려고 탭바도 사이드바도 두지 않았습니다.
@@ -157,6 +158,7 @@ export default function PunchApp() {
               </div>
             )}
             <BirthLogin />
+            <LoginQr />
           </>
         )}
       </div>
@@ -221,13 +223,12 @@ export default function PunchApp() {
             busy={busy}
             needsLocation={!!data.workplace}
             spot={gps.spot}
-            // 번호를 대고 들어온 사람에게 같은 번호를 한 번 더 묻지 않습니다.
-            needsPunchId={me ? !!me.punchId : false}
-            onPunch={async (action, photo, place, punchId) => {
+            onPunch={async (action, photo, place) => {
               const next = await command(action, {
                 employeeId: chosen.id,
                 photo,
-                punchId: punchId ?? '',
+                // 번호는 고른 사람의 기록에서 그대로 보냅니다 — 화면에서 다시 묻지 않습니다.
+                punchId: chosen.punchId ?? '',
                 ...place,
               });
               if (next) {

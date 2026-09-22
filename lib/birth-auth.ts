@@ -20,7 +20,8 @@ type StoredSession = {
   expiresAt: string;
 };
 type Credential = { salt: string; hash: string };
-export type Member = { team: string; id: string; name: string; admin?: boolean };
+// 직원 ID 하나로 찾아난 사람. 어느 워크스페이스의 누구인지만 담습니다.
+export type MemberMatch = { team: string; actor: string };
 
 export type BirthSession = {
   team: string;
@@ -119,8 +120,13 @@ export async function getBirthSession(request: Request): Promise<BirthSession | 
   };
 }
 
-// 로그인 드롭다운을 채우는 목록. 팀·id·이름만 내보내고 생년월일·연락처·시급은 내보내지 않습니다.
-export async function listMembers(preferredTeam = '') {
+// 이름 목록에서 고르는 대신 직원 ID 를 칩니다 — 단말에 대는 그 번호이고, 직원이 아는 번호도 그것 하나입니다.
+// 어느 워크스페이스 사람인지는 서버가 찾습니다. 번호는 워크스페이스마다 1001 부터 새로 나가므로
+// 같은 번호가 여러 곳에 있을 수 있습니다 — 그래서 찾은 것을 모두 돌려주고, 고를 수 없으면 부르는 쪽에서 막습니다.
+// 먼저 찾은 쪽을 그냥 고르면 번호만 같은 남의 팀으로 들어가게 됩니다.
+export async function findMembers(typed: string, preferredTeam = ''): Promise<MemberMatch[]> {
+  const wanted = typed.trim();
+  if (!wanted || wanted.length > 100) return [];
   const rows = preferredTeam
     ? await env.DB
         .prepare('SELECT id, owner, state, version FROM workspaces WHERE id = ?')
@@ -129,28 +135,28 @@ export async function listMembers(preferredTeam = '') {
     : await env.DB
         .prepare('SELECT id, owner, state, version FROM workspaces LIMIT 100')
         .all<WorkspaceRow>();
-  // 워크스페이스가 아직 없어도 관리자는 골라야 첫 설정을 시작할 수 있으므로 항상 넣습니다.
-  // 없을 때의 'master' 는 첫 워크스페이스를 만들 때 쓰는 이름이라 그대로 둡니다.
-  const adminTeam = rows.results[0]?.id || 'master';
-  const members: Member[] = ADMINS.map((entry) => ({
-    team: adminTeam,
-    id: entry.id,
-    name: entry.name,
-    admin: true,
-  }));
+  // 고정 명단 관리자는 직원이 아니라 어느 워크스페이스에도 없습니다. 이름 그대로 칩니다.
+  // 아직 워크스페이스가 없어도 첫 설정을 시작해야 하므로 'master' 로라도 들여보냅니다.
+  const roster = ADMINS.find((entry) => entry.id.toLowerCase() === wanted.toLowerCase());
+  if (roster) {
+    return [{ team: preferredTeam || rows.results[0]?.id || 'master', actor: roster.id }];
+  }
+  const found: MemberMatch[] = [];
   for (const row of rows.results) {
     const state = JSON.parse(row.state) as State;
     for (const employee of state.employees) {
-      if (employee.archived) continue;
-      members.push({ team: row.id, id: employee.id, name: employee.name || employee.id });
+      // 삭제한 사람의 번호로는 들어오지 못합니다. 그 번호를 다시 받은 사람만 걸립니다.
+      if (!employee.archived && employee.punchId && employee.punchId === wanted) {
+        found.push({ team: row.id, actor: employee.id });
+      }
     }
   }
-  return members;
+  return found;
 }
 
 export async function createBirthSession(team: string, actor: string, password = '') {
   if (!team || !actor || team.length > 100 || actor.length > 100) {
-    throw Error('직원을 선택하세요.');
+    throw Error('직원 ID를 입력하세요.');
   }
   // 관리자를 흉내 낸 요청도 그 계정의 비밀번호를 그대로 거쳐야 합니다.
   const adminEntry = adminFor(actor);
@@ -173,7 +179,8 @@ export async function createBirthSession(team: string, actor: string, password =
       employee?.punchId || '',
     ))
   ) {
-    throw Error('비밀번호를 확인하세요.');
+    // 없는 번호인지 틀린 비밀번호인지 가르지 않습니다. 가르면 번호를 넣어 보며 누가 있는지 셀 수 있습니다.
+    throw Error('직원 ID 또는 비밀번호를 확인하세요.');
   }
   const admin = adminEntry !== null || employee?.admin === true;
 

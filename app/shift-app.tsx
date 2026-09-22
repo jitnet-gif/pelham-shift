@@ -99,6 +99,7 @@ import MonthSchedule from './month-schedule';
 import DaySchedule from './day-schedule';
 import WhosWorking from './whos-working';
 import BirthLogin from './birth-login';
+import LoginQr from './login-qr';
 import PasswordChange from './password-change';
 import { useLang } from './use-lang';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -258,7 +259,6 @@ export default function ShiftApp() {
   const [birthAuth, setBirthAuth] = useState(false);
   const [passwordChanged, setPasswordChanged] = useState(true);
   const [passwordDialog, setPasswordDialog] = useState(false);
-  const passwordOfferShown = useRef(false);
   const staffReadOnly = !actor.admin;
   // 폰으로 보는 직원. 스케줄·메시지·출퇴근이 전용 화면으로 갈립니다.
   const staffPhone = phone && !actor.admin;
@@ -362,13 +362,8 @@ export default function ShiftApp() {
     if (r.actor) setActor(r.actor);
     if (r.team) setTeam(r.team);
     setBirthAuth(r.authMethod === 'birth');
-    if (r.authMethod === 'birth' && r.passwordChanged === false) {
-      setPasswordChanged(false);
-      if (!passwordOfferShown.current) {
-        passwordOfferShown.current = true;
-        setPasswordDialog(true);
-      }
-    } else if (r.authMethod === 'birth') setPasswordChanged(true);
+    // 첫 로그인이라고 비밀번호 변경을 먼저 띄우지 않습니다. 바꾸고 싶을 때 직접 엽니다.
+    if (r.authMethod === 'birth') setPasswordChanged(r.passwordChanged !== false);
   };
   async function refresh() {
     try {
@@ -1107,6 +1102,7 @@ export default function ShiftApp() {
               ))}
             </div>
             <BirthLogin />
+            <LoginQr />
           </>
         )}
       </div>
@@ -4147,11 +4143,11 @@ export default function ShiftApp() {
                 busy={busy}
                 needsLocation={!!data.workplace}
                 spot={gps.spot}
-                needsPunchId={!!emp(actor.id)?.punchId}
-                onPunch={async (action, photo, place, punchId) => {
+                onPunch={async (action, photo, place) => {
                   const next = await command(action, {
                     photo,
-                    punchId: punchId ?? '',
+                    // 번호는 로그인한 본인 기록에서 그대로 보냅니다 — 화면에서 다시 묻지 않습니다.
+                    punchId: emp(actor.id)?.punchId ?? '',
                     ...place,
                   });
                   // 사진은 이 기기에만 남깁니다. 방금 남은 기록에 묶어 두어야 나중에 찾습니다.

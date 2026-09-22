@@ -14,7 +14,7 @@ export const APPS = [
     key: 'punch',
     path: '/attendance',
     title: 'Pelham Punch · 출퇴근',
-    name: 'Punch In',
+    name: 'Check In',
     icon: '/icons/punch-192.png',
     note: '출근·퇴근·휴게 찍기',
   },

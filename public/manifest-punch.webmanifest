@@ -1,8 +1,8 @@
 {
   "id": "/attendance",
   "name": "Pelham Punch",
-  "short_name": "Punch In",
-  "description": "Punch in, punch out and take breaks straight from your phone",
+  "short_name": "Check In",
+  "description": "Check in, check out and take breaks straight from your phone",
   "start_url": "/attendance",
   "scope": "/",
   "display": "standalone",

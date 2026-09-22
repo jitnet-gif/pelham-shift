@@ -1,0 +1,19 @@
+/* 로그인 상자 바로 아래에 붙는 카드입니다. 폭은 로그인 상자와 같게 맞춰 한 줄로 보이게 합니다. */
+.login-qr{padding:20px 22px 22px}
+.login-screen .login-qr{width:100%;max-width:520px;box-sizing:border-box}
+.login-qr h3{margin:0 0 5px;font-size:16px}
+.login-qr>p{margin:0 0 16px;color:#637772;font-size:13px;line-height:1.6}
+.login-qr ul{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:0;padding:0;list-style:none}
+.login-qr li{min-width:0;display:grid;justify-items:center;gap:6px}
+.login-qr-name{display:flex;align-items:center;gap:7px;min-width:0}
+.login-qr-name b{font-size:14px;overflow-wrap:anywhere}
+.login-qr-icon{width:20px;height:20px;border-radius:5px;background-size:cover;background-position:center;flex:none}
+.login-qr li small{font-size:12px;color:#8b9791;text-align:center;line-height:1.5}
+/* QR 은 흰 바탕에 검정이어야 읽힙니다 — 어두운 화면에서도 색을 바꾸지 않습니다. */
+.login-qr .qr{display:block;width:100%;max-width:168px;height:auto;margin:2px 0;border:1px solid var(--border);border-radius:9px}
+.login-qr-url{font-size:11px;color:#50685b;text-align:center;line-height:1.5;overflow-wrap:anywhere}
+.login-qr-url:hover{text-decoration:underline}
+@media(max-width:700px){.login-qr{padding:18px}}
+/* 휴대폰 폭에서 둘을 나란히 두면 한 칸이 150px 정도로 좁아지고, 그만한 QR 은 카메라가 잘 읽지 못합니다.
+   찍으라고 두는 그림이니, 옆으로 붙이기보다 위아래로 세워 크게 보여 줍니다. */
+@media(max-width:560px){.login-qr ul{grid-template-columns:1fr;gap:22px}.login-qr .qr{max-width:230px}}
