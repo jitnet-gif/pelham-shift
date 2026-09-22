@@ -335,7 +335,6 @@ const en: Record<string, string> = {
   '이름 앞 컬러 상자 · 직원 ID · 연락처 · 개인별 시급 · 로그인 설정':
     'Color tag · employee ID · phone · hourly rate · login settings',
   '직원 추가': 'Add employee',
-  '급여 통화': 'Pay currency',
   '직원 접속 주소': 'Staff link',
   '직원은 로그인 화면에서 자기 이름을 골라 로그인합니다. 초기 비밀번호는 1111이며, 직원이 직접 변경할 수 있습니다.':
     'Staff sign in by picking their own name on the sign-in screen. Everyone starts with the password 1111 and can change it themselves.',

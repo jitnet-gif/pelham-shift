@@ -1574,15 +1574,6 @@ export default function ShiftApp() {
                 </button>
               </div>
               <div className="filterbar">
-                <Pick
-                  label={t('급여 통화')}
-                  value={data.currency}
-                  onChange={(v) => void command('currency', { currency: v })}
-                  options={['USD', 'CAD', 'KRW', 'PHP'].map((v) => ({
-                    value: v,
-                    label: v,
-                  }))}
-                />
                 {!setup && (
                   <div className="teamlink">
                     <b>{t('직원 접속 주소')}</b>
