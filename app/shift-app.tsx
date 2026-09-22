@@ -57,7 +57,7 @@ import {
   SelectItem,
 } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
-import { ko, enUS } from 'date-fns/locale';
+import { enUS } from 'date-fns/locale';
 import {
   Table,
   TableHeader,
@@ -100,7 +100,6 @@ import DaySchedule from './day-schedule';
 import WhosWorking from './whos-working';
 import BirthLogin from './birth-login';
 import PasswordChange from './password-change';
-import LangToggle from './lang-toggle';
 import { useLang } from './use-lang';
 import { useIsMobile } from '@/hooks/use-mobile';
 import PhoneSchedule from './phone-schedule';
@@ -887,7 +886,7 @@ export default function ShiftApp() {
           <Calendar
             className="birthcalendar"
             mode="single"
-            locale={lang === 'ko' ? ko : enUS}
+            locale={enUS}
             captionLayout="dropdown"
             startMonth={new Date(1930, 0)}
             endMonth={new Date()}
@@ -1070,7 +1069,6 @@ export default function ShiftApp() {
   if (auth !== 'in')
     return (
       <div className="login-screen">
-        <LangToggle />
         <span className="brand">
           <span className="brandmark" aria-hidden="true" />
           pelham<span className="brandlight">shift</span>
@@ -2768,7 +2766,6 @@ export default function ShiftApp() {
           <MapPin size={16} /> Pelham Hills <span> / </span> {t('팀 워크스페이스')}
         </div>
         <div className="account">
-          <LangToggle />
           {!setup && (
             <button
               aria-label={t('메시지 보기')}
@@ -3560,7 +3557,6 @@ export default function ShiftApp() {
               </span>
             </div>
             <div className="sidebar-tools">
-              <LangToggle />
               {birthAuth && !actor.admin && (
                 <button className="linkbutton" onClick={() => setPasswordDialog(true)}>
                   {t('비밀번호')}

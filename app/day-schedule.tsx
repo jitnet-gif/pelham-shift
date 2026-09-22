@@ -58,7 +58,7 @@ export default function DaySchedule({
   onAddShift: (employeeId: string, date: string, start?: string) => void;
   onPublish: () => void;
 }) {
-  const { t, lang } = useLang();
+  const { t, locale } = useLang();
   // 빈 칸 위에 마우스를 올리면 그 자리에 + 를 띄웁니다. 누르면 그 시각으로 근무가 열립니다.
   const [hover, setHover] = useState<{ id: string; at: number } | null>(null);
   // 가로 위치를 30분 단위 시각으로 바꿉니다. 클릭과 + 표시가 같은 값을 씁니다.
@@ -102,7 +102,7 @@ export default function DaySchedule({
     (sum, s) => sum + ((endOf(s) - minutes(s.start)) / 60) * rateOf(s.employeeId),
     0,
   );
-  const heading = new Intl.DateTimeFormat(lang === 'en' ? 'en-US' : 'ko-KR', {
+  const heading = new Intl.DateTimeFormat(locale, {
     weekday: 'short',
     month: 'short',
     day: 'numeric',

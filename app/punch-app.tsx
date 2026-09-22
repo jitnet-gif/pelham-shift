@@ -9,7 +9,6 @@ import { useLang } from './use-lang';
 import GpsGuard, { useGps } from './gps-guard';
 import StaffClock from './staff-clock';
 import BirthLogin from './birth-login';
-import LangToggle from './lang-toggle';
 
 // 홈 화면의 주황 아이콘이 여는 앱입니다. 스케줄 앱과 데이터는 같지만 화면은 시계 한 장뿐입니다.
 // 일하러 온 사람이 찍기까지 한 번도 길을 고르지 않게 하려고 탭바도 사이드바도 두지 않았습니다.
@@ -144,7 +143,6 @@ export default function PunchApp() {
   if (auth !== 'in')
     return (
       <div className="login-screen">
-        <LangToggle />
         <span className="brand">
           <span className="brandmark" aria-hidden="true" />
           pelham<span className="brandlight">punch</span>
@@ -188,7 +186,6 @@ export default function PunchApp() {
     <div className="punchapp">
       {/* 위치 안내가 화면을 덮어도 이 줄은 위에 남습니다 — 위치를 막은 사람도 계정은 바꿀 수 있어야 합니다. */}
       <div className="punchbar">
-        <LangToggle />
         <span className="punchbar-gap" />
         <button
           type="button"

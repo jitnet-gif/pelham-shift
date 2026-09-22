@@ -2,7 +2,6 @@
 import {useEffect,useMemo,useState} from 'react';
 import {ArrowLeft,CheckCircle2,ClipboardList,Plus,RefreshCw,Send,UserRound} from 'lucide-react';
 import type {State,Task} from '@/lib/domain';
-import LangToggle from '../lang-toggle';
 import {useLang} from '../use-lang';
 type Actor={id:string;admin:boolean};
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
@@ -21,8 +20,8 @@ export default function TaskInbox(){
  // Managers and staff with task permission can assign tasks; everyone works on the tasks assigned to them.
  const canAssign=actor.admin||!!employee(actor.id)?.taskManager;
  const status=(task:Task)=>task.status==='completed'?[t('완료'),'done']:task.status==='seen'?[t('status::확인'),'seen']:[t('새 작업'),'sent'];
- if(error&&!state)return <main className="task-shell"><section className="task-card error-card"><ClipboardList size={30}/><h1>{t('작업 수신함')}</h1><p>{t(error)}</p><a className="task-button" href={root}>{t('로그인하고 열기')}</a><LangToggle/></section></main>;
- return <main className="task-shell"><header className="task-top"><a href={root} className="back"><ArrowLeft size={17}/> {t('스케줄')}</a><div><p>PELHAM SHIFT</p><h1>{canAssign?t('작업 지시 관리'):t('내 작업 수신함')}</h1></div><span className="task-top-actions"><LangToggle/><button className="refresh" onClick={()=>void refresh()} aria-label={t('새로고침')}><RefreshCw size={18}/></button></span></header>
+ if(error&&!state)return <main className="task-shell"><section className="task-card error-card"><ClipboardList size={30}/><h1>{t('작업 수신함')}</h1><p>{t(error)}</p><a className="task-button" href={root}>{t('로그인하고 열기')}</a></section></main>;
+ return <main className="task-shell"><header className="task-top"><a href={root} className="back"><ArrowLeft size={17}/> {t('스케줄')}</a><div><p>PELHAM SHIFT</p><h1>{canAssign?t('작업 지시 관리'):t('내 작업 수신함')}</h1></div><span className="task-top-actions"><button className="refresh" onClick={()=>void refresh()} aria-label={t('새로고침')}><RefreshCw size={18}/></button></span></header>
  {error&&<p role="alert" className="task-alert">{t(error)}</p>}
  {setup?<section className="task-card"><ClipboardList size={32}/><h2>{t('워크스페이스를 먼저 생성하세요')}</h2><p>{t('관리자 화면에서 ‘내 워크스페이스 생성’을 누르면 작업 지시를 시작할 수 있습니다.')}</p><a className="task-button" href={root}>{t('스케줄로 이동')}</a></section>:<>
  {canAssign&&<section className="task-compose"><div><span className="task-kicker">MANAGER</span><h2>{t('직원에게 작업 지시 보내기')}</h2><p>{t('직원은 수신함에서 확인과 완료 처리를 할 수 있습니다.')}</p></div><form onSubmit={e=>{e.preventDefault();void send('taskCreate',form).then(()=>setForm({assignedTo:'',title:'',notes:'',date:today()}))}}><label>{t('받는 직원')}<select required value={form.assignedTo} onChange={e=>setForm(f=>({...f,assignedTo:e.target.value}))}><option value="">{t('직원을 선택하세요')}</option>{employees.map(e=><option value={e.id} key={e.id}>{e.name} · {e.role}</option>)}</select></label><label>{t('마감일')}<input type="date" required value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/></label><label className="wide">{t('작업 제목')}<input maxLength={160} required placeholder={t('예: 3번 홀 장비 점검')} value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))}/></label><label className="wide">{t('작업 안내')}<textarea maxLength={2000} placeholder={t('필요한 준비물, 완료 기준 등을 적어주세요.')} value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}/></label><button className="task-button" disabled={busy}><Send size={16}/> {t('작업 보내기')}</button></form></section>}

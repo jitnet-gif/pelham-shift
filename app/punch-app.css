@@ -39,7 +39,6 @@
   white-space: nowrap;
 }
 .punchbar button.on { color: #087e6d; }
-.punchbar .lang-toggle { margin: 0; }
 
 /* 아래에 탭바가 없으니 시계가 화면을 전부 씁니다. 버튼도 바닥에 바로 붙습니다.
    staff.css 는 main 의 좌우 여백(16px)을 되돌리려고 음수 margin 을 씁니다.

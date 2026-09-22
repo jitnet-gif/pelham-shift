@@ -34,7 +34,6 @@
 .sidebar-name small{font-size:11px;color:var(--sub);white-space:nowrap}
 .sidebar-tools{display:flex;align-items:center;gap:8px;padding:0 6px}
 .sidebar-tools .iconbutton{color:var(--sub);border-radius:6px;padding:7px}
-.sidebar-tools .lang-toggle{margin-right:auto}
 .sidebar-tools .iconbutton.on{color:#087e6d}
 .sidebar-tools .iconbutton:hover{background:var(--hover);color:var(--ink)}
 .collapsed .brandtext,.collapsed .sidenav-item span,.collapsed .sidenav-heading span,.collapsed .sidenav-count,.collapsed .sidebar-name,.collapsed .sidebar-tools .lang-toggle,.collapsed .sidebar-tools .linkbutton{display:none}
