@@ -547,11 +547,12 @@ export default function ShiftApp() {
       watcher.disconnect();
     };
   }, [unread.length]);
+  // 기호로 쓰면 CAD 와 USD 가 똑같이 $ 로 보입니다. 어느 나라 돈인지 드러나게 통화 코드로 적습니다.
   const money = (n: number) =>
     new Intl.NumberFormat(locale, {
       style: 'currency',
       currency: data.currency,
-      currencyDisplay: 'narrowSymbol',
+      currencyDisplay: 'code',
     }).format(n);
   // 7shifts-style clock times: 14:00 → 2pm, 08:30 → 8:30am.
   const ampm = (v: string) => {
