@@ -176,6 +176,7 @@ export default function ShiftApp() {
   const [form, setForm] = useState<Record<string, string>>({});
   const [rows, setRows] = useState<string[][]>([]);
   const [timecard, setTimecard] = useState<Timecard | null>(null);
+  const [presets, setPresets] = useState(false);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [filename, setFilename] = useState('');
   const [filter, setFilter] = useState('all');
@@ -435,8 +436,94 @@ export default function ShiftApp() {
         onChange={(e) => put('note', e.target.value)}
         placeholder={t('이 근무에서 알아야 할 내용을 적어주세요.')}
       />
-      <small className="notecount">{(form.note || '').length}/250</small>
+      <small className="notecount">{250 - (form.note || '').length}</small>
     </label>
+  );
+  // 이미 짜 놓은 근무에서 가장 자주 쓰인 시간대를 그대로 프리셋으로 씁니다.
+  const commonTimes = [
+    ...data.shifts
+      .reduce((m, s) => m.set(s.start + '|' + s.end, (m.get(s.start + '|' + s.end) ?? 0) + 1), new Map<string, number>())
+      .entries(),
+  ]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([pair]) => pair.split('|'));
+  const shiftBreak = Number(form.breakMinutes || 0);
+  const paidHours = Math.max(0, shiftHours - shiftBreak / 60);
+  const shiftTimes = (
+    <>
+      <div className="timerow">
+        <span className="timebox">
+          <Clock3 size={16} />
+          <input
+            type="time"
+            step={1800}
+            required
+            value={form.start || ''}
+            onChange={(e) => put('start', e.target.value)}
+          />
+          <em>→</em>
+          <input
+            type="time"
+            step={1800}
+            required
+            value={form.end || ''}
+            onChange={(e) => put('end', e.target.value)}
+          />
+          {paidHours > 0 && <b>{t('({n}시간)', { n: paidHours })}</b>}
+        </span>
+        <label className="flagcheck">
+          <Checkbox
+            checked={form.close === '1'}
+            onCheckedChange={(on) => put('close', on ? '1' : '')}
+          />
+          {t('마감')}
+        </label>
+        <label className="flagcheck">
+          <Checkbox checked={form.bd === '1'} onCheckedChange={(on) => put('bd', on ? '1' : '')} />
+          BD
+        </label>
+      </div>
+      {commonTimes.length > 0 && (
+        <button type="button" className="linklike" onClick={() => setPresets((v) => !v)}>
+          {t('자주 쓰는 시간대 고르기')}
+        </button>
+      )}
+      {presets && (
+        <div className="presetrow">
+          {commonTimes.map(([a, b]) => (
+            <button
+              type="button"
+              key={a + b}
+              className="presetchip"
+              onClick={() => {
+                put('start', a);
+                put('end', b);
+                setPresets(false);
+              }}
+            >
+              {a} – {b}
+            </button>
+          ))}
+        </div>
+      )}
+      {form.breakMinutes ? (
+        <label className="field breakfield">
+          {t('휴게(분)')}
+          <input
+            type="number"
+            min={0}
+            max={720}
+            value={form.breakMinutes}
+            onChange={(e) => put('breakMinutes', e.target.value)}
+          />
+        </label>
+      ) : (
+        <button type="button" className="linklike plus" onClick={() => put('breakMinutes', '30')}>
+          <Plus size={15} /> {t('휴게 추가')}
+        </button>
+      )}
+    </>
   );
   // 타임카드는 이름으로만 사람을 알려 주므로, 직원 명단에서 같은 이름을 찾아 ID 를 붙입니다.
   const nameKey = (v: string) => v.toLowerCase().replace(/\s+/g, ' ').trim();
@@ -1952,16 +2039,9 @@ export default function ShiftApp() {
                 />
                 {areaPick(t('업무 / 장소'))}
                 {input('date', t('근무일'), 'date')}
-                <div className="formgrid">
-                  {input('start', t('출근'), 'time')}
-                  {input('end', t('퇴근'), 'time')}
-                </div>
+                {shiftTimes}
                 <p className="hint">
-                  {shiftHours
-                    ? t('{n}시간 근무 · 퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.', {
-                        n: shiftHours,
-                      })
-                    : t('퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.')}
+                  {t('퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.')}
                 </p>
                 {noteField}
               </>
@@ -1971,16 +2051,9 @@ export default function ShiftApp() {
                 {box(emp(data.shifts.find((s) => s.id === form.ids)?.employeeId || ''))}
                 {areaPick(t('업무 / 장소'))}
                 {input('date', t('근무일'), 'date')}
-                <div className="formgrid">
-                  {input('start', t('출근'), 'time')}
-                  {input('end', t('퇴근'), 'time')}
-                </div>
+                {shiftTimes}
                 <p className="hint">
-                  {shiftHours
-                    ? t('{n}시간 근무 · 퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.', {
-                        n: shiftHours,
-                      })
-                    : t('퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.')}
+                  {t('퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.')}
                 </p>
                 {noteField}
               </>
@@ -2251,6 +2324,12 @@ export default function ShiftApp() {
                 {t('닫기')}
               </button>
             ) : (
+              <>
+              {(modal === 'shift' || modal === 'shiftUpdate') && (
+                <button className="button cancel" type="button" onClick={() => setModal('')}>
+                  {t('취소')}
+                </button>
+              )}
               <button
                 className="button primary submit"
                 disabled={
@@ -2274,6 +2353,7 @@ export default function ShiftApp() {
                         : t('선택한 {n}명에게 공지 저장', { n: rainTargets.length })
                       : t('저장')}
               </button>
+              </>
             )}
           </form>
         </DialogContent>

@@ -413,6 +413,11 @@ const en: Record<string, string> = {
   '안내 내용': 'Message',
   '{n}시간 근무 · 퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.':
     '{n} hour shift · an end time earlier than the start counts as the next day.',
+  '({n}시간)': '({n} hrs)',
+  '마감': 'Close',
+  '자주 쓰는 시간대 고르기': 'or use common shift times',
+  '휴게 추가': 'Add break',
+  '휴게시간이 근무시간보다 깁니다.': 'The break is longer than the shift.',
   '직원에게 남길 메모': 'Note for the employee',
   '이 근무에서 알아야 할 내용을 적어주세요.': 'Anything the employee should know about this shift.',
   '퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.':

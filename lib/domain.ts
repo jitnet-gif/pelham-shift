@@ -1,6 +1,7 @@
 // admin: 직원이면서 관리자 권한을 가진 사람. archived: 삭제한 직원 — 지난 기록을 위해 데이터에는 남기고 화면 목록에서만 감춥니다.
 export type Employee = {id:string;name:string;color:string;role:string;rate:number;email:string;birthDate:string;phone?:string;taskManager?:boolean;admin?:boolean;archived?:boolean};
-export type Shift = {id:string;employeeId:string;date:string;start:string;end:string;area:string;note?:string;originalId?:string};
+// close: 마감조, bd: 영업일 표시. 뜻은 클럽이 정하고, 앱은 근무에 표시만 해 둡니다.
+export type Shift = {id:string;employeeId:string;date:string;start:string;end:string;area:string;note?:string;breakMinutes?:number;close?:boolean;bd?:boolean;originalId?:string};
 export type Swap = {id:string;shiftId:string;from:string;to:string;status:'requested'|'accepted'|'approved'|'rejected';createdAt:string;bonus:number};
 export type Attendance = {id:string;employeeId:string;date:string;start:string;end:string;breakMinutes:number};
 export type Message = {id:string;sender:string;to:string;body:string;createdAt:string;readBy:string[];kind:string;recipients?:string[]};
