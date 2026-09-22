@@ -114,6 +114,7 @@ import StaffMore, { type MoreItem } from './staff-more';
 import TimePicker from './time-picker';
 import GpsGuard, { useGps } from './gps-guard';
 import { LAYOUT_KEY, readLayout, type Layout } from './layout-choice';
+import { appAt } from './apps';
 const minutesOf = (v: string) => Number(v.slice(0, 2)) * 60 + Number(v.slice(3, 5));
 // 폰 상단 바는 브랜드 대신 지금 보고 있는 화면 이름을 띄웁니다. 사이드바와 같은 말을 씁니다.
 const TAB_LABELS: Record<string, string> = {
@@ -756,8 +757,10 @@ export default function ShiftApp({ landing = 'schedule' }: { landing?: string })
   // 설치한 앱 아이콘(배지), 브라우저 탭 제목과 파비콘에도 안 읽은 개수를 올립니다.
   useEffect(() => {
     const count = unread.length;
+    // 제목도 파비콘도 지금 주소의 앱 것을 씁니다. 출퇴근 앱은 이름도 아이콘도 따로입니다.
+    const self = appAt(window.location.pathname);
     // Next 가 기본 제목을 다시 써 넣는 경우가 있어, 제목이 바뀌면 개수를 다시 붙입니다.
-    const wanted = (count ? '(' + count + ') ' : '') + 'Pelham Shift · 근무 관리';
+    const wanted = (count ? '(' + count + ') ' : '') + t(self.title);
     const keepTitle = () => {
       if (document.title !== wanted) document.title = wanted;
     };
@@ -783,12 +786,12 @@ export default function ShiftApp({ landing = 'schedule' }: { landing?: string })
       link.href = href;
     };
     if (!count) {
-      paint('/icons/icon-192.png');
+      paint(self.icon);
       return () => watcher.disconnect();
     }
     let live = true;
     const icon = new Image();
-    icon.src = '/icons/icon-192.png';
+    icon.src = self.icon;
     icon.onload = () => {
       if (!live) return;
       const size = 64;
@@ -814,7 +817,7 @@ export default function ShiftApp({ landing = 'schedule' }: { landing?: string })
       live = false;
       watcher.disconnect();
     };
-  }, [unread.length]);
+  }, [unread.length, t]);
   // 기호로 쓰면 CAD 와 USD 가 똑같이 $ 로 보입니다. 어느 나라 돈인지 드러나게 통화 코드로 적습니다.
   const money = (n: number) =>
     new Intl.NumberFormat(locale, {

@@ -12,6 +12,7 @@ export const weekdays = (lang: Lang) =>
 const en: Record<string, string> = {
   // App shell and navigation
   'Pelham Shift · 근무 관리': 'Pelham Shift · Staff scheduling',
+  'Pelham Punch · 출퇴근': 'Pelham Punch · Time clock',
   '근무 스케줄': 'Schedule',
   '근무 현황': "Who's working",
   '근무 중': 'On now',
@@ -503,6 +504,14 @@ const en: Record<string, string> = {
   ' 또는 홈 화면에 추가': ' or Add to Home screen',
   '홈 화면 앱을 열고 로그인 → ': 'Open the home screen app and sign in → ',
   '이 기기에 바로 설치': 'Install on this device',
+  '앱은 두 개입니다. 하나씩 따로 설치하면 홈 화면에 아이콘이 두 개 생깁니다.':
+    'There are two apps. Install them one at a time and you get two icons on your home screen.',
+  '설치할 앱': 'App to install',
+  '스케줄·근무표·메시지': 'Schedule, timesheets, messages',
+  '출근·퇴근·휴게 찍기': 'Punch in, punch out, breaks',
+  '나머지 앱은 위 토글로 바꿔 주소를 열고 같은 방법으로 한 번 더 설치하세요.':
+    'For the other app, switch above, open its link, and install it the same way.',
+  '이 앱 주소로 이동해 설치하기': 'Go to this app’s link to install it',
 
   // Task inbox
   '작업을 불러오지 못했습니다.': 'Could not load tasks.',
@@ -721,6 +730,7 @@ const en: Record<string, string> = {
   'start::출근 찍기': 'Start shift',
   '출근 전': 'Not punched in',
   '예정된 근무가 없습니다': 'No scheduled shift',
+  '일정이 없어도 찍을 수 있습니다.': 'You can still punch in.',
   '출근·퇴근은 사진이 찍혀야 기록됩니다.': 'A photo is required to start or end a shift.',
   '카메라를 켜는 중입니다…': 'Starting the camera…',
   '카메라를 켤 수 없습니다. 기기 설정에서 카메라 권한을 허용해 주세요.':

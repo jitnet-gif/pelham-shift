@@ -253,6 +253,9 @@ export default function StaffClock({
                   ? `${clock(shift.start)}–${clock(shift.end)} (${duration(shift.start, shift.end)}${t('h::시간')})`
                   : t('예정된 근무가 없습니다')}
             </b>
+            {!working && !shift && (
+              <small className="stclock-free">{t('일정이 없어도 찍을 수 있습니다.')}</small>
+            )}
             <small>
               {employee?.role}
               {area && area !== employee?.role ? ` | ${area}` : ''} · {location}
@@ -264,6 +267,7 @@ export default function StaffClock({
             {t(problem)}
           </p>
         )}
+        <div className="stclock-actions">
         {working ? (
           <>
             <button
@@ -285,6 +289,7 @@ export default function StaffClock({
             {t('start::출근 찍기')}
           </button>
         )}
+        </div>
       </div>
     </section>
   );

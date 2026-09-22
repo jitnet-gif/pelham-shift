@@ -4,7 +4,7 @@
 .installurl{display:flex;gap:8px;margin-bottom:16px}
 .installurl input{flex:1;min-width:0;padding:8px 10px;border:1px solid #d5e0d9;border-radius:6px;font-size:13px;color:#243e31}
 .installsteps{margin:0 0 6px;padding-left:20px;font-size:14px;line-height:1.9;color:#50685b}
-.installpick{display:flex;width:100%;margin-bottom:10px}
+.segmented.installpick{display:flex;width:100%;margin-bottom:10px}
 .installpick button{flex:1;justify-content:center}
 .installpick-icon{width:20px;height:20px;border-radius:5px;background-size:cover;background-position:center;flex:none}
 .installnote{margin:0;font-size:13px;color:#6b7a73;text-align:center}

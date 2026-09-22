@@ -631,3 +631,19 @@
 @media (min-width: 901px) {
   .stclock { max-width: 520px; margin: 0 auto; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
 }
+
+/* 출퇴근 버튼은 늘 보이게 바닥에 붙입니다. 아래 탭바에 가려지던 자리입니다. */
+.stclock-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin: 0 -16px;
+  padding: 4px 16px 12px;
+  background: linear-gradient(to bottom, rgb(250 250 251 / 0), #fafafb 22%);
+}
+/* 폰에는 아래에 탭바가 붙어 있습니다. 버튼은 그 위에 뜹니다. */
+@media (max-width: 900px) {
+  .stclock-actions { bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
+  .stclock-body { padding-bottom: 76px; }
+}
+.stclock-free { color: #3aa76d; }

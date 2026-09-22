@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { isLang, locale, translate, weekdays, type Lang, type Vars } from '@/lib/i18n';
+import { appAt } from './apps';
 
 const STORAGE_KEY = 'pelham_lang';
 const listeners = new Set<() => void>();
@@ -35,7 +36,8 @@ export function useLang() {
   const lang = useSyncExternalStore(subscribe, current, (): Lang => 'ko');
   useEffect(() => {
     document.documentElement.lang = lang;
-    document.title = translate(lang, 'Pelham Shift · 근무 관리');
+    // 제목은 지금 주소의 앱 이름입니다. 출퇴근 앱 창에 스케줄 앱 이름이 뜨지 않게.
+    document.title = translate(lang, appAt(window.location.pathname).title);
   }, [lang]);
   const t = useCallback((text: string, vars?: Vars) => translate(lang, text, vars), [lang]);
   return { lang, setLang, t, days: weekdays(lang), locale: locale(lang) };
