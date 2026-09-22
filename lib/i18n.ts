@@ -493,8 +493,14 @@ const en: Record<string, string> = {
   // Sign-in and password
   로그인: 'Sign in',
   '로그인하지 못했습니다.': 'Could not sign in.',
-  '직원 ID와 비밀번호를 입력하세요. 첫 비밀번호는 본인 직원 ID 입니다.':
-    'Enter your employee ID and password. Your first password is your own employee ID.',
+  '비밀번호 칸에 본인 직원 ID 를 입력하면 이름이 나옵니다.':
+    'Type your employee ID in the password box and your name appears above it.',
+  '관리자 아이디와 비밀번호를 입력하세요.': 'Enter the manager account and its password.',
+  '관리자 아이디': 'Manager account',
+  '비밀번호 (직원 ID)': 'Password (your employee ID)',
+  '직원 ID 를 입력하세요': 'Enter your employee ID',
+  '관리자로 로그인': 'Sign in as a manager',
+  '직원으로 로그인': 'Sign in as staff',
   '직원 ID를 입력하세요.': 'Enter your employee ID.',
   '직원 ID 또는 비밀번호를 확인하세요.': 'Check your employee ID and password.',
   '이 직원 ID를 쓰는 팀이 여럿입니다. 팀 주소로 열어 다시 로그인하세요.':

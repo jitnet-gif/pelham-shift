@@ -3,3 +3,8 @@
 /* A long error message must not land in the icon column and squeeze the text column. */
 .birth-login .formerror{grid-column:1/-1;margin:4px 0 0;line-height:1.6;overflow-wrap:anywhere}
 .birth-login>div{min-width:0}
+/* 이름 칸은 보여 주기만 합니다. disabled 는 글씨를 흐리게 만드는데, 여기서는 본인 확인용이라
+   또렷하게 읽혀야 합니다 — 색과 진하기를 되돌려 둡니다. */
+.birth-login .birth-login-name{-webkit-text-fill-color:#1d3b31;color:#1d3b31;opacity:1;font-weight:600;background:#f2f7f4;cursor:default}
+.birth-login .birth-login-name::placeholder{-webkit-text-fill-color:#93a49d;color:#93a49d;font-weight:400}
+.birth-login-switch{grid-column:1/-1;justify-self:start;padding:0;margin-top:2px}

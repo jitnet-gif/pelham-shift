@@ -21,7 +21,7 @@ type StoredSession = {
 };
 type Credential = { salt: string; hash: string };
 // 직원 ID 하나로 찾아난 사람. 어느 워크스페이스의 누구인지만 담습니다.
-export type MemberMatch = { team: string; actor: string };
+export type MemberMatch = { team: string; actor: string; name: string };
 
 export type BirthSession = {
   team: string;
@@ -139,7 +139,7 @@ export async function findMembers(typed: string, preferredTeam = ''): Promise<Me
   // 아직 워크스페이스가 없어도 첫 설정을 시작해야 하므로 'master' 로라도 들여보냅니다.
   const roster = ADMINS.find((entry) => entry.id.toLowerCase() === wanted.toLowerCase());
   if (roster) {
-    return [{ team: preferredTeam || rows.results[0]?.id || 'master', actor: roster.id }];
+    return [{ team: preferredTeam || rows.results[0]?.id || 'master', actor: roster.id, name: roster.name }];
   }
   const found: MemberMatch[] = [];
   for (const row of rows.results) {
@@ -147,7 +147,7 @@ export async function findMembers(typed: string, preferredTeam = ''): Promise<Me
     for (const employee of state.employees) {
       // 삭제한 사람의 번호로는 들어오지 못합니다. 그 번호를 다시 받은 사람만 걸립니다.
       if (!employee.archived && employee.punchId && employee.punchId === wanted) {
-        found.push({ team: row.id, actor: employee.id });
+        found.push({ team: row.id, actor: employee.id, name: employee.name || employee.punchId });
       }
     }
   }
