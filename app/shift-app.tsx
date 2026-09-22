@@ -972,13 +972,14 @@ export default function ShiftApp() {
                     <p>{t('오늘 누가 나와 있는지 출근 순서대로 봅니다. 실제 출근 기록이 아니라 예정된 근무 기준입니다.')}</p>
                   </div>
                 </div>
+                {/* 관리자가 대신 찍어 주는 버튼은 잠시 감춰 둡니다. canPunchOthers 를 actor.admin 으로 되돌리면 다시 나옵니다. */}
                 <WhosWorking
                   date={day}
                   now={tick}
                   employees={staff}
                   shifts={data.shifts}
                   punches={data.punches ?? []}
-                  canPunchOthers={actor.admin}
+                  canPunchOthers={false}
                   busy={busy}
                   onShiftSelect={(id) => open('detail', { id })}
                   onPunch={(employeeId, kind) => void command(kind, { employeeId })}
