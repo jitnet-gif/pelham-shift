@@ -145,7 +145,7 @@ export default function PhoneTeam({
         <div className="pteam-block">
           <h3>{t('로그인')}</h3>
           <p className="pteam-note">
-            {t('직원은 로그인 화면에서 자기 이름을 골라 들어옵니다. 처음 비밀번호는 1111이고, 직원이 직접 바꿉니다.')}
+            {t('직원은 로그인 화면에서 자기 이름을 골라 들어옵니다. 처음 비밀번호는 본인 직원 ID 이고, 직원이 직접 바꿉니다.')}
           </p>
         </div>
 
@@ -217,7 +217,7 @@ export default function PhoneTeam({
           <h3>{t('직원 접속 주소')}</h3>
           <input readOnly value={teamLink} onFocus={(e) => e.target.select()} />
           <p className="pteam-note">
-            {t('직원은 로그인 화면에서 자기 이름을 골라 들어옵니다. 처음 비밀번호는 1111이고, 직원이 직접 바꿉니다.')}
+            {t('직원은 로그인 화면에서 자기 이름을 골라 들어옵니다. 처음 비밀번호는 본인 직원 ID 이고, 직원이 직접 바꿉니다.')}
           </p>
         </div>
       )}

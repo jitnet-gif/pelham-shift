@@ -56,7 +56,7 @@ export default function PasswordChange({
         <DialogTitle><KeyRound size={20} /> {t('비밀번호 변경')}</DialogTitle>
         <DialogDescription>
           {initial
-            ? t('초기 비밀번호는 1111입니다. 지금 새 비밀번호로 변경하거나 나중에 변경할 수 있습니다.')
+            ? t('첫 비밀번호는 본인 직원 ID 입니다. 단말에서 눌러 보이는 번호이니 지금 바꾸는 편이 좋습니다.')
             : t('새 비밀번호를 입력하면 다음 로그인부터 적용됩니다.')}
         </DialogDescription>
         <form onSubmit={submit}>
@@ -65,7 +65,7 @@ export default function PasswordChange({
             <input
               type="password"
               autoComplete="current-password"
-              placeholder={initial ? t('초기 비밀번호: 1111') : ''}
+              placeholder={initial ? t('첫 비밀번호: 내 직원 ID') : ''}
               value={currentPassword}
               onChange={(event) => setCurrentPassword(event.target.value)}
               required

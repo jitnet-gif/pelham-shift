@@ -57,7 +57,7 @@ export default function BirthLogin() {
       <div className="birth-login-icon"><LockKeyhole size={22} /></div>
       <div>
         <h2>{t('로그인')}</h2>
-        <p>{t('이름을 고르고 비밀번호를 입력하세요. 직원 초기 비밀번호는 1111입니다.')}</p>
+        <p>{t('이름을 고르고 비밀번호를 입력하세요. 직원 첫 비밀번호는 본인 직원 ID 입니다.')}</p>
       </div>
       <form onSubmit={submit}>
         <label className="field">

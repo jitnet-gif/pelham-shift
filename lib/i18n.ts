@@ -391,8 +391,8 @@ const en: Record<string, string> = {
     'Color tag · employee ID · phone · hourly rate · login settings',
   '직원 추가': 'Add employee',
   '직원 접속 주소': 'Staff link',
-  '직원은 로그인 화면에서 자기 이름을 골라 로그인합니다. 초기 비밀번호는 1111이며, 직원이 직접 변경할 수 있습니다.':
-    'Staff sign in by picking their own name on the sign-in screen. Everyone starts with the password 1111 and can change it themselves.',
+  '직원은 로그인 화면에서 자기 이름을 골라 로그인합니다. 첫 비밀번호는 본인 직원 ID 이며, 직원이 직접 변경할 수 있습니다.':
+    'Staff sign in by picking their own name on the sign-in screen. Everyone starts with their own employee ID as the password and can change it themselves.',
   '출근 알림 자동 점검 주소': 'Shift reminder check URL',
   '앱이 열려 있으면 30초마다 자동 점검합니다. 아무도 앱을 열지 않을 때도 1시간 전 알림을 보내려면 외부 cron(예: cron-job.org)에 이 주소를 5분 간격으로 등록하세요. 비공개 사이트는 외부 호출이 차단될 수 있습니다. 이 주소는 비밀번호처럼 보관하세요.':
     "While the app is open it checks every 30 seconds. To send 1-hour reminders even when nobody has the app open, add this URL to an external cron service (e.g. cron-job.org) every 5 minutes. Private sites may block outside calls. Keep this URL secret, like a password.",
@@ -468,19 +468,19 @@ const en: Record<string, string> = {
   // Sign-in and password
   로그인: 'Sign in',
   '로그인하지 못했습니다.': 'Could not sign in.',
-  '이름을 고르고 비밀번호를 입력하세요. 직원 초기 비밀번호는 1111입니다.':
-    'Pick your name, then enter your password. Staff start with the password 1111.',
+  '이름을 고르고 비밀번호를 입력하세요. 직원 첫 비밀번호는 본인 직원 ID 입니다.':
+    'Pick your name, then enter your password. Staff start with their own employee ID as the password.',
   '직원 목록을 불러오지 못했습니다.': 'Could not load the staff list.',
   '확인 중…': 'Checking…',
   '비밀번호 변경': 'Change password',
   '새 비밀번호가 일치하지 않습니다.': 'The new passwords do not match.',
   '비밀번호를 변경하지 못했습니다.': 'Could not change the password.',
-  '초기 비밀번호는 1111입니다. 지금 새 비밀번호로 변경하거나 나중에 변경할 수 있습니다.':
+  '첫 비밀번호는 본인 직원 ID 입니다. 단말에서 눌러 보이는 번호이니 지금 바꾸는 편이 좋습니다.':
     'Your initial password is 1111. You can change it now or later.',
   '새 비밀번호를 입력하면 다음 로그인부터 적용됩니다.':
     'The new password applies from your next sign-in.',
   '현재 비밀번호': 'Current password',
-  '초기 비밀번호: 1111': 'Initial password: 1111',
+  '첫 비밀번호: 내 직원 ID': 'Initial password: 1111',
   '새 비밀번호': 'New password',
   '새 비밀번호 (4자 이상)': 'New password (4 or more characters)',
   '새 비밀번호 확인': 'Confirm new password',
@@ -677,6 +677,11 @@ const en: Record<string, string> = {
   '오늘 고마웠던 동료: ': 'Shout-out to: ',
 
   // 출퇴근 단말 · /attendance kiosk
+  '직원 ID를 입력하세요': 'Enter your employee ID',
+  '직원 ID가 맞지 않습니다.': 'That employee ID does not match.',
+  '직원 ID (숫자 4~8자리)': 'Employee ID (4–8 digits)',
+  '직원 ID는 숫자 4~8자리로 입력하세요.': 'Enter an employee ID of 4 to 8 digits.',
+  '이미 쓰이고 있는 직원 ID 입니다.': 'That employee ID is already in use.',
   '출퇴근 단말': 'Time clock',
   'pad::지우기': 'Clear',
   'start::출근 찍기': 'Start shift',

@@ -690,7 +690,7 @@ export default function ShiftApp() {
       ui === 'pelham'
         ? 0
         : sort === 'id'
-          ? a.id.localeCompare(b.id)
+          ? (a.punchId || '').localeCompare(b.punchId || '')
           : a.name.localeCompare(b.name, locale),
     );
   const longDate = (date: string) =>
@@ -2022,7 +2022,7 @@ export default function ShiftApp() {
                       onFocus={(e) => e.target.select()}
                     />
                       <small>
-                      {t('직원은 로그인 화면에서 자기 이름을 골라 로그인합니다. 초기 비밀번호는 1111이며, 직원이 직접 변경할 수 있습니다.')}
+                      {t('직원은 로그인 화면에서 자기 이름을 골라 로그인합니다. 첫 비밀번호는 본인 직원 ID 이며, 직원이 직접 변경할 수 있습니다.')}
                     </small>
                   </div>
                 )}
@@ -2058,7 +2058,9 @@ export default function ShiftApp() {
                   {staff.map((e) => (
                     <TableRow key={e.id}>
                       <TableCell>{box(e)}</TableCell>
-                      <TableCell>{e.id}</TableCell>
+                      <TableCell>
+                        {e.punchId || <span className="muted">{t('미등록')}</span>}
+                      </TableCell>
                       <TableCell>
                         {e.role}
                         {e.admin && (
@@ -2473,7 +2475,8 @@ export default function ShiftApp() {
                 {birthField(t('생년월일'))}
                 {input('phone', t('연락처 (예: 914-555-0123)'), 'tel', false)}
                 {/* 공용 단말에서 출근을 찍을 때 본인 확인에 쓰는 번호입니다. 비워 두면 묻지 않고 바로 찍습니다. */}
-                {input('punchId', t('Punch ID (숫자 4~8자리, 선택)'), 'text', false)}
+                {/* 단말에서 찍는 번호이자 첫 로그인 비밀번호입니다. 한 사람에 하나. */}
+                {input('punchId', t('직원 ID (숫자 4~8자리)'))}
                 {input('email', t('로그인 이메일'), 'email', false)}
                 <div className="formgrid">
                   {input('color', t('직원 색상'), 'color')}

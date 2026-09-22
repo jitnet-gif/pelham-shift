@@ -42,7 +42,7 @@ const hhmm = (d: Date) =>
 export default function AttendanceKiosk() {
   const { t, locale } = useLang();
   const [now, setNow] = useState(() => new Date());
-  const [device, setDevice] = useState<'loading' | 'ready' | 'blocked'>('loading');
+  const [ready, setReady] = useState(true);
   const [location, setLocation] = useState('');
   const [code, setCode] = useState('');
   const [session, setSession] = useState<Snapshot | null>(null);
@@ -68,10 +68,9 @@ export default function AttendanceKiosk() {
         const data = (await r.json()) as { location?: string; error?: string };
         if (!r.ok) throw Error(data.error || '열 수 없습니다.');
         setLocation(data.location || '');
-        setDevice('ready');
       } catch (e) {
         setError(e instanceof Error ? e.message : '열 수 없습니다.');
-        setDevice('blocked');
+        setReady(false);
       }
     })();
   }, []);
@@ -212,21 +211,6 @@ export default function AttendanceKiosk() {
       minute: '2-digit',
       timeZone: 'America/New_York',
     }).format(now);
-
-  if (device === 'blocked')
-    return (
-      <main className="kiosk">
-        <section className="kiosk-stop">
-          <Settings size={30} />
-          <h1>{t('출퇴근 단말')}</h1>
-          <p>{t(error)}</p>
-          <a className="kiosk-link" href={'/' + query()}>
-            {t('로그인하러 가기')}
-          </a>
-          <LangToggle />
-        </section>
-      </main>
-    );
 
   // 로그인한 사람이 있습니다 — 지금 근무와 사진 찍는 화면을 보여 줍니다.
   if (session) {
@@ -384,7 +368,7 @@ export default function AttendanceKiosk() {
         </span>
       </div>
       <div className="kiosk-pad">
-        <p className="kiosk-ask">{t('Punch ID를 입력하세요')}</p>
+        <p className="kiosk-ask">{t('직원 ID를 입력하세요')}</p>
         <output className="kiosk-code" aria-live="polite">
           {'•'.repeat(code.length)}
         </output>
@@ -428,7 +412,7 @@ export default function AttendanceKiosk() {
         )}
         <button
           className="kiosk-signin"
-          disabled={busy || device !== 'ready' || code.length < 4}
+          disabled={busy || !ready || code.length < 4}
           onClick={() => void send(code)}
         >
           {t('signin::출근 찍기')}

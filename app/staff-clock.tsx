@@ -90,7 +90,7 @@ export default function StaffClock({
         </div>
         <div className="stclock-pad">
           <p className="stclock-ask">
-            {expected ? t('Punch ID를 입력하세요') : t('출근을 찍습니다')}
+            {expected ? t('직원 ID를 입력하세요') : t('출근을 찍습니다')}
           </p>
           {expected && (
             <>
@@ -126,7 +126,7 @@ export default function StaffClock({
               </div>
             </>
           )}
-          {wrong && <p className="stclock-wrong">{t('Punch ID가 맞지 않습니다.')}</p>}
+          {wrong && <p className="stclock-wrong">{t('직원 ID가 맞지 않습니다.')}</p>}
           <button
             className="stclock-signin"
             disabled={busy || !ready}
