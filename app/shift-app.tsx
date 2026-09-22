@@ -417,6 +417,10 @@ export default function ShiftApp() {
     label: e.name + ' · ' + e.id,
   }));
   // 대체 신청은 근무일 7일 전까지만 받습니다. 가까운 날짜만 남아 있으면 고를 근무가 하나도 없습니다.
+  // 오늘 내 펀치. 직원 화면의 출근·퇴근 버튼이 이것을 보고 갈립니다.
+  const myPunch = [...(data.punches ?? [])]
+    .reverse()
+    .find((p) => p.employeeId === actor.id && p.date === localDate(new Date(tick)));
   const swappable = data.shifts.filter(
     (s) => canSwap(s.date) && (actor.admin || s.employeeId === actor.id) && !s.originalId,
   );
@@ -841,7 +845,11 @@ export default function ShiftApp() {
                   now={tick}
                   employees={staff}
                   shifts={data.shifts}
+                  punches={data.punches ?? []}
+                  canPunchOthers={actor.admin}
+                  busy={busy}
                   onShiftSelect={(id) => open('detail', { id })}
+                  onPunch={(employeeId, kind) => void command(kind, { employeeId })}
                 />
               </div>
             </TabsContent>
@@ -1118,6 +1126,35 @@ export default function ShiftApp() {
                   </button>
                 )}
               </div>
+              {!actor.admin && (
+                <div className="punchcard">
+                  <div>
+                    <b>
+                      {myPunch
+                        ? myPunch.out
+                          ? t('오늘 퇴근까지 찍었습니다.')
+                          : t('출근으로 찍혀 있습니다.')
+                        : t('아직 출근을 찍지 않았습니다.')}
+                    </b>
+                    <span>
+                      {myPunch
+                        ? myPunch.out
+                          ? myPunch.in + ' → ' + myPunch.out
+                          : myPunch.in + t(' 출근')
+                        : t('일을 시작할 때 눌러주세요. 찍히는 시각은 매장 서버 시각입니다.')}
+                    </span>
+                  </div>
+                  <button
+                    className="button primary"
+                    disabled={busy || Boolean(myPunch?.out)}
+                    onClick={() =>
+                      void command(myPunch && !myPunch.out ? 'punchOut' : 'punchIn', {})
+                    }
+                  >
+                    {myPunch?.out ? t('완료') : myPunch ? t('퇴근 찍기') : t('출근 찍기')}
+                  </button>
+                </div>
+              )}
               {actor.admin && (
                 <>
                   <input
@@ -2751,6 +2788,7 @@ export default function ShiftApp() {
           </div>
           <TabsList className="sidenav">
             {actor.admin && navItem('dashboard', '대시보드', LayoutDashboard)}
+            {actor.admin && navItem('working', '근무 현황', Radar, { sub: true })}
             <div className={'sidenav-group' + (scheduleTabs.includes(tab) ? ' current' : '')}>
               <span className="sidenav-heading">
                 <CalendarDays size={19} />
@@ -2777,7 +2815,6 @@ export default function ShiftApp() {
             {actor.admin && navItem('logbook', '업무일지', BookOpen)}
             {navItem('messages', '메시지', MessageSquare, { count: unread.length })}
             <hr />
-            {actor.admin && navItem('working', '근무 현황', Radar)}
             {navItem('attendance', '출근 기록', Timer)}
             {navItem('payroll', '급여 관리', Wallet)}
             <hr />

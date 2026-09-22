@@ -87,15 +87,87 @@
   min-height: 49px;
 }
 .working-name {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
   width: var(--wk-name);
   min-width: var(--wk-name);
   padding-right: 18px;
   text-align: right;
+  overflow: hidden;
+}
+.working-name b {
   font-size: 14px;
+  font-weight: 500;
   color: #33463d;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* 실제로 찍힌 시각. 아직 안 찍었으면 그렇다고 적습니다. */
+.working-name small {
+  font-size: 11px;
+  color: #93a49b;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.working-block.late {
+  background: #fdeee8;
+}
+/* 공용 단말에서 관리자가 대신 찍어 주는 버튼 */
+.working-punch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 12px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid #cfe0d6;
+  border-radius: 8px;
+  background: #fff;
+  color: #087e6d;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.working-punch.out {
+  border-color: #eccfc6;
+  color: #b4543a;
+}
+.working-punch:disabled {
+  border-color: #e4eae7;
+  color: #a6b4ac;
+}
+/* 직원이 자기 출퇴근을 찍는 카드 */
+.punchcard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 20px 22px;
+  margin-bottom: 22px;
+  border: 1px solid #cfe3d8;
+  border-radius: 10px;
+  background: #f4faf7;
+  flex-wrap: wrap;
+}
+.punchcard b {
+  display: block;
+  font-size: 16px;
+  color: #21362e;
+  margin-bottom: 6px;
+}
+.punchcard span {
+  font-size: 13px;
+  color: #6d8074;
+}
+.punchcard .button {
+  min-height: 46px;
+  padding: 0 26px;
+  font-size: 15px;
 }
 .working-track {
   position: relative;

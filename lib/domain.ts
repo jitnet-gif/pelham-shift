@@ -10,7 +10,10 @@ export type Decision='pending'|'approved'|'declined';
 export type TimeOff = {id:string;employeeId:string;from:string;to:string;allDay:boolean;start?:string;end?:string;reason:string;status:Decision;createdAt:string;decidedAt?:string};
 // Recurring weekly unavailability: weekday 0 (Sun) – 6 (Sat), all day or between start/end.
 export type Availability = {id:string;employeeId:string;weekday:number;allDay:boolean;start?:string;end?:string;note:string;effectiveFrom?:string;status:Decision;createdAt:string;decidedAt?:string};
-export type State = {employees:Employee[];shifts:Shift[];swaps:Swap[];attendance:Attendance[];messages:Message[];tasks:Task[];timeOff?:TimeOff[];availability?:Availability[];currency:string;published:boolean};
+// 직원이 그 자리에서 찍은 실제 출퇴근. 나중에 올리는 출근기계 기록(Attendance)과 달리 지금 이 순간을 말합니다.
+export type Punch = {id:string;employeeId:string;date:string;in:string;out?:string};
+export type State = {employees:Employee[];shifts:Shift[];swaps:Swap[];attendance:Attendance[];messages:Message[];tasks:Task[];timeOff?:TimeOff[];availability?:Availability[];punches?:Punch[];currency:string;published:boolean};
+export const localTime=(d:Date)=>new Intl.DateTimeFormat('en-GB',{timeZone:'America/New_York',hour:'2-digit',minute:'2-digit',hour12:false}).format(d);
 export const localDate=(d:Date)=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
 export function addDays(date:string,n:number){const d=new Date(date+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)}
 export function weekStart(date:string){return addDays(date,-new Date(date+'T12:00:00Z').getUTCDay())}

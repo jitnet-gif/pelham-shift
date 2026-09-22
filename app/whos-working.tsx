@@ -1,5 +1,6 @@
 'use client';
-import type { Employee, Shift } from '@/lib/domain';
+import { LogIn, LogOut } from 'lucide-react';
+import type { Employee, Punch, Shift } from '@/lib/domain';
 import { useLang } from './use-lang';
 
 const minutes = (v: string) => Number(v.slice(0, 2)) * 60 + Number(v.slice(3, 5));
@@ -29,20 +30,27 @@ export default function WhosWorking({
   now,
   employees,
   shifts,
+  punches,
+  canPunchOthers,
+  busy,
   onShiftSelect,
+  onPunch,
 }: {
   date: string;
   now: number;
   employees: Employee[];
   shifts: Shift[];
+  punches: Punch[];
+  canPunchOthers: boolean;
+  busy: boolean;
   onShiftSelect: (id: string) => void;
+  onPunch: (employeeId: string, kind: 'punchIn' | 'punchOut') => void;
 }) {
   const { t } = useLang();
   const emp = (id: string) => employees.find((e) => e.id === id);
   const today = shifts
     .filter((s) => s.date === date && emp(s.employeeId))
     .sort((a, b) => minutes(a.start) - minutes(b.start) || endOf(a) - endOf(b));
-  // 뉴욕 기준 현재 시각. 오늘이 아닌 날을 보고 있으면 진행 중인 근무는 없습니다.
   const clock = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'America/New_York',
     hour: '2-digit',
@@ -57,10 +65,24 @@ export default function WhosWorking({
   }).format(new Date(now));
   const live = date === stampToday;
   const cursor = minutes(clock);
-  const state = (s: Shift) =>
-    !live ? 'plan' : cursor < minutes(s.start) ? 'soon' : cursor < endOf(s) ? 'on' : 'done';
+  const dayPunches = punches.filter((p) => p.date === date);
+  const punchOf = (employeeId: string) =>
+    [...dayPunches].reverse().find((p) => p.employeeId === employeeId);
+  // 실제 펀치가 있으면 그것이 사실입니다. 없을 때만 예정 시각으로 갈립니다.
+  const state = (s: Shift) => {
+    const punch = punchOf(s.employeeId);
+    if (punch && !punch.out) return 'on';
+    if (punch?.out) return 'done';
+    if (!live) return 'soon';
+    return cursor < minutes(s.start) ? 'soon' : cursor < endOf(s) ? 'late' : 'missed';
+  };
   const count = (kind: string) => today.filter((s) => state(s) === kind).length;
-  // 눈금은 그날 근무에 맞춰 잡습니다. 7shifts 처럼 첫 출근 한 시간 전부터 마지막 퇴근 한 시간 뒤까지.
+  const blocks: [string, string, number][] = [
+    ['on', '근무 중', count('on')],
+    ['late', '미기록', count('late') + count('missed')],
+    ['soon', '예정', count('soon')],
+    ['done', '퇴근', count('done')],
+  ];
   const from = today.length ? Math.floor(Math.min(...today.map((s) => minutes(s.start))) / 60) : 5;
   const to = today.length ? Math.ceil(Math.max(...today.map(endOf)) / 60) + 1 : 21;
   const span = Math.max(to - from, 1) * 60;
@@ -70,15 +92,10 @@ export default function WhosWorking({
   return (
     <section className="working">
       <div className="working-blocks">
-        {[
-          ['on', '근무 중', count('on')],
-          ['soon', '예정', count('soon')],
-          ['done', '종료', count('done')],
-          ['all', '오늘 근무', today.length],
-        ].map(([key, label, n]) => (
-          <div className={'working-block ' + key} key={key as string}>
-            <b>{n as number}</b>
-            <span>{t(label as string)}</span>
+        {blocks.map(([key, label, n]) => (
+          <div className={'working-block ' + key} key={key}>
+            <b>{n}</b>
+            <span>{t(label)}</span>
           </div>
         ))}
       </div>
@@ -99,9 +116,20 @@ export default function WhosWorking({
             </div>
             {today.map((s) => {
               const person = emp(s.employeeId)!;
+              const punch = punchOf(s.employeeId);
+              const mark = state(s);
               return (
                 <div className="working-row" key={s.id}>
-                  <span className="working-name">{person.name}</span>
+                  <span className="working-name">
+                    <b>{person.name}</b>
+                    <small>
+                      {punch
+                        ? punch.out
+                          ? t('{a} 출근 · {b} 퇴근', { a: stamp(punch.in), b: stamp(punch.out) })
+                          : t('{a} 출근', { a: stamp(punch.in) })
+                        : t('기록 없음')}
+                    </small>
+                  </span>
                   <div className="working-track">
                     {hours.map((h) => (
                       <i key={h} className="working-line" style={{ left: at(h * 60) + '%' }} />
@@ -110,10 +138,10 @@ export default function WhosWorking({
                       <i className="working-now" style={{ left: at(cursor) + '%' }} />
                     )}
                     <button
-                      className={'working-bar ' + state(s)}
+                      className={'working-bar ' + mark}
                       style={{
                         left: at(minutes(s.start)) + '%',
-                        width: (endOf(s) - minutes(s.start)) / span * 100 + '%',
+                        width: ((endOf(s) - minutes(s.start)) / span) * 100 + '%',
                         background: toneOf(s.area),
                       }}
                       onClick={() => onShiftSelect(s.id)}
@@ -125,6 +153,18 @@ export default function WhosWorking({
                       </b>
                     </button>
                   </div>
+                  {canPunchOthers && live && (
+                    <button
+                      className={'working-punch' + (punch && !punch.out ? ' out' : '')}
+                      disabled={busy || Boolean(punch?.out)}
+                      onClick={() =>
+                        onPunch(person.id, punch && !punch.out ? 'punchOut' : 'punchIn')
+                      }
+                    >
+                      {punch && !punch.out ? <LogOut size={15} /> : <LogIn size={15} />}
+                      {punch?.out ? t('완료') : punch ? t('punch::퇴근') : t('punch::출근')}
+                    </button>
+                  )}
                 </div>
               );
             })}
