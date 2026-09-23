@@ -92,6 +92,18 @@
   background: #dfe7e3;
   color: #8ba096;
 }
+.dayview-unpublish {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 15px;
+  border: 1px solid #e3c877;
+  border-radius: 8px;
+  background: #fff4d4;
+  color: #6b4e0a;
+  font-size: 14px;
+}
 .dayview-scroll {
   overflow: auto;
   max-height: min(72vh, 820px);

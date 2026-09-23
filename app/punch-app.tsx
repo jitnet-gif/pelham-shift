@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { Bell, BellRing, CalendarDays, LogOut } from 'lucide-react';
 import { LOCATION, localDate, seed, type State } from '@/lib/domain';
 import { pushOn, relangPush, subscribePush } from '@/lib/push-client';
+import { notice } from '@/lib/notice';
 import { useLang } from './use-lang';
 import GpsGuard, { useGps } from './gps-guard';
 import StaffClock from './staff-clock';
@@ -50,8 +51,12 @@ export default function PunchApp() {
 
   // 불러오기는 지금 판 번호를 돌려줍니다. 저장이 어긋났을 때 그 번호로 한 번 더 보냅니다.
   const refresh = async () => {
+    // 전파가 잠깐 끊긴 것은 알리지 않습니다. 브라우저가 던지는 'Failed to fetch' 를
+    // 그대로 띄우면 번역도 없이 띠에 박힌 채 남고, 30초 뒤 차례에 저절로 다시 붙습니다.
+    let reached = false;
     try {
       const r = await fetch('/api/workspace' + query());
+      reached = true;
       const json = (await r.json()) as Payload;
       if (r.status === 401) {
         setAuth('out');
@@ -59,10 +64,12 @@ export default function PunchApp() {
       }
       if (!r.ok) throw Error(json.error);
       setAuth('in');
-      return ingest(json);
+      const at = ingest(json);
+      setStatus('');
+      return at;
     } catch (e) {
-      setStatus(e instanceof Error ? e.message : '불러오지 못했습니다.');
       setAuth((a) => (a === 'loading' ? 'out' : a));
+      if (reached) setStatus(notice(e, '불러오지 못했습니다.'));
       return undefined;
     }
   };
@@ -120,7 +127,7 @@ export default function PunchApp() {
       setStatus('기록했습니다.');
       return json.state ?? null;
     } catch (e) {
-      setStatus(e instanceof Error ? e.message : '기록하지 못했습니다.');
+      setStatus(notice(e, '기록하지 못했습니다.'));
       return null;
     } finally {
       setBusy(false);
@@ -134,7 +141,7 @@ export default function PunchApp() {
       setPush(true);
       setStatus('이 기기에서 푸시 알림을 켰습니다. 출근 1시간 전 알림과 우천 공지를 받습니다.');
     } catch (e) {
-      setStatus(e instanceof Error ? e.message : '알림을 켜지 못했습니다.');
+      setStatus(notice(e, '알림을 켜지 못했습니다.'));
     } finally {
       setBusy(false);
     }

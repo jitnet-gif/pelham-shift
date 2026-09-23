@@ -1,6 +1,7 @@
 'use client';
 import { FormEvent, useState } from 'react';
 import { KeyRound } from 'lucide-react';
+import { notice } from '@/lib/notice';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { useLang } from './use-lang';
 
@@ -44,7 +45,7 @@ export default function PasswordChange({
       onChanged();
       onClose();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '비밀번호를 변경하지 못했습니다.');
+      setError(notice(reason, '비밀번호를 변경하지 못했습니다.'));
     } finally {
       setBusy(false);
     }

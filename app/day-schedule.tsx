@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Search, Send } from 'lucide-react';
+import { ChevronLeft, ChevronRight, EyeOff, Plus, Search, Send } from 'lucide-react';
 import type { Employee, Shift } from '@/lib/domain';
 import { useLang } from './use-lang';
 
@@ -45,6 +45,7 @@ export default function DaySchedule({
   onShiftSelect,
   onAddShift,
   onPublish,
+  onUnpublish,
 }: {
   date: string;
   employees: Employee[];
@@ -57,6 +58,7 @@ export default function DaySchedule({
   onShiftSelect: (id: string) => void;
   onAddShift: (employeeId: string, date: string, start?: string) => void;
   onPublish: () => void;
+  onUnpublish: () => void;
 }) {
   const { t, locale } = useLang();
   // 빈 칸 위에 마우스를 올리면 그 자리에 + 를 띄웁니다. 누르면 그 시각으로 근무가 열립니다.
@@ -143,6 +145,11 @@ export default function DaySchedule({
           {canEdit && (
             <button className="dayview-publish" disabled={published} onClick={onPublish}>
               <Send size={15} /> {t('직원에게 공개')}
+            </button>
+          )}
+          {canEdit && published && (
+            <button className="dayview-unpublish" onClick={onUnpublish}>
+              <EyeOff size={15} /> {t('게시 해제')}
             </button>
           )}
         </div>

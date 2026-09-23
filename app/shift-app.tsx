@@ -26,7 +26,6 @@ import {
   TriangleAlert,
   UserRound,
   LayoutDashboard,
-  BookOpen,
   CircleQuestionMark,
   Timer,
   Radar,
@@ -40,6 +39,7 @@ import {
   ArrowLeft,
   House,
   X,
+  EyeOff,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
@@ -96,6 +96,7 @@ import {
   type State,
 } from '@/lib/domain';
 import { download } from '@/lib/importer';
+import { notice } from '@/lib/notice';
 import InstallQr from './install-qr';
 import MonthSchedule from './month-schedule';
 import DaySchedule from './day-schedule';
@@ -134,7 +135,6 @@ const TAB_LABELS: Record<string, string> = {
   timeoff: '휴무',
   availability: '근무 가능 시간',
   team: '팀',
-  logbook: '업무일지',
   messages: '메시지',
   attendance: '출근 기록',
   payroll: '급여 관리',
@@ -373,9 +373,14 @@ export default function ShiftApp() {
     // 첫 로그인이라고 비밀번호 변경을 먼저 띄우지 않습니다. 바꾸고 싶을 때 직접 엽니다.
     if (r.authMethod === 'birth') setPasswordChanged(r.passwordChanged !== false);
   };
+  // 30초마다 도는 불러오기입니다. 전파가 잠깐 끊긴 것까지 알리면, 브라우저가 던지는
+  // 'Failed to fetch' 가 번역도 없이 띠에 박힌 채 남습니다 (lib/notice.ts).
+  // 서버까지 닿아서 받은 말만 띄우고, 못 닿은 것은 다음 차례에 저절로 낫게 둡니다.
   async function refresh() {
+    let reached = false;
     try {
       const r = await fetch('/api/workspace' + query());
+      reached = true;
       const json = (await r.json()) as { error?: string };
       if (r.status === 401) {
         setAuth('out');
@@ -384,9 +389,12 @@ export default function ShiftApp() {
       if (!r.ok) throw Error(json.error);
       setAuth('in');
       ingest(json);
+      // 지난번에 띄운 말은 여기서 지웁니다. 그래야 한 번 뜬 띠가 계속 박혀 있지 않습니다.
+      setStatus('');
     } catch (e) {
-      setStatus(e instanceof Error ? e.message : '불러오지 못했습니다.');
       setAuth((a) => (a === 'loading' ? 'out' : a));
+      if (!reached) return;
+      setStatus(notice(e, '불러오지 못했습니다.'));
     }
   }
   useEffect(() => {
@@ -405,6 +413,17 @@ export default function ShiftApp() {
       if (!employeeNav.has(tab)) setTab('schedule');
     }
   }, [actor.admin, tab]);
+  // 게시 해제는 직원 화면에서 근무표가 통째로 사라지므로 한 번 묻습니다. 기록은 지워지지 않습니다.
+  const unpublish = () => {
+    if (
+      confirm(
+        t(
+          '게시를 해제할까요? 근무표는 그대로 저장되지만 직원 화면에서는 사라집니다. 기록은 지워지지 않습니다.',
+        )
+      )
+    )
+      void command('unpublish');
+  };
   async function command(type: string, payload: any = {}) {
     if (setup && type !== 'initialize') {
       setStatus(
@@ -427,7 +446,7 @@ export default function ShiftApp() {
       setStatus('저장했습니다.');
       return json.state ?? null;
     } catch (e) {
-      setStatus(e instanceof Error ? e.message : '저장하지 못했습니다.');
+      setStatus(notice(e, '저장하지 못했습니다.'));
       return null;
     } finally {
       setBusy(false);
@@ -467,7 +486,7 @@ export default function ShiftApp() {
         '이 기기에서 푸시 알림을 켰습니다. 출근 1시간 전 알림과 우천 공지를 받습니다.',
       );
     } catch (e) {
-      setStatus(e instanceof Error ? e.message : '알림을 켜지 못했습니다.');
+      setStatus(notice(e, '알림을 켜지 못했습니다.'));
     } finally {
       setBusy(false);
     }
@@ -482,9 +501,7 @@ export default function ShiftApp() {
           : '알림을 받을 기기가 없습니다. 푸시 알림을 다시 켜세요.',
       );
     } catch (e) {
-      setStatus(
-        e instanceof Error ? e.message : '테스트 알림을 보내지 못했습니다.',
-      );
+      setStatus(notice(e, '테스트 알림을 보내지 못했습니다.'));
     } finally {
       setBusy(false);
     }
@@ -977,6 +994,11 @@ export default function ShiftApp() {
         .filter((v) => (v === id ? on : rainTargets.includes(v)))
         .join(','),
     );
+  // 아직 공개하지 않은 근무 수. 공개는 워크스페이스 전체 스위치라 보고 있는 주가 아니라
+  // 전체를 셉니다 — 버튼에 적힌 수가 곧 누르면 공개될 근무 수입니다.
+  const drafts = data.shifts.filter((s) => s.draft).length;
+  // 띄울지 말지는 한 곳에서 정합니다 — 띄우는 자리와, 목록 끝이 가리지 않게 둘 여백이 같은 답을 봐야 합니다.
+  const publishBar = phone && actor.admin && tab === 'schedule' && drafts > 0;
   const reminders = data.published
     ? data.shifts
         .filter(
@@ -3111,6 +3133,15 @@ export default function ShiftApp() {
                       >
                         {t('직원에게 공개')}
                       </button>
+                      {data.published && (
+                        <button
+                          disabled={busy || setup}
+                          className="button unpublish"
+                          onClick={() => unpublish()}
+                        >
+                          {t('게시 해제')}
+                        </button>
+                      )}
                       <button
                         className="button primary"
                         onClick={() =>
@@ -3528,6 +3559,16 @@ export default function ShiftApp() {
                         <Send size={16} />
                         {data.published ? t('공개됨') : t('스케줄 공개')}
                       </button>
+                      {data.published && (
+                        <button
+                          className="button unpublish"
+                          disabled={busy || setup}
+                          onClick={() => unpublish()}
+                        >
+                          <EyeOff size={16} />
+                          {t('게시 해제')}
+                        </button>
+                      )}
                     </div>
   ) : null;
   const schedFiltersNode = staffReadOnly ? null : (
@@ -3617,7 +3658,6 @@ export default function ShiftApp() {
               <ClipboardList size={19} />
               <span>{t('작업')}</span>
             </a>
-            {actor.admin && navItem('logbook', '업무일지', BookOpen)}
             {navItem('messages', '메시지', MessageSquare, { count: unread.length })}
             <hr />
             {navItem('attendance', '출근 기록', Timer)}
@@ -3707,7 +3747,7 @@ export default function ShiftApp() {
               )}
             </header>
           )}
-          <main>
+          <main className={publishBar ? 'has-publishbar' : undefined}>
             {setup && (
               <div className="demo-banner setup">
                 <span>
@@ -4113,6 +4153,7 @@ export default function ShiftApp() {
                       });
                     }}
                     onPublish={() => void command('publish')}
+                    onUnpublish={unpublish}
                   />
                 ) : staffReadOnly || view === 'month' ? (
                   <MonthSchedule
@@ -4190,7 +4231,6 @@ export default function ShiftApp() {
               </section>
             </TabsContent>
             {comingSoon('dashboard', LayoutDashboard, '대시보드', '오늘 근무자, 이번 주 근무시간과 인건비, 처리할 요청을 한 화면에 모아 보여줄 예정입니다.')}
-            {comingSoon('logbook', BookOpen, '업무일지', '날짜별 운영 메모와 특이사항을 기록하고 팀과 공유하는 기능을 준비하고 있습니다.')}
             {comingSoon('help', CircleQuestionMark, '도움말', '스케줄 작성, 휴무·근무 가능 시간, 대체 근무 사용법 안내를 준비하고 있습니다.')}
             <TabsContent value="home">
               {/* 이 탭은 직원 기록이 있을 때만 길에 놓입니다. 주소를 직접 열어 들어온 경우에만 이 줄을 봅니다. */}
@@ -4260,6 +4300,21 @@ export default function ShiftApp() {
               PELHAM SHIFT <span>{t('팀의 시간, 더 간편하게.')}</span>
             </footer>
           </main>
+          {/* 공개하지 않은 근무가 남아 있으면 탭바 바로 위에 띄웁니다. 목록을 아무리 내려도
+              '아직 공개 안 된 게 몇 건 있다'가 눈에서 사라지지 않게. 공개하면 스스로 사라집니다. */}
+          {publishBar && (
+            <div className="publishbar">
+              <button
+                className="publishbar-button"
+                disabled={busy || setup}
+                onClick={() => command('publish')}
+              >
+                {drafts === 1
+                  ? t('스케줄 공개 (근무 1건)')
+                  : t('스케줄 공개 (근무 {n}건)', { n: drafts })}
+              </button>
+            </div>
+          )}
           {/* 폰의 기본 이동 수단. 나머지 메뉴는 '더보기'가 여는 서랍에 그대로 있습니다. */}
           <nav className="tabbar" aria-label={t('주요 메뉴')}>
             {tabBarItems.map(({ key, label, Icon, count }) => (

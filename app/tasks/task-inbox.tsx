@@ -2,6 +2,7 @@
 import {useEffect,useMemo,useState} from 'react';
 import {ArrowLeft,CheckCircle2,ClipboardList,Plus,RefreshCw,Send,UserRound} from 'lucide-react';
 import type {State,Task} from '@/lib/domain';
+import {notice} from '@/lib/notice';
 import {useLang} from '../use-lang';
 type Actor={id:string;admin:boolean};
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
@@ -12,9 +13,9 @@ export default function TaskInbox(){
  // /tasks is also rendered on the server, where window does not exist; the team query is filled in after mount.
  const [root,setRoot]=useState('/');
  const receive=(data:any)=>{if(data.state){setState({...data.state,tasks:data.state.tasks??[]});setVersion(data.version);setSetup(false)}else setSetup(true);if(data.actor)setActor(data.actor)};
- async function refresh(){try{const r=await fetch('/api/workspace'+query());const data=await r.json();if(!r.ok)throw Error(data.error||'작업을 불러오지 못했습니다.');receive(data);setError('')}catch(e){setError(e instanceof Error?e.message:'작업을 불러오지 못했습니다.')}}
+ async function refresh(){try{const r=await fetch('/api/workspace'+query());const data=await r.json();if(!r.ok)throw Error(data.error||'작업을 불러오지 못했습니다.');receive(data);setError('')}catch(e){setError(notice(e,'작업을 불러오지 못했습니다.'))}}
  useEffect(()=>{setRoot('/'+query());void refresh()},[]);
- async function send(type:string,payload:Record<string,string>){if(!state)return;setBusy(true);try{const r=await fetch('/api/workspace'+query(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,payload,version})});const data=await r.json();if(!r.ok)throw Error(data.error||'저장하지 못했습니다.');receive(data);setError('')}catch(e){setError(e instanceof Error?e.message:'저장하지 못했습니다.')}finally{setBusy(false)}}
+ async function send(type:string,payload:Record<string,string>){if(!state)return;setBusy(true);try{const r=await fetch('/api/workspace'+query(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,payload,version})});const data=await r.json();if(!r.ok)throw Error(data.error||'저장하지 못했습니다.');receive(data);setError('')}catch(e){setError(notice(e,'저장하지 못했습니다.'))}finally{setBusy(false)}}
  const employees=state?.employees??[];const tasks=useMemo(()=>[...(state?.tasks??[])].sort((a,b)=>a.status==='completed'&&b.status!=='completed'?1:a.date.localeCompare(b.date)),[state]);
  const employee=(id:string)=>employees.find(e=>e.id===id);
  // Managers and staff with task permission can assign tasks; everyone works on the tasks assigned to them.

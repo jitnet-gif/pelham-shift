@@ -1,6 +1,7 @@
 'use client';
 import { FormEvent, useEffect, useState } from 'react';
 import { LockKeyhole } from 'lucide-react';
+import { notice } from '@/lib/notice';
 import { useLang } from './use-lang';
 
 // 직원은 칸 하나만 씁니다 — 비밀번호 칸에 본인 직원 ID(단말에 대는 번호)를 칩니다.
@@ -57,7 +58,7 @@ export default function BirthLogin() {
       const here = window.location.pathname;
       window.location.assign(result.team ? here + '?team=' + encodeURIComponent(result.team) : here);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '로그인하지 못했습니다.');
+      setError(notice(reason, '로그인하지 못했습니다.'));
     } finally {
       setBusy(false);
     }

@@ -73,6 +73,8 @@
 .button.publish{min-height:42px;padding-inline:18px;font-weight:600;background:#087e6d;border-color:#087e6d;color:#fff}
 .button.publish:hover{background:#066b5d}
 .button.publish:disabled{background:#d8dcd9;border-color:#c9ceca;color:#5d6764;opacity:1}
+.button.unpublish{min-height:42px;padding-inline:18px;font-weight:600;background:#fff4d4;border-color:#e3c877;color:#6b4e0a}
+.button.unpublish:hover{background:#ffecb8}
 
 /* Filter row */
 .sched-filters{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-bottom:4px}
@@ -154,7 +156,16 @@
   .app-shell main{padding:14px 16px 0}
   .sched-actions{margin-left:0;width:100%}
   .sched-actions .button.publish{margin-left:auto}
+  .sched-actions .button.publish+.button.unpublish{margin-left:0}
   .roster-scroll{max-height:calc(100dvh - 200px)}
+  /* 공개하지 않은 근무가 남았을 때만 뜨는 줄. 탭바(56px)와 홈 인디케이터 위에 얹고,
+     z-index 는 탭바(30) 아래로 둡니다 — 겹치면 이동이 먼저입니다. */
+  .publishbar{position:fixed;left:12px;right:12px;bottom:calc(68px + env(safe-area-inset-bottom,0px));z-index:29}
+  .publishbar-button{display:flex;align-items:center;justify-content:center;width:100%;min-height:50px;padding:0 16px;border:0;border-radius:8px;background:#4371fd;color:#fff;font-size:16px;font-weight:650;letter-spacing:-.2px;box-shadow:0 12px 26px -12px rgba(67,113,253,.8)}
+  .publishbar-button:active{background:#2f5ce8}
+  .publishbar-button:disabled{background:#a9bcf0;box-shadow:none}
+  /* 떠 있는 줄이 목록 마지막 줄을 덮지 않게, 그 줄이 떠 있는 동안만 아래를 비웁니다. */
+  .app-shell main.has-publishbar{padding-bottom:78px}
 }
 @media (max-width:600px){
   .daterange{flex:1}
@@ -166,7 +177,8 @@
   .sched-filters-gap{display:none}
   .sched-filters .button{flex:1 1 calc(50% - 5px)}
   .sched-actions{gap:8px}
-  .sched-actions .button.publish{flex:1}
+  .sched-actions .button.publish,
+  .sched-actions .button.unpublish{flex:1}
   .roster{grid-template-columns:150px repeat(7,minmax(96px,1fr));min-width:822px}
   .roster-staff{padding:8px 10px;gap:8px}
   .roster-avatar{width:28px;height:28px;font-size:12px}
