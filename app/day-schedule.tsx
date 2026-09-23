@@ -40,6 +40,7 @@ export default function DaySchedule({
   shifts,
   rateOf,
   money,
+  showCost,
   published,
   canEdit,
   onDateChange,
@@ -53,6 +54,8 @@ export default function DaySchedule({
   shifts: Shift[];
   rateOf: (employeeId: string) => number;
   money: (n: number) => string;
+  // 시급이 내려오지 않는 사람에게는 금액을 그리지 않습니다.
+  showCost: boolean;
   published: boolean;
   canEdit: boolean;
   onDateChange: (date: string) => void;
@@ -163,7 +166,8 @@ export default function DaySchedule({
               {t('직원 {n}명', { n: employees.length })}
             </span>
             <small>
-              {dayHours.toFixed(2)} {t('시간')} · {money(dayCost)}
+              {dayHours.toFixed(2)} {t('시간')}
+              {showCost && <> · {money(dayCost)}</>}
             </small>
           </div>
           <div className="dv-hours">
@@ -184,8 +188,8 @@ export default function DaySchedule({
                     <span>
                       <b>{e.name}</b>
                       <small>
-                        {hoursOf(e.id).toFixed(2)} {t('시간')} ·{' '}
-                        {money(hoursOf(e.id) * rateOf(e.id))}
+                        {hoursOf(e.id).toFixed(2)} {t('시간')}
+                        {showCost && <> · {money(hoursOf(e.id) * rateOf(e.id))}</>}
                       </small>
                     </span>
                     {canEdit && (
@@ -262,13 +266,13 @@ export default function DaySchedule({
           <div className="dv-foot">
             <div className="dv-foot-label">
               <b>{dayHours.toFixed(2)} {t('시간')}</b>
-              <small>{money(dayCost)}</small>
+              {showCost && <small>{money(dayCost)}</small>}
             </div>
             <div className="dv-foot-hours">
               {HOURS.map((h) => (
                 <span key={h}>
                   <b>{hourHours(h).toFixed(1)}</b>
-                  <small>{money(hourCost(h))}</small>
+                  {showCost && <small>{money(hourCost(h))}</small>}
                 </span>
               ))}
             </div>

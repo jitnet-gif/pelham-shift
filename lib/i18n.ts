@@ -494,6 +494,15 @@ const en: Record<string, string> = {
     'When on, this employee can send tasks to other staff from the task inbox and see the progress of every task. Schedules, payroll and staff details stay read-only.',
   '· {name} 지시': '· assigned by {name}',
   '작업 지시 권한이 필요합니다.': 'You need permission to assign tasks.',
+  // Jobs (업무) — the list every employee and shift picks from, grown from the task screen.
+  '업무 목록': 'Jobs',
+  '여기에 더한 업무는 직원 정보와 근무 추가 화면의 업무 선택지에 바로 나타납니다.':
+    'A job you add here shows up right away in the job picker on the employee and shift screens.',
+  '새 업무 이름': 'New job name',
+  '예: Kitchen': 'e.g. Kitchen',
+  '업무 추가': 'Add job',
+  '이미 있는 업무입니다.': 'That job is already on the list.',
+  '업무는 40개까지 만들 수 있습니다.': 'You can keep up to 40 jobs.',
   '대체근무 신청': 'Request a swap',
   '대체근무 승인': 'Approve swap',
   '근무 상세': 'Shift details',
@@ -538,6 +547,14 @@ const en: Record<string, string> = {
     'This is the staff view. Ask your manager to change the schedule.',
   '대체근무를 신청할 수 있습니다.': 'You can request a swap for this shift.',
   '대체근무 신청 기한이 지났습니다.': 'The swap request deadline has passed.',
+  '진행 중인 대체근무 요청이 있어 수정하거나 삭제할 수 없습니다.':
+    'A swap request is in progress, so this shift cannot be edited or deleted.',
+  '근무 내용을 확인하고, 시간을 고치거나 근무를 삭제할 수 있습니다.':
+    'Review the shift, then edit its time or delete it.',
+  '근무 내용입니다.': 'Shift details.',
+  '근무 삭제': 'Delete shift',
+  '이 근무를 삭제할까요? 되돌릴 수 없고, 직원 화면에서도 사라집니다.':
+    'Delete this shift? This cannot be undone and it disappears from the staff view too.',
   '전 직원에게 공지 저장': 'Save notice for all staff',
   '선택한 {n}명에게 공지 저장': 'Save notice for {n} selected',
 
@@ -953,6 +970,10 @@ const patterns: [RegExp, (match: RegExpMatchArray) => string][] = [
   [
     /^(\S+): 진행 중인 대체근무 요청이 있어 수정할 수 없습니다\.$/,
     ([, date]) => `${date}: a swap request is in progress, so this shift can't be edited.`,
+  ],
+  [
+    /^(\S+): 진행 중인 대체근무 요청이 있어 삭제할 수 없습니다\.$/,
+    ([, date]) => `${date}: a swap request is in progress, so this shift can't be deleted.`,
   ],
   [
     /^(\S+): 출근과 퇴근 시간이 같습니다\.$/,

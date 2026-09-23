@@ -90,8 +90,7 @@ import {
   LOCATION,
   TIME_ZONE,
   WEATHER_SPOT,
-  AREAS,
-  SHIFT_AREAS,
+  areaList,
   type Employee,
   type Message,
   type State,
@@ -104,7 +103,6 @@ import DaySchedule from './day-schedule';
 import WhosWorking from './whos-working';
 import BirthLogin from './birth-login';
 import LoginQr from './login-qr';
-import PasswordChange from './password-change';
 import { useLang } from './use-lang';
 import { useIsMobile } from '@/hooks/use-mobile';
 import PhoneSchedule from './phone-schedule';
@@ -265,12 +263,15 @@ export default function ShiftApp() {
   const [push, setPush] = useState<{ on: boolean; tickUrl?: string }>({
     on: false,
   });
-  const [birthAuth, setBirthAuth] = useState(false);
-  const [passwordChanged, setPasswordChanged] = useState(true);
-  const [passwordDialog, setPasswordDialog] = useState(false);
-  const staffReadOnly = !actor.admin;
+  // 작업 지시 권한은 근무 편성까지 봅니다 — 근무를 넣고 고치고, 스케줄을 공개하고 내립니다.
+  // 급여·직원 정보와 근무 삭제는 그대로 관리자 몫이라, 그 둘은 계속 actor.admin 으로 가릅니다.
+  const canSchedule =
+    actor.admin || !!data.employees.find((e) => e.id === actor.id)?.taskManager;
+  const staffReadOnly = !canSchedule;
+  // 시급은 관리자에게만 내려오므로, 다른 사람에게는 0 원이 아니라 아예 보이지 않게 합니다.
+  const showCost = actor.admin;
   // 폰으로 보는 직원. 스케줄·메시지·출퇴근이 전용 화면으로 갈립니다.
-  const staffPhone = phone && !actor.admin;
+  const staffPhone = phone && !canSchedule;
 
   // 뒤로 가기는 앱을 닫지 않고 한 단계씩 되돌립니다.
   // 열려 있는 것부터 닫고, 그다음 지나온 화면을 되짚고, 마지막은 홈(스케줄)에 머뭅니다.
@@ -281,7 +282,6 @@ export default function ShiftApp() {
     modal: '',
     navOpen: false,
     payDetail: '',
-    passwordDialog: false,
     // 근무표 안에서 보고 있는 급여 기간. 뒤로 가기는 기간 목록으로 먼저 돌아갑니다.
     sheet: '',
     clock: false,
@@ -296,7 +296,6 @@ export default function ShiftApp() {
     back.current.modal = modal;
     back.current.navOpen = navOpen;
     back.current.payDetail = payDetail;
-    back.current.passwordDialog = passwordDialog;
     back.current.sheet = sheet;
     back.current.teamPick = teamPick;
     back.current.clock = !!clockField;
@@ -315,7 +314,6 @@ export default function ShiftApp() {
     refill();
     const step = () => {
       if (state.navOpen) return setNavOpen(false);
-      if (state.passwordDialog) return setPasswordDialog(false);
       if (state.payDetail) return setPayDetail('');
       if (state.clock) return setClockField(null);
       if (state.modal) return setModal('');
@@ -370,9 +368,6 @@ export default function ShiftApp() {
     } else setSetup(true);
     if (r.actor) setActor(r.actor);
     if (r.team) setTeam(r.team);
-    setBirthAuth(r.authMethod === 'birth');
-    // 첫 로그인이라고 비밀번호 변경을 먼저 띄우지 않습니다. 바꾸고 싶을 때 직접 엽니다.
-    if (r.authMethod === 'birth') setPasswordChanged(r.passwordChanged !== false);
   };
   // 30초마다 도는 불러오기입니다. 전파가 잠깐 끊긴 것까지 알리면, 브라우저가 던지는
   // 'Failed to fetch' 가 번역도 없이 띠에 박힌 채 남습니다 (lib/notice.ts).
@@ -408,12 +403,13 @@ export default function ShiftApp() {
     return () => clearInterval(timer);
   }, []);
   useEffect(() => {
-    if (!actor.admin) {
+    // 근무를 편성하지 않는 사람에게는 월간 한 장만 보여 줍니다. 편성하는 사람은 보기와 필터를 그대로 씁니다.
+    if (!canSchedule) {
       setFilter('all');
       setView('month');
-      if (!employeeNav.has(tab)) setTab('schedule');
     }
-  }, [actor.admin, tab]);
+    if (!actor.admin && !employeeNav.has(tab)) setTab('schedule');
+  }, [actor.admin, canSchedule, tab]);
   // 게시 해제는 직원 화면에서 근무표가 통째로 사라지므로 한 번 묻습니다. 기록은 지워지지 않습니다.
   const unpublish = () => {
     if (
@@ -653,12 +649,21 @@ export default function ShiftApp() {
           Math.abs(minutesOf(b.start) - minutesOf(myPunch.in))
         : a.start.localeCompare(b.start),
     )[0];
+  // 대체근무 요청이 오가는 중인 근무. 이때는 시간도 못 고치고 지우지도 못합니다.
+  const swapBusy = (shiftId: string) =>
+    data.swaps.some(
+      (r) =>
+        r.shiftId === shiftId &&
+        (r.status === 'requested' || r.status === 'accepted'),
+    );
   const swappable = data.shifts.filter(
     (s) => canSwap(s.date) && (actor.admin || s.employeeId === actor.id) && !s.originalId,
   );
   const roles = [...new Set(staff.map((e) => e.role))].sort((a, b) =>
     a.localeCompare(b),
   );
+  // 고를 수 있는 업무. 작업 화면에서 늘린 목록이 있으면 그것이고, 없으면 기본 두 가지입니다.
+  const areas = areaList(data);
   const visibleEmployees = staff
     .filter(
       (e) =>
@@ -966,7 +971,7 @@ export default function ShiftApp() {
     key: string,
     label: string,
     blank = '',
-    list: readonly string[] = AREAS,
+    list: readonly string[] = areas,
   ) => {
     const current = form[key] || '';
     return (
@@ -999,7 +1004,7 @@ export default function ShiftApp() {
   // 전체를 셉니다 — 버튼에 적힌 수가 곧 누르면 공개될 근무 수입니다.
   const drafts = data.shifts.filter((s) => s.draft).length;
   // 띄울지 말지는 한 곳에서 정합니다 — 띄우는 자리와, 목록 끝이 가리지 않게 둘 여백이 같은 답을 봐야 합니다.
-  const publishBar = phone && actor.admin && tab === 'schedule' && drafts > 0;
+  const publishBar = phone && canSchedule && tab === 'schedule' && drafts > 0;
   const reminders = data.published
     ? data.shifts
         .filter(
@@ -2030,7 +2035,7 @@ export default function ShiftApp() {
                     email: '',
                     rate: '0',
                     color: '#087e6d',
-                    role: AREAS[0],
+                    role: areas[0],
                   })
                 }
                 onEdit={(e) =>
@@ -2070,7 +2075,7 @@ export default function ShiftApp() {
                       email: '',
                       rate: '0',
                       color: '#087e6d',
-                      role: AREAS[0],
+                      role: areas[0],
                     })
                   }
                 >
@@ -2446,7 +2451,11 @@ export default function ShiftApp() {
                 ? t('수락한 대체 직원에게 근무를 이전합니다. 추가수당은 실제 출근기록이 있을 때 반영합니다.')
                 : modal === 'shiftUpdate'
                   ? t('저장하면 스케줄이 작성 중 상태로 바뀝니다. 수정 후 직원에게 공개를 다시 누르세요.')
-                  : t('내용을 확인한 후 저장하세요.')}
+                  : modal === 'detail'
+                    ? actor.admin
+                      ? t('근무 내용을 확인하고, 시간을 고치거나 근무를 삭제할 수 있습니다.')
+                      : t('근무 내용입니다.')
+                    : t('내용을 확인한 후 저장하세요.')}
           </DialogDescription>
           <form
             onSubmit={(e) => {
@@ -2454,8 +2463,9 @@ export default function ShiftApp() {
               if (modal === 'approve')
                 void command('swapDecision', { ...form, action: 'approve' });
               else if (modal === 'detail') {
-                setModal('swap');
-                setForm({ shiftId: form.id, to: '' });
+                // 근무 상세의 기본 단추는 삭제입니다. 되돌릴 수 없어 한 번 묻고 지웁니다.
+                if (confirm(t('이 근무를 삭제할까요? 되돌릴 수 없고, 직원 화면에서도 사라집니다.')))
+                  void command('shiftRemove', { id: form.id });
               } else void command(modal, form);
             }}
           >
@@ -2505,7 +2515,7 @@ export default function ShiftApp() {
                   onChange={(v) => put('employeeId', v)}
                   options={options}
                 />
-                {areaPick('area', t('업무 / 장소'), '', SHIFT_AREAS)}
+                {areaPick('area', t('업무 / 장소'))}
                 {/* 근무일은 열던 자리에서 정해져 있어 고르지 않고 보여만 줍니다. */}
                 <p className="hint">
                   {t('근무일 · {date}', { date: form.date ? longDate(form.date) : '' })}
@@ -2520,7 +2530,7 @@ export default function ShiftApp() {
             {modal === 'shiftUpdate' && (
               <>
                 {box(emp(data.shifts.find((s) => s.id === form.ids)?.employeeId || ''))}
-                {areaPick('area', t('업무 / 장소'), '', SHIFT_AREAS)}
+                {areaPick('area', t('업무 / 장소'))}
                 {input('date', t('근무일'), 'date')}
                 {shiftTimes}
                 <p className="hint">
@@ -2765,19 +2775,22 @@ export default function ShiftApp() {
                         })}
                       </p>
                     )}
-                    <p className="hint">
-                      {staffReadOnly
-                        ? t('직원용 보기 화면입니다. 일정 변경은 관리자에게 문의하세요.')
-                        : canSwap(s.date)
-                        ? t('대체근무를 신청할 수 있습니다.')
-                        : t('대체근무 신청 기한이 지났습니다.')}
-                    </p>
-                    {actor.admin && (
+                    {/* 관리자에게는 막히는 경우에만 한 줄을 띄웁니다. 할 수 있는 일은 설명 줄이 이미 말합니다. */}
+                    {staffReadOnly ? (
+                      <p className="hint">
+                        {t('직원용 보기 화면입니다. 일정 변경은 관리자에게 문의하세요.')}
+                      </p>
+                    ) : swapBusy(s.id) ? (
+                      <p className="hint">
+                        {t('진행 중인 대체근무 요청이 있어 수정하거나 삭제할 수 없습니다.')}
+                      </p>
+                    ) : null}
+                    {canSchedule && (
                       <div className="detailactions">
                         <button
                           type="button"
                           className="button"
-                          disabled={busy}
+                          disabled={busy || swapBusy(s.id)}
                           onClick={() =>
                             open('shiftUpdate', {
                               ids: s.id,
@@ -2802,7 +2815,7 @@ export default function ShiftApp() {
               </p>
             )}
             {/* 폰에서는 이 묶음이 시트 바닥에 붙는 푸터가 됩니다. 데스크톱에서는 display:contents 라 아무 영향이 없습니다. */}
-            {staffReadOnly && modal === 'detail' ? (
+            {!actor.admin && modal === 'detail' ? (
               <div className="dialog-actions">
                 <button
                   className="button primary submit"
@@ -2814,7 +2827,7 @@ export default function ShiftApp() {
               </div>
             ) : (
               <div className="dialog-actions">
-              {(modal === 'shift' || modal === 'shiftUpdate') && (
+              {(modal === 'shift' || modal === 'shiftUpdate' || modal === 'detail') && (
                 <button className="button cancel" type="button" onClick={() => setModal('')}>
                   {t('취소')}
                 </button>
@@ -2826,16 +2839,14 @@ export default function ShiftApp() {
                   (modal === 'rain' && !rainTargets.length) ||
                   (modal === 'swap' && !swappable.length) ||
                   (modal === 'detail' &&
-                    !canSwap(
-                      data.shifts.find((s) => s.id === form.id)?.date || '',
-                    ))
+                    (!data.shifts.some((s) => s.id === form.id) || swapBusy(form.id)))
                 }
                 type="submit"
               >
                 {busy
                   ? t('저장 중…')
                   : modal === 'detail'
-                    ? t('대체근무 신청')
+                    ? t('근무 삭제')
                     : modal === 'rain'
                       ? rainAll
                         ? t('전 직원에게 공지 저장')
@@ -2847,12 +2858,6 @@ export default function ShiftApp() {
           </form>
         </DialogContent>
       </Dialog>
-      <PasswordChange
-        open={passwordDialog}
-        initial={!passwordChanged}
-        onClose={() => setPasswordDialog(false)}
-        onChanged={() => setPasswordChanged(true)}
-      />
     </>
   );
   // Version 1 (pelham-shifts): top bar and tab row.
@@ -2882,14 +2887,6 @@ export default function ShiftApp() {
             {actor.admin ? 'P' : name(actor.id).slice(0, 1)}
           </span>
           <span>{actor.admin ? t('관리자') : name(actor.id)}</span>
-          {birthAuth && !actor.admin && (
-            <button
-              className="linkbutton"
-              onClick={() => setPasswordDialog(true)}
-            >
-              {t('비밀번호')}
-            </button>
-          )}
           <button
             className="iconbutton"
             aria-label={t('로그아웃')}
@@ -3125,7 +3122,7 @@ export default function ShiftApp() {
                   <span className="draft">
                     ● {data.published ? t('직원 공개 중') : t('작성 중')}
                   </span>
-                  {actor.admin && (
+                  {canSchedule && (
                     <>
                       <button
                         disabled={busy || setup}
@@ -3157,7 +3154,7 @@ export default function ShiftApp() {
                                   : timelineDate,
                             start: '09:00',
                             end: '17:00',
-                            area: AREAS[0],
+                            area: areas[0],
                           })
                         }
                       >
@@ -3509,16 +3506,6 @@ export default function ShiftApp() {
     {
       label: '설정',
       items: [
-        ...(birthAuth
-          ? [
-              {
-                key: 'password',
-                label: '비밀번호 변경',
-                Icon: ClipboardList,
-                onSelect: () => setPasswordDialog(true),
-              } as MoreItem,
-            ]
-          : []),
         { key: 'help', label: '도움말', Icon: CircleQuestionMark, onSelect: () => setTab('help') },
         { key: 'logout', label: '로그아웃', Icon: LogOut, onSelect: () => void logout() },
       ],
@@ -3549,7 +3536,7 @@ export default function ShiftApp() {
       body: t('안전하게 장비를 정리하고 퇴근 기록을 남겨주세요.'),
       targets: staff.map((e) => e.id).join(','),
     });
-  const schedActionsNode = actor.admin ? (
+  const schedActionsNode = canSchedule ? (
                     <div className="sched-actions">
                       <button
                         className="button publish"
@@ -3677,11 +3664,6 @@ export default function ShiftApp() {
               </span>
             </div>
             <div className="sidebar-tools">
-              {birthAuth && !actor.admin && (
-                <button className="linkbutton" onClick={() => setPasswordDialog(true)}>
-                  {t('비밀번호')}
-                </button>
-              )}
               {!setup && (
                 <button
                   className={'iconbutton' + (push.on ? ' on' : '')}
@@ -3879,7 +3861,7 @@ export default function ShiftApp() {
                         date,
                         start: '09:00',
                         end: '17:00',
-                        area: dept === 'all' ? AREAS[0] : dept,
+                        area: dept === 'all' ? areas[0] : dept,
                         note: '',
                       })
                     }
@@ -3900,23 +3882,25 @@ export default function ShiftApp() {
                               onChange={(e) => setSearch(e.target.value)}
                             />
                           </label>
-                          <button
-                            className="roster-add"
-                            aria-label={t('직원 추가')}
-                            title={t('직원 추가')}
-                            onClick={() =>
-                              open('employee', {
-                                name: '',
-                                phone: '',
-                                email: '',
-                                rate: '0',
-                                color: '#087e6d',
-                                role: dept === 'all' ? AREAS[0] : dept,
-                              })
-                            }
-                          >
-                            <UserPlus size={18} />
-                          </button>
+                          {actor.admin && (
+                            <button
+                              className="roster-add"
+                              aria-label={t('직원 추가')}
+                              title={t('직원 추가')}
+                              onClick={() =>
+                                open('employee', {
+                                  name: '',
+                                  phone: '',
+                                  email: '',
+                                  rate: '0',
+                                  color: '#087e6d',
+                                  role: dept === 'all' ? areas[0] : dept,
+                                })
+                              }
+                            >
+                              <UserPlus size={18} />
+                            </button>
+                          )}
                         </div>
                         {weekDates.map((date, i) => (
                           <div
@@ -3977,8 +3961,8 @@ export default function ShiftApp() {
                                             {e.name}
                                           </button>
                                           <small>
-                                            {t('{h}시간', { h: hours.toFixed(2) })} -{' '}
-                                            {money(hours * e.rate)}
+                                            {t('{h}시간', { h: hours.toFixed(2) })}
+                                            {showCost && <> - {money(hours * e.rate)}</>}
                                           </small>
                                         </span>
                                       </div>
@@ -4097,7 +4081,7 @@ export default function ShiftApp() {
                                 .reduce((n, s) => n + duration(s.start, s.end), 0)
                                 .toFixed(2),
                             })}
-                            <small>{money(rosterCost(rosterShifts))}</small>
+                            {showCost && <small>{money(rosterCost(rosterShifts))}</small>}
                           </span>
                         </div>
                         {weekDates.map((date) => {
@@ -4118,7 +4102,7 @@ export default function ShiftApp() {
                                   : '-'}
                               </em>
                               <b>{t('{h}시간', { h: dayHours.toFixed(2) })}</b>
-                              <small>{money(rosterCost(list))}</small>
+                              {showCost && <small>{money(rosterCost(list))}</small>}
                             </div>
                           );
                         })}
@@ -4136,6 +4120,7 @@ export default function ShiftApp() {
                     )}
                     rateOf={(id) => emp(id)?.rate || 0}
                     money={money}
+                    showCost={showCost}
                     published={data.published}
                     canEdit={!staffReadOnly}
                     onDateChange={setDay}
@@ -4149,7 +4134,7 @@ export default function ShiftApp() {
                         date,
                         start: from,
                         end: String(end).padStart(2, '0') + from.slice(2),
-                        area: emp(employeeId)?.role || AREAS[0],
+                        area: emp(employeeId)?.role || areas[0],
                         note: '',
                       });
                     }}

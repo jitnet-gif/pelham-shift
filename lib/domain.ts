@@ -25,7 +25,8 @@ export type ClockName = {name:string;raw:string;employeeId:string};
 export const nameKey=(v:string)=>v.toLowerCase().replace(/\s+/g,' ').trim();
 // 출퇴근을 찍을 수 있는 자리. 관리자가 현장에서 지정하고, 반경(m) 밖이면 찍히지 않습니다.
 export type Workplace = {lat:number;lng:number;radius:number};
-export type State = {workplace?:Workplace;employees:Employee[];shifts:Shift[];swaps:Swap[];attendance:Attendance[];messages:Message[];tasks:Task[];timeOff?:TimeOff[];availability?:Availability[];punches?:Punch[];clockNames?:ClockName[];currency:string;published:boolean};
+// areas: 이 워크스페이스가 직접 늘려 온 업무(직무) 목록. 비어 있으면 아래 기본값을 씁니다.
+export type State = {workplace?:Workplace;employees:Employee[];shifts:Shift[];swaps:Swap[];attendance:Attendance[];messages:Message[];tasks:Task[];timeOff?:TimeOff[];availability?:Availability[];punches?:Punch[];clockNames?:ClockName[];areas?:string[];currency:string;published:boolean};
 // 클럽이 서 있는 자리의 시간대. 화면·서버·알림이 모두 이 한 줄을 봅니다.
 // 온타리오는 뉴욕과 시각이 같아 예전 기록과 어긋나지 않고, 이름만 자리에 맞게 돌아옵니다.
 export const TIME_ZONE='America/Toronto';
@@ -116,9 +117,10 @@ export const LOCATION='Pelham Hills Golf Club';
 export const WEATHER_SPOT: {lat:number;lng:number} | null = {lat:42.98515,lng:-79.30084};
 // 근무지 장소. 새 직원·새 근무의 기본값이자 시범 데이터의 배정 기준입니다.
 export const AREAS=['Proshop','Workshop'] as const;
-// 근무를 추가·수정할 때 고를 수 있는 장소. 나머지 업무는 목록에서 감춥니다.
-// 예전에 다른 장소로 저장된 근무는 그 값을 그대로 유지하고, 그 근무를 열었을 때만 선택지에 함께 보입니다.
-export const SHIFT_AREAS=['Proshop','Workshop'] as const;
+// 직원의 업무와 근무의 장소는 이제 한 목록입니다 — 작업 지시 권한을 가진 사람이 작업 화면에서 늘립니다.
+// 예전에 다른 이름으로 저장된 근무는 그 값을 그대로 유지하고, 그 근무를 열었을 때만 선택지에 함께 보입니다.
+export const MAX_AREAS=40;
+export function areaList(state:{areas?:string[]}):string[]{return state.areas?.length?state.areas:[...AREAS]}
 export function seed():State{const names=['Josh','Grace','Claudio','Francis','James','Karen','Dylan','Dustin','Sam'];const colors=['#5579cf','#c48537','#20a69a','#9864c3','#e17b57','#5c9d61','#d26395','#628597','#a89643'];const employees=names.map((name,i)=>({id:'E'+String(i+1).padStart(3,'0'),name,color:colors[i],role:AREAS[i%AREAS.length],rate:0,email:'',birthDate:'',phone:'',punchId:String(1001+i)}));const week=weekStart(localDate(new Date()));const shifts:Shift[]=[];for(let d=0;d<7;d++) employees.forEach((e,i)=>{if((i+d)%4!==1) shifts.push({id:`s${d}-${i}`,employeeId:e.id,date:addDays(week,d),start:i%3===0?'10:00':i%3===1?'06:00':'12:00',end:i%3===0?'18:00':i%3===1?'14:00':'20:00',area:e.role})});
  // 지난 두 급여 기간과 이번 기간의 출퇴근 기록. 지난 기간은 이미 확인이 끝나 닫혀 있습니다.
  const today=localDate(new Date());const start=addDays(payPeriodStart(today),-2*PAY_PERIOD_DAYS);const punches:Punch[]=[];
