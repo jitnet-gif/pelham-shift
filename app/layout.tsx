@@ -13,7 +13,6 @@ import './day-schedule.css';
 import './whos-working.css';
 import Fresh from './fresh';
 import './birth-login.css';
-import './password-change.css';
 import './app-shell.css';
 import './phone-dialog.css';
 import './staff.css';
