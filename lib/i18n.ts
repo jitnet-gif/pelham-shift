@@ -292,6 +292,25 @@ const en: Record<string, string> = {
   '{date} 일정 보기': 'View {date}',
 
   // Attendance tab
+  // 관리자는 이름 목록에서 한 사람을 고르고, 그 사람 출근부를 2주 급여 기간씩 넘겨 봅니다.
+  '이름을 고르면 그 사람 출근부를 2주 급여 기간씩 봅니다.':
+    'Pick a name to read that person’s timesheet, one two-week pay period at a time.',
+  '직원별 출근 기록': 'Attendance by employee',
+  '등록된 직원이 없습니다.': 'No employees have been added yet.',
+  '이번 기간 {n}건 · {h}시간': '{n} this period · {h} h',
+  '마지막 기록 {date}': 'Last seen {date}',
+  '찍힌 기록 없음': 'No check-ins',
+  '퇴사': 'Left',
+  '확인 대기 {n}': '{n} awaiting review',
+  '아직 끝난 근무가 없습니다': 'No finished shifts yet',
+  '근무 중 {n}': '{n} on shift',
+  '직원 목록': 'All employees',
+  '이전 급여 기간': 'Previous pay period',
+  '다음 급여 기간': 'Next pay period',
+  '{n}건 · {h}시간': '{n} shifts · {h} h',
+  '진행 중인 기간': 'Open period',
+  '마감된 기간': 'Closed period',
+  '이 기간에 출근기계 기록이 없습니다.': 'No time clock records in this period.',
   '단말에서 찍힌 출퇴근과 그때 찍힌 사진을 봅니다.':
     'The check-ins taken on the time clock, with the photo from that moment.',
   '찍힌 출퇴근': 'Check-ins',
@@ -837,11 +856,7 @@ const en: Record<string, string> = {
   '직원ID_': 'employee-ids_',
 
   // 출퇴근 단말 · /attendance kiosk
-  '누가 찍나요?': 'Who is checking in or out?',
-  '다음': 'Next',
-  '{name} 이(가) 아니신가요?': 'Not {name}?',
-  '아직 직원이 없습니다. 스케줄 앱에서 먼저 직원을 추가하세요.':
-    'No staff yet. Add staff in the schedule app first.',
+  '스케줄 앱을 엽니다…': 'Opening the Shift app…',
   '직원 ID를 입력하세요': 'Enter your employee ID',
   '직원 ID가 맞지 않습니다.': 'That employee ID does not match.',
   '직원 ID (숫자 4~8자리)': 'Employee ID (4–8 digits)',
@@ -890,7 +905,6 @@ const en: Record<string, string> = {
   '출근을 찍습니다': 'Check in',
   '지우기': 'CLEAR',
   '한 자 지우기': 'Delete one digit',
-  'Punch ID가 맞지 않습니다.': 'That Punch ID does not match.',
   'signin::출근 찍기': 'Sign in',
   'endshift::퇴근 찍기': 'Check out',
   '출근 중': 'Checked-in',
