@@ -16,14 +16,13 @@ import {
   Sunset,
   Wind,
 } from 'lucide-react';
+import { TIME_ZONE } from '@/lib/domain';
 import { useLang } from './use-lang';
 import './weather-panel.css';
 
 // 골프장은 해가 뜨기 전에 사람이 나옵니다. 스케줄을 보는 자리에서 그 날의 하늘과
 // 해 뜨고 지는 시각을 같이 봅니다. Open-Meteo 는 열쇠 없이 열려 있어 서버를 거치지 않습니다.
-// 클럽은 온타리오에 있습니다. 뉴욕과 시각이 같아 화면의 다른 시간과 어긋나지 않으면서,
-// 일출·일몰은 그 자리의 시간대로 받습니다.
-const ZONE = 'America/Toronto';
+
 const API = 'https://api.open-meteo.com/v1/forecast';
 // 예보가 닿는 범위. 이보다 먼 날은 불러도 빈 답이 옵니다.
 const PAST_DAYS = 92;
@@ -93,7 +92,7 @@ export default function WeatherPanel({
     (signal?: AbortSignal) => {
       if (far || !spot) return;
       const url =
-        `${API}?latitude=${spot.lat}&longitude=${spot.lng}&timezone=${encodeURIComponent(ZONE)}` +
+        `${API}?latitude=${spot.lat}&longitude=${spot.lng}&timezone=${encodeURIComponent(TIME_ZONE)}` +
         // 온타리오는 섭씨와 km/h 로 날씨를 읽습니다. 급여를 CAD 로 셈하는 곳과 같은 기준입니다.
         '&temperature_unit=celsius&wind_speed_unit=kmh' +
         '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset' +

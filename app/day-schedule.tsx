@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight, EyeOff, Plus, Search, Send } from 'lucide-react';
 import type { Employee, Shift } from '@/lib/domain';
+import { TIME_ZONE } from '@/lib/domain';
 import { useLang } from './use-lang';
 
 // 하루를 오전 5시부터 보여줍니다. 7shifts 의 Day 보기와 같은 구간입니다.
@@ -72,7 +73,7 @@ export default function DaySchedule({
   const asTime = (m: number) =>
     String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
   const today = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/New_York',
+    timeZone: TIME_ZONE,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

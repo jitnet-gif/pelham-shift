@@ -429,8 +429,8 @@ const en: Record<string, string> = {
   // Swaps tab
   '신청 → 대체 직원 수락 → 관리자 승인': 'Request → covering employee accepts → manager approves',
   '대체 신청': 'Request swap',
-  '뉴욕 현지 날짜 기준, 근무일 7일 전까지 신청과 승인을 완료하세요. 기존 근무와 겹치는 대체는 차단됩니다.':
-    'Request and approve swaps at least 7 days before the shift (New York date). Swaps that overlap existing shifts are blocked.',
+  '온타리오 현지 날짜 기준, 근무일 7일 전까지 신청과 승인을 완료하세요. 기존 근무와 겹치는 대체는 차단됩니다.':
+    'Request and approve swaps at least 7 days before the shift (Ontario date). Swaps that overlap existing shifts are blocked.',
   '수락 대기': 'Awaiting acceptance',
   '승인 대기': 'Awaiting approval',
   '승인 완료': 'Approved',
@@ -503,7 +503,7 @@ const en: Record<string, string> = {
     'Moves the shift to the covering employee who accepted. The bonus counts only when there is a matching attendance record.',
   '내용을 확인한 후 저장하세요.': 'Review the details, then save.',
   '종료 날짜': 'End date',
-  '종료 시각 (뉴욕)': 'End time (New York)',
+  '종료 시각 (온타리오)': 'End time (Ontario)',
   '받는 직원 ({n}/{total}명)': 'Recipients ({n}/{total})',
   '안내 내용': 'Message',
   '{n}시간 근무 · 퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.':

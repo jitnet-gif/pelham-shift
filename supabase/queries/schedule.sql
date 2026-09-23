@@ -15,7 +15,7 @@
 --   · 자정을 넘기는 근무가 있어 길이는 (끝 - 시작 + 1440) mod 1440 으로 셉니다. 그냥 빼면 음수가 됩니다.
 --   · 근무시간 = 그 길이에서 breakMinutes 를 뺀 값, 0 밑으로는 내려가지 않습니다.
 --   · 주는 일요일에 시작합니다. Postgres 의 date_trunc('week') 는 월요일이라 쓰지 않습니다.
---   · 오늘은 서버 시간(UTC)이 아니라 America/New_York 기준입니다.
+--   · 오늘은 서버 시간(UTC)이 아니라 America/Toronto 기준입니다.
 --   · 급여 기간은 2026-09-20 일요일부터 2주씩입니다. 기준일보다 앞선 날짜도 맞게 떨어지도록 floor 로 나눕니다.
 --
 -- 형식이 깨진 값(예: '9:00')이 한 줄이라도 있으면 그냥 ::int 로 바꿀 때 조회 전체가 죽습니다.
@@ -56,7 +56,7 @@ order by w.id;
 --    날짜는 params 에서 한 줄만 바꾸면 됩니다.
 -- ───────────────────────────────────────────────────────────────────────────
 with params as (
-  select (now() at time zone 'America/New_York')::date as day   -- 다른 날을 보려면: date '2026-09-22'
+  select (now() at time zone 'America/Toronto')::date as day   -- 다른 날을 보려면: date '2026-09-22'
 ),
 shift_raw as (
   select w.id as workspace, s.*
@@ -113,10 +113,10 @@ order by s.workspace, s.start_min, name;
 -- 3. 지금 이 순간 근무 중인 사람 · 자정을 넘긴 어제 근무까지 같이 봅니다
 -- ───────────────────────────────────────────────────────────────────────────
 with params as (
-  select (now() at time zone 'America/New_York')                 as ts,
-         (now() at time zone 'America/New_York')::date           as day,
-         extract(hour   from now() at time zone 'America/New_York')::int * 60
-       + extract(minute from now() at time zone 'America/New_York')::int as now_min
+  select (now() at time zone 'America/Toronto')                 as ts,
+         (now() at time zone 'America/Toronto')::date           as day,
+         extract(hour   from now() at time zone 'America/Toronto')::int * 60
+       + extract(minute from now() at time zone 'America/Toronto')::int as now_min
 ),
 shift_raw as (
   select w.id as workspace, s.*
@@ -166,8 +166,8 @@ order by s.workspace, s.area, name;
 --    40시간을 넘는 주가 보이면 초과근무가 예정되어 있다는 뜻입니다.
 -- ───────────────────────────────────────────────────────────────────────────
 with params as (
-  select (now() at time zone 'America/New_York')::date - 28 as from_day,   -- 조회 시작
-         (now() at time zone 'America/New_York')::date + 28 as to_day      -- 조회 끝
+  select (now() at time zone 'America/Toronto')::date - 28 as from_day,   -- 조회 시작
+         (now() at time zone 'America/Toronto')::date + 28 as to_day      -- 조회 끝
 ),
 shift_raw as (
   select w.id as workspace, s.*
@@ -282,8 +282,8 @@ order by workspace, period_from desc, hours desc;
 --    사람이 0명인 칸은 여기 나오지 않습니다. 빈 날은 9번으로 확인하세요.
 -- ───────────────────────────────────────────────────────────────────────────
 with params as (
-  select (now() at time zone 'America/New_York')::date      as from_day,
-         (now() at time zone 'America/New_York')::date + 13 as to_day
+  select (now() at time zone 'America/Toronto')::date      as from_day,
+         (now() at time zone 'America/Toronto')::date + 13 as to_day
 ),
 shift_raw as (
   select w.id as workspace, s.*
@@ -465,8 +465,8 @@ order by workspace, day, name;
 -- 9. 아무도 잡히지 않은 날 · 근무표에 구멍이 있는지
 -- ───────────────────────────────────────────────────────────────────────────
 with params as (
-  select (now() at time zone 'America/New_York')::date      as from_day,
-         (now() at time zone 'America/New_York')::date + 27 as to_day
+  select (now() at time zone 'America/Toronto')::date      as from_day,
+         (now() at time zone 'America/Toronto')::date + 27 as to_day
 ),
 day_list as (
   select w.id as workspace, d::date as day
@@ -501,8 +501,8 @@ order by d.workspace, d.day;
 --     정확한 지각·급여는 lib/domain.ts 의 lateBy() / payroll() 이 겹치는 근무를 짝지어 계산합니다.
 -- ───────────────────────────────────────────────────────────────────────────
 with params as (
-  select (now() at time zone 'America/New_York')::date - 13 as from_day,
-         (now() at time zone 'America/New_York')::date      as to_day
+  select (now() at time zone 'America/Toronto')::date - 13 as from_day,
+         (now() at time zone 'America/Toronto')::date      as to_day
 ),
 shift_raw as (
   select w.id as workspace, s.*

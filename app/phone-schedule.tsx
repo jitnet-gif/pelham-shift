@@ -13,7 +13,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import type { Availability, Employee, Shift, TimeOff } from '@/lib/domain';
-import { addDays, weekdayOf } from '@/lib/domain';
+import { TIME_ZONE, addDays, weekdayOf } from '@/lib/domain';
 import { useLang } from './use-lang';
 import WeatherPanel from './weather-panel';
 
@@ -84,7 +84,7 @@ export default function PhoneSchedule({
     }).format(new Date(date + 'T12:00:00Z'));
   const of = (id: string) => employees.find((e) => e.id === id);
   const today = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/New_York',
+    timeZone: TIME_ZONE,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

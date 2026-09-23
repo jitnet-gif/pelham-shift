@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Camera, Check, Coffee, Hourglass, LogOut } from 'lucide-react';
 import type { Employee, Punch, Shift } from '@/lib/domain';
 import { say } from './say';
-import { duration } from '@/lib/domain';
+import { TIME_ZONE, duration } from '@/lib/domain';
 import { useLang } from './use-lang';
 
 // 직원이 자기 폰으로 출퇴근을 찍는 화면입니다.
@@ -20,10 +20,10 @@ const SHOT_WIDTH = 360;
 // 찍힌 사진을 화면에 크게 띄워 두는 시간. 이 뒤에는 다시 카메라가 보입니다.
 // 기록되었다는 말도 같은 시간만큼만 머뭅니다. 공용 단말은 이 시간이 지난 뒤에 다음 사람에게 넘어갑니다.
 export const REVIEW_MS = 3000;
-// 매장 시각(뉴욕)의 HH:MM. 찍히는 시각과 같은 기준이어야 '근무한 시간'이 어긋나지 않습니다.
+// 매장 시각(온타리오)의 HH:MM. 찍히는 시각과 같은 기준이어야 '근무한 시간'이 어긋나지 않습니다.
 const hhmm = (d: Date) =>
   new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'America/New_York',
+    timeZone: TIME_ZONE,
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
@@ -302,20 +302,20 @@ export default function StaffClock({
       weekday: 'short',
       month: 'short',
       day: 'numeric',
-      timeZone: 'America/New_York',
+      timeZone: TIME_ZONE,
     }).format(now) +
     '  ' +
     new Intl.DateTimeFormat(locale, {
       hour: 'numeric',
       minute: '2-digit',
-      timeZone: 'America/New_York',
+      timeZone: TIME_ZONE,
     }).format(now);
   const today = new Intl.DateTimeFormat(locale, {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
     day: 'numeric',
-    timeZone: 'America/New_York',
+    timeZone: TIME_ZONE,
   }).format(now);
   const area = working?.area || shift?.area || employee?.role;
 

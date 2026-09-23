@@ -2,7 +2,7 @@
 import { useEffect, useRef } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { Employee, Shift } from '@/lib/domain';
-import { addDays, weekdayOf } from '@/lib/domain';
+import { TIME_ZONE, addDays, weekdayOf } from '@/lib/domain';
 import { useLang } from './use-lang';
 
 // 직원이 보는 스케줄. 한 주를 날짜 줄로 펼쳐, 근무가 없는 날도 한 줄씩 남겨 둡니다.
@@ -54,7 +54,7 @@ export default function StaffSchedule({
     rowsRef.current[selected]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [selected]);
   const today = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/New_York',
+    timeZone: TIME_ZONE,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

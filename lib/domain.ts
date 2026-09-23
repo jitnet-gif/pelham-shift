@@ -26,8 +26,11 @@ export const nameKey=(v:string)=>v.toLowerCase().replace(/\s+/g,' ').trim();
 // 출퇴근을 찍을 수 있는 자리. 관리자가 현장에서 지정하고, 반경(m) 밖이면 찍히지 않습니다.
 export type Workplace = {lat:number;lng:number;radius:number};
 export type State = {workplace?:Workplace;employees:Employee[];shifts:Shift[];swaps:Swap[];attendance:Attendance[];messages:Message[];tasks:Task[];timeOff?:TimeOff[];availability?:Availability[];punches?:Punch[];clockNames?:ClockName[];currency:string;published:boolean};
-export const localTime=(d:Date)=>new Intl.DateTimeFormat('en-GB',{timeZone:'America/New_York',hour:'2-digit',minute:'2-digit',hour12:false}).format(d);
-export const localDate=(d:Date)=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
+// 클럽이 서 있는 자리의 시간대. 화면·서버·알림이 모두 이 한 줄을 봅니다.
+// 온타리오는 뉴욕과 시각이 같아 예전 기록과 어긋나지 않고, 이름만 자리에 맞게 돌아옵니다.
+export const TIME_ZONE='America/Toronto';
+export const localTime=(d:Date)=>new Intl.DateTimeFormat('en-GB',{timeZone:TIME_ZONE,hour:'2-digit',minute:'2-digit',hour12:false}).format(d);
+export const localDate=(d:Date)=>new Intl.DateTimeFormat('en-CA',{timeZone:TIME_ZONE,year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
 export function addDays(date:string,n:number){const d=new Date(date+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)}
 export function weekStart(date:string){return addDays(date,-new Date(date+'T12:00:00Z').getUTCDay())}
 export const minutes=(t:string)=>Number(t.slice(0,2))*60+Number(t.slice(3,5));

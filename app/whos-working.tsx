@@ -1,6 +1,7 @@
 'use client';
 import { LogIn, LogOut } from 'lucide-react';
 import type { Employee, Punch, Shift } from '@/lib/domain';
+import { TIME_ZONE } from '@/lib/domain';
 import { useLang } from './use-lang';
 
 const minutes = (v: string) => Number(v.slice(0, 2)) * 60 + Number(v.slice(3, 5));
@@ -52,13 +53,13 @@ export default function WhosWorking({
     .filter((s) => s.date === date && emp(s.employeeId))
     .sort((a, b) => minutes(a.start) - minutes(b.start) || endOf(a) - endOf(b));
   const clock = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'America/New_York',
+    timeZone: TIME_ZONE,
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
   }).format(new Date(now));
   const stampToday = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/New_York',
+    timeZone: TIME_ZONE,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

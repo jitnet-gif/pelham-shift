@@ -88,6 +88,7 @@ import {
   payPeriodEnd,
   DEFAULT_WORKPLACE_RADIUS,
   LOCATION,
+  TIME_ZONE,
   WEATHER_SPOT,
   AREAS,
   SHIFT_AREAS,
@@ -1007,7 +1008,7 @@ export default function ShiftApp() {
         )
         .filter((s) => {
           const parts = new Intl.DateTimeFormat('en-GB', {
-            timeZone: 'America/New_York',
+            timeZone: TIME_ZONE,
             hour: '2-digit',
             minute: '2-digit',
             hour12: false,
@@ -1774,7 +1775,7 @@ export default function ShiftApp() {
               </div>
               <div className="policy">
                 {t(
-                  '뉴욕 현지 날짜 기준, 근무일 7일 전까지 신청과 승인을 완료하세요. 기존 근무와 겹치는 대체는 차단됩니다.',
+                  '온타리오 현지 날짜 기준, 근무일 7일 전까지 신청과 승인을 완료하세요. 기존 근무와 겹치는 대체는 차단됩니다.',
                 )}
               </div>
               {data.swaps.map((r) => {
@@ -1932,7 +1933,7 @@ export default function ShiftApp() {
                       </span>
                       <time>
                         {new Date(m.createdAt).toLocaleString(locale, {
-                          timeZone: 'America/New_York',
+                          timeZone: TIME_ZONE,
                         })}
                       </time>
                     </div>
@@ -2461,7 +2462,7 @@ export default function ShiftApp() {
             {modal === 'rain' && (
               <>
                 {input('date', t('종료 날짜'), 'date')}
-                {input('end', t('종료 시각 (뉴욕)'), 'time')}
+                {input('end', t('종료 시각 (온타리오)'), 'time')}
                 <fieldset className="recipients">
                   <legend>
                     {t('받는 직원 ({n}/{total}명)', {
@@ -2914,7 +2915,7 @@ export default function ShiftApp() {
                 </TabsTrigger>
               ))}
           </TabsList>
-          <span className="tz">America / New York</span>
+          <span className="tz">America / Toronto</span>
         </div>
         <main>
           <div className="pageheading">
@@ -3672,7 +3673,7 @@ export default function ShiftApp() {
               </span>
               <span className="sidebar-name">
                 <b>{actor.admin ? t('관리자') : name(actor.id)}</b>
-                <small>Pelham Hills · New York</small>
+                <small>Pelham Hills · Ontario</small>
               </span>
             </div>
             <div className="sidebar-tools">
