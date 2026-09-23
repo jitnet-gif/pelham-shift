@@ -1,6 +1,6 @@
 import {after} from 'next/server';
 import {env} from '@/lib/db';
-import {seed,distanceMeters} from '@/lib/domain';
+import {seed,distanceMeters,workplaceOf} from '@/lib/domain';
 import {photoBytes} from '@/lib/punch-photo';
 import {applyCommand,type Command} from '@/lib/operations';
 import {context,visible,json,sameOrigin} from '@/lib/workspace';
@@ -12,9 +12,10 @@ export async function POST(req:Request){try{if(!sameOrigin(req))return json({err
  const needsPhoto=body.type==='punchIn'||body.type==='punchOut';
  const photo=needsPhoto?photoBytes((body.payload as {photo?:unknown})?.photo):null;
  if(needsPhoto&&!photo)return json({error:'사진이 찍히지 않아 출퇴근을 기록하지 않았습니다. 카메라를 확인하고 다시 눌러주세요.'},400);
- // 출퇴근 자리를 지정해 두었으면, 그 자리 가까이에서 찍은 것인지 함께 봅니다.
- const place=c.state.workplace;
- if(needsPhoto&&place){
+ // 출퇴근은 근무지 가까이에서 찍은 것만 받습니다.
+ // 관리자가 자리를 다시 잡지 않았으면 클럽 기본 자리(196 Webber Rd, 반경 1km)를 봅니다.
+ const place=workplaceOf(c.state);
+ if(needsPhoto){
   const p=body.payload as {lat?:unknown;lng?:unknown};
   const lat=Number(p?.lat),lng=Number(p?.lng);
   if(!Number.isFinite(lat)||!Number.isFinite(lng)||lat<-90||lat>90||lng<-180||lng>180)

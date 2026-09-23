@@ -3,9 +3,9 @@
 // oxlint-disable next/no-img-element
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Camera, Check, Coffee, Hourglass, LogOut } from 'lucide-react';
-import type { Employee, Punch, Shift } from '@/lib/domain';
+import type { Employee, Punch, Shift, Workplace } from '@/lib/domain';
 import { say } from './say';
-import { TIME_ZONE, duration } from '@/lib/domain';
+import { TIME_ZONE, distanceMeters, duration } from '@/lib/domain';
 import { useLang } from './use-lang';
 
 // 직원이 자기 폰으로 출퇴근을 찍는 화면입니다.
@@ -35,7 +35,7 @@ export default function StaffClock({
   shift,
   location,
   busy,
-  needsLocation,
+  workplace,
   spot,
   onPunch,
   onBreak,
@@ -45,8 +45,8 @@ export default function StaffClock({
   shift?: Shift;
   location: string;
   busy: boolean;
-  // 근무지를 지정해 둔 곳이면, 사진과 함께 지금 서 있는 자리도 보냅니다.
-  needsLocation: boolean;
+  // 출퇴근을 찍을 수 있는 자리와 그 반경. 사진과 함께 지금 서 있는 자리도 보냅니다.
+  workplace: Workplace;
   // 앱이 내내 지켜보고 있는 자리. 찍는 순간에만 위치를 켜는 일이 없도록 이 값을 씁니다.
   spot: { lat: number; lng: number; accuracy?: number } | null;
   onPunch: (
@@ -79,6 +79,12 @@ export default function StaffClock({
   // 마지막으로 잡은 프레임의 시각. 같은 값이 또 나오면 영상이 멈춘 것이고,
   // 그대로 찍으면 아까 찍힌 장면이 한 번 더 저장됩니다.
   const lastFrame = useRef(-1);
+  // 지켜보던 자리를 아직 못 받았을 때, 누르면서 한 번 물어본 값. 화면에 남겨 두어야 왜 막혔는지 보입니다.
+  const [fix, setFix] = useState<{ lat: number; lng: number } | null>(null);
+  const here = spot ?? fix;
+  // 서버가 재는 것과 같은 방법으로 잽니다 — 화면에서 통과한 것이 서버에서 막히면 안 됩니다.
+  const away = here ? Math.round(distanceMeters(workplace, here)) : null;
+  const tooFar = away !== null && away > workplace.radius;
 
   const stop = useCallback(() => {
     stream.current?.getTracks().forEach((track) => track.stop());
@@ -254,6 +260,8 @@ export default function StaffClock({
     });
   // 출근·퇴근은 사진이 먼저입니다. 사진이 없으면 서버로 보내지도 않습니다.
   const press = async (action: 'punchIn' | 'punchOut') => {
+    // 근무지 밖에서는 사진도 찍지 않습니다 — 어차피 기록되지 않고, 경고는 화면에 이미 떠 있습니다.
+    if (tooFar) return;
     const taken = capture();
     if (!taken.photo) {
       setProblem(taken.problem || '사진이 찍히지 않았습니다.');
@@ -268,20 +276,24 @@ export default function StaffClock({
     // 사진은 찍힌 순간부터 3초입니다. 저장이 늦어도 화면이 사진에 붙들려 있지 않습니다.
     reviewTimer.current = setTimeout(() => setReview(''), REVIEW_MS);
     setSaved('saving');
-    // 자리는 근무지를 지정하지 않은 곳에서도 기록에 남깁니다.
-    // 다만 '그 자리에서만 찍을 수 있게' 막는 것은 근무지를 지정한 곳에서만입니다.
+    // 출퇴근은 근무지 안에서만 찍힙니다. 어디서 눌렀는지 모르면 사진이 있어도 보내지 않습니다.
     let place: { lat: number; lng: number; accuracy?: number } | undefined = spot ?? undefined;
-    if (needsLocation) {
-      // 지켜보던 값이 있으면 그대로 쓰고, 아직 첫 값을 못 받았을 때만 한 번 더 물어봅니다.
-      if (!place) {
-        setProblem('위치를 확인하는 중입니다…');
-        place = (await locate()) ?? undefined;
-      }
-      if (!place) {
-        setSaved('');
-        setProblem('위치를 확인하지 못했습니다. 위치 권한을 허용하고 다시 눌러주세요.');
-        return;
-      }
+    // 지켜보던 값이 있으면 그대로 쓰고, 아직 첫 값을 못 받았을 때만 한 번 더 물어봅니다.
+    if (!place) {
+      setProblem('위치를 확인하는 중입니다…');
+      place = (await locate()) ?? undefined;
+      if (place) setFix(place);
+    }
+    if (!place) {
+      setSaved('');
+      setProblem('위치를 확인하지 못했습니다. 위치 권한을 허용하고 다시 눌러주세요.');
+      return;
+    }
+    // 첫 자리를 방금 받은 길입니다. 여기서 처음 거리를 재고, 멀면 보내지 않습니다 — 까닭은 위 경고 줄이 말합니다.
+    if (Math.round(distanceMeters(workplace, place)) > workplace.radius) {
+      setSaved('');
+      setProblem('');
+      return;
     }
     setProblem('');
     setShot(taken.photo);
@@ -416,6 +428,15 @@ export default function StaffClock({
             </small>
           </span>
         </div>
+        {/* 근무지에서 멀면 버튼을 잠그고 얼마나 떨어졌는지 알립니다. 눌러도 기록되지 않기 때문입니다. */}
+        {tooFar && (
+          <p role="alert" className="stclock-error">
+            {t('근무지에서 약 {n}m 떨어져 있습니다. {r}m 안에서만 출퇴근을 찍을 수 있습니다.', {
+              n: away,
+              r: workplace.radius,
+            })}
+          </p>
+        )}
         {problem && (
           <p role="alert" className="stclock-error">
             {t(problem)}
@@ -436,7 +457,7 @@ export default function StaffClock({
             </button>
             <button
               className="stclock-end"
-              disabled={busy || !!saved}
+              disabled={busy || !!saved || tooFar}
               onClick={() => void press('punchOut')}
             >
               {t('endshift::퇴근 찍기')}
@@ -446,7 +467,7 @@ export default function StaffClock({
         ) : (
           <button
             className="stclock-start"
-            disabled={busy || !!saved}
+            disabled={busy || !!saved || tooFar}
             onClick={() => void press('punchIn')}
           >
             <Camera size={20} />

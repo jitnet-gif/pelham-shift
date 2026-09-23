@@ -855,11 +855,13 @@ const en: Record<string, string> = {
   '지금 내 위치로 지정': 'Use my location',
   '위치를 확인하는 중입니다…': 'Checking your location…',
   '반경(m)': 'Radius (m)',
-  '해제': 'Turn off',
+  '기본 위치로': 'Reset to default',
   '근무지에서 {n}m 안에서만 출퇴근이 찍힙니다. 위도 {lat}, 경도 {lng}':
     'Staff can check in and out within {n} m of the workplace. Latitude {lat}, longitude {lng}.',
-  '아직 지정하지 않았습니다. 근무지에서 이 버튼을 누르면 그 자리가 기준이 되고, 그 뒤로는 근처에서만 출퇴근이 찍힙니다.':
-    'Not set yet. Press this button while at the workplace and that spot becomes the centre; after that, staff can only check in and out nearby.',
+  '클럽 자리(196 Webber Rd, Welland)가 기본값입니다. 근무지에서 위 버튼을 누르면 그 자리로 바뀝니다.':
+    'The club itself (196 Webber Rd, Welland) is the default. Press the button above while at the workplace to move the centre there.',
+  '근무지에서 약 {n}m 떨어져 있습니다. {r}m 안에서만 출퇴근을 찍을 수 있습니다.':
+    'You are about {n} m from the workplace. Check in and out is only possible within {r} m.',
   '이 기기는 위치를 알려주지 않습니다.': 'This device does not report a location.',
   '위치를 확인하지 못했습니다. 위치 권한을 허용하고 다시 눌러주세요.':
     'Your location could not be checked. Allow location access and try again.',

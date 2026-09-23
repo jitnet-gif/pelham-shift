@@ -86,11 +86,10 @@ import {
   weekdayOf,
   payPeriodStart,
   payPeriodEnd,
-  DEFAULT_WORKPLACE_RADIUS,
   LOCATION,
   TIME_ZONE,
-  WEATHER_SPOT,
   areaList,
+  workplaceOf,
   type Employee,
   type Message,
   type State,
@@ -212,7 +211,7 @@ export default function ShiftApp() {
   // 근무지를 지정하는 동안 기기에 자리를 물어보는 중인지.
   const [locating, setLocating] = useState(false);
   // 근무지를 지정해 둔 곳에서는 앱을 여는 동안 위치를 계속 지켜봅니다.
-  const gps = useGps(!!data.workplace, true);
+  const gps = useGps(true);
   const [version, setVersion] = useState(0);
   const [team, setTeam] = useState('');
   const [actor, setActor] = useState({ id: 'admin', admin: true });
@@ -2114,7 +2113,7 @@ export default function ShiftApp() {
                     </small>
                   </div>
                 )}
-                {/* 출퇴근을 찍을 수 있는 자리. 비워 두면 어디서든 찍을 수 있습니다. */}
+                {/* 출퇴근을 찍을 수 있는 자리. 끌 수는 없고, 풀면 클럽 기본 자리(1km)로 돌아갑니다. */}
                 <div className="teamlink">
                   <b>{t('출퇴근 가능 위치')}</b>
                   <span className="workplace">
@@ -2133,7 +2132,7 @@ export default function ShiftApp() {
                             void command('workplace', {
                               lat: String(spot.coords.latitude),
                               lng: String(spot.coords.longitude),
-                              radius: String(data.workplace?.radius ?? DEFAULT_WORKPLACE_RADIUS),
+                              radius: String(workplaceOf(data).radius),
                             });
                           },
                           () => {
@@ -2147,43 +2146,43 @@ export default function ShiftApp() {
                       <MapPin size={16} />{' '}
                       {locating ? t('위치를 확인하는 중입니다…') : t('지금 내 위치로 지정')}
                     </button>
+                    <label>
+                      {t('반경(m)')}
+                      <input
+                        type="number"
+                        min={50}
+                        max={2000}
+                        step={50}
+                        key={workplaceOf(data).radius}
+                        defaultValue={workplaceOf(data).radius}
+                        onBlur={(e) =>
+                          void command('workplace', {
+                            lat: String(workplaceOf(data).lat),
+                            lng: String(workplaceOf(data).lng),
+                            radius: e.target.value,
+                          })
+                        }
+                      />
+                    </label>
+                    {/* 기본 자리로 되돌리기. 직접 잡아 둔 자리가 있을 때만 보입니다 — 끄기가 아닙니다. */}
                     {data.workplace && (
-                      <>
-                        <label>
-                          {t('반경(m)')}
-                          <input
-                            type="number"
-                            min={50}
-                            max={2000}
-                            step={50}
-                            defaultValue={data.workplace.radius}
-                            onBlur={(e) =>
-                              void command('workplace', {
-                                lat: String(data.workplace!.lat),
-                                lng: String(data.workplace!.lng),
-                                radius: e.target.value,
-                              })
-                            }
-                          />
-                        </label>
-                        <button
-                          className="button"
-                          disabled={busy}
-                          onClick={() => void command('workplace', { clear: '1' })}
-                        >
-                          {t('해제')}
-                        </button>
-                      </>
+                      <button
+                        className="button"
+                        disabled={busy}
+                        onClick={() => void command('workplace', { clear: '1' })}
+                      >
+                        {t('기본 위치로')}
+                      </button>
                     )}
                   </span>
                   <small>
-                    {data.workplace
-                      ? t('근무지에서 {n}m 안에서만 출퇴근이 찍힙니다. 위도 {lat}, 경도 {lng}', {
-                          n: data.workplace.radius,
-                          lat: data.workplace.lat.toFixed(5),
-                          lng: data.workplace.lng.toFixed(5),
-                        })
-                      : t('아직 지정하지 않았습니다. 근무지에서 이 버튼을 누르면 그 자리가 기준이 되고, 그 뒤로는 근처에서만 출퇴근이 찍힙니다.')}
+                    {t('근무지에서 {n}m 안에서만 출퇴근이 찍힙니다. 위도 {lat}, 경도 {lng}', {
+                      n: workplaceOf(data).radius,
+                      lat: workplaceOf(data).lat.toFixed(5),
+                      lng: workplaceOf(data).lng.toFixed(5),
+                    })}{' '}
+                    {!data.workplace &&
+                      t('클럽 자리(196 Webber Rd, Welland)가 기본값입니다. 근무지에서 위 버튼을 누르면 그 자리로 바뀝니다.')}
                   </small>
                 </div>
                 {push.tickUrl && (
@@ -3524,10 +3523,8 @@ export default function ShiftApp() {
     if (tab === 'timesheets' && sheet) setSheet('');
     else setTab('more');
   };
-  // 날씨를 물어볼 자리. 출퇴근 반경을 잡아 둔 워크스페이스는 그 좌표가 곧 근무지입니다.
-  const weatherSpot: { lat: number; lng: number } | null = data.workplace
-    ? { lat: data.workplace.lat, lng: data.workplace.lng }
-    : WEATHER_SPOT;
+  // 날씨를 물어볼 자리. 출퇴근이 찍히는 자리와 같은 좌표를 봅니다.
+  const weatherSpot: { lat: number; lng: number } = workplaceOf(data);
   // 우천 근무 종료 공지. 데스크톱 머리줄과 폰 날씨 칸이 같은 내용을 엽니다.
   const rainNotice = () =>
     open('rain', {
@@ -4233,7 +4230,7 @@ export default function ShiftApp() {
                 shift={myShiftToday}
                 location={LOCATION}
                 busy={busy}
-                needsLocation={!!data.workplace}
+                workplace={workplaceOf(data)}
                 spot={gps.spot}
                 onPunch={async (action, photo, place) => {
                   const next = await command(action, {

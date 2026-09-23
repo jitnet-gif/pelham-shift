@@ -47,10 +47,17 @@ export function distanceMeters(a:{lat:number;lng:number},b:{lat:number;lng:numbe
  const dLat=rad(b.lat-a.lat),dLng=rad(b.lng-a.lng);
  const h=Math.sin(dLat/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLng/2)**2;
  return 2*R*Math.asin(Math.min(1,Math.sqrt(h)))}
-// 기본 반경. 클럽하우스 앞에서 찍은 것만 통과시키는 선입니다.
-// 코스 안쪽에서도 찍어야 하면 관리자가 팀 워크스페이스 화면에서 늘립니다.
-export const DEFAULT_WORKPLACE_RADIUS=100;
+// 클럽이 서 있는 자리. 196 Webber Road, Welland(Pelham), Ontario L3B 5N8, Canada —
+// OpenStreetMap 에 등록된 클럽 자체의 좌표입니다. 출퇴근 반경과 날씨가 이 한 줄을 함께 봅니다.
+export const CLUB_SPOT={lat:42.98515,lng:-79.30084};
+// 기본 반경. 클럽에서 1km 안에서 찍은 것만 통과시키는 선입니다.
+// 코스 안쪽과 주차장까지 넉넉히 들어오고, 집이나 옆 동네에서 찍은 것은 들어오지 않습니다.
+export const DEFAULT_WORKPLACE_RADIUS=1000;
 export const MIN_WORKPLACE_RADIUS=50,MAX_WORKPLACE_RADIUS=2000;
+// 아무것도 지정하지 않아도 출퇴근은 클럽 1km 안에서만 찍힙니다.
+// 관리자가 자리를 다시 잡으면 그 값을 먼저 보고, 풀면 이 기본값으로 돌아옵니다 — 끄는 길은 없습니다.
+export const DEFAULT_WORKPLACE:Workplace={...CLUB_SPOT,radius:DEFAULT_WORKPLACE_RADIUS};
+export const workplaceOf=(s:{workplace?:Workplace})=>s.workplace??DEFAULT_WORKPLACE;
 export const weekdayOf=(date:string)=>new Date(date+'T12:00:00Z').getUTCDay();
 // 급여 기간은 일요일에 시작하는 2주입니다. 기준일 2026-09-20 은 실제 운영 주기(9/20~10/3)에 맞춘 일요일입니다.
 export const PAY_PERIOD_DAYS=14;
@@ -111,10 +118,9 @@ export function payroll(state:State,employeeId:string,from:string,to:string){con
  return {hours,regularHours,otHours,lateMinutes,lateDays,base:cents(base),otPay:cents(otPay),bonus,lateDeduction:cents(lateDeduction),total:cents(earned-lateDeduction),...punchReviewCounts(state,employeeId,from,to)}}
 // 근무지 이름. 직원 화면과 출퇴근 단말이 같은 이름을 씁니다.
 export const LOCATION='Pelham Hills Golf Club';
-// 날씨와 일출·일몰은 클럽이 서 있는 자리의 것입니다.
-// 196 Webber Road, Pelham, Ontario L3B 5N8, Canada — OpenStreetMap 에 등록된 클럽 자체의 좌표입니다.
-// 관리자가 출퇴근 반경을 잡아 두었으면 그 좌표(state.workplace)를 먼저 쓰고, 없을 때 이 값으로 떨어집니다.
-export const WEATHER_SPOT: {lat:number;lng:number} | null = {lat:42.98515,lng:-79.30084};
+// 날씨와 일출·일몰은 클럽이 서 있는 자리의 것입니다 — 출퇴근을 찍는 자리와 같은 좌표를 봅니다.
+// 관리자가 출퇴근 자리를 다시 잡아 두었으면 그 좌표(state.workplace)를 먼저 쓰고, 없을 때 이 값으로 떨어집니다.
+export const WEATHER_SPOT: {lat:number;lng:number} | null = CLUB_SPOT;
 // 근무지 장소. 새 직원·새 근무의 기본값이자 시범 데이터의 배정 기준입니다.
 export const AREAS=['Proshop','Workshop'] as const;
 // 직원의 업무와 근무의 장소는 이제 한 목록입니다 — 작업 지시 권한을 가진 사람이 작업 화면에서 늘립니다.

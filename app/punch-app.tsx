@@ -3,7 +3,7 @@ import './punch-app.css';
 import { savePunchPhoto } from './punch-photo-store';
 import { useEffect, useState } from 'react';
 import { Bell, BellRing, CalendarDays, LogOut } from 'lucide-react';
-import { LOCATION, localDate, seed, type State } from '@/lib/domain';
+import { LOCATION, localDate, seed, workplaceOf, type State } from '@/lib/domain';
 import { pushOn, relangPush, subscribePush } from '@/lib/push-client';
 import { notice } from '@/lib/notice';
 import { useLang } from './use-lang';
@@ -35,8 +35,8 @@ export default function PunchApp() {
   const [status, setStatus] = useState('');
   const [tick, setTick] = useState(() => Date.now());
   const [push, setPush] = useState(false);
-  // 근무지를 지정해 둔 곳에서는 앱을 여는 동안 위치를 계속 지켜봅니다.
-  const gps = useGps(!!data.workplace, true);
+  // 출퇴근은 근무지 안에서만 찍히므로, 앱을 여는 동안 위치를 계속 지켜봅니다.
+  const gps = useGps(true);
   const query = () => (typeof window === 'undefined' ? '' : window.location.search);
 
   const ingest = (r: Payload) => {
@@ -230,7 +230,7 @@ export default function PunchApp() {
         shift={myShiftToday}
         location={LOCATION}
         busy={busy}
-        needsLocation={!!data.workplace}
+        workplace={workplaceOf(data)}
         spot={gps.spot}
         onPunch={async (action, photo, place) => {
           const next = await command(action, {

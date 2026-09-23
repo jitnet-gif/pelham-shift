@@ -36,7 +36,8 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
  // 지운 근무에 딸린 대체 기록은 빈 줄로 남지 않도록 함께 치웁니다.
  // 지우기는 공개 상태를 건드리지 않습니다 — 근무 하나를 지우려다 온 팀의 스케줄이 가려지면 안 되기 때문입니다.
  case 'shiftRemove': {admin();const shift=s.shifts.find(x=>x.id===text(p.id,120))??fail('근무를 찾을 수 없습니다. 새로고침 후 다시 시도하세요.');if(s.swaps.some(r=>r.shiftId===shift.id&&(r.status==='requested'||r.status==='accepted')))fail(`${shift.date}: 진행 중인 대체근무 요청이 있어 삭제할 수 없습니다.`);s.shifts=s.shifts.filter(x=>x.id!==shift.id);s.swaps=s.swaps.filter(r=>r.shiftId!==shift.id);break;}
- // 출퇴근을 찍을 수 있는 자리. 비우면 어디서든 찍을 수 있던 예전 방식으로 돌아갑니다.
+ // 출퇴근을 찍을 수 있는 자리. 푸는 것은 끄기가 아니라 클럽 기본 자리(1km)로 되돌리기입니다 —
+ // 어디서든 찍을 수 있던 예전 방식으로는 돌아가지 않습니다.
  case 'workplace': {admin();
   if(p.clear==='1'||p.clear===true){s.workplace=undefined;break}
   const lat=Number(p.lat),lng=Number(p.lng),radius=Math.round(Number(p.radius));
