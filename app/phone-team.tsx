@@ -132,22 +132,12 @@ export default function PhoneTeam({
             <dt>{t('시급')}</dt>
             <dd>{t('{money} / 시간', { money: money(person.rate) })}</dd>
           </div>
+          {/* 직원 ID 하나로 끝냅니다 — 단말에 누르는 번호이자 첫 비밀번호입니다. */}
           <div>
             <dt>{t('직원 ID')}</dt>
-            <dd>{person.id}</dd>
-          </div>
-          <div>
-            <dt>{t('출근기계 ID')}</dt>
             <dd>{person.punchId || <span className="none">{t('미등록')}</span>}</dd>
           </div>
         </dl>
-
-        <div className="pteam-block">
-          <h3>{t('로그인')}</h3>
-          <p className="pteam-note">
-            {t('직원은 로그인 화면에서 자기 이름을 골라 들어옵니다. 처음 비밀번호는 본인 직원 ID 이고, 직원이 직접 바꿉니다.')}
-          </p>
-        </div>
 
         {!person.archived && person.id !== meId && (
           <button

@@ -1,19 +1,21 @@
 'use client';
+import { useState } from 'react';
 import {
   CalendarClock,
   CalendarX,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  CloudSun,
   MapPin,
   Plus,
-  SlidersHorizontal,
   TriangleAlert,
   UserRound,
 } from 'lucide-react';
 import type { Availability, Employee, Shift, TimeOff } from '@/lib/domain';
 import { addDays, weekdayOf } from '@/lib/domain';
 import { useLang } from './use-lang';
+import WeatherPanel from './weather-panel';
 
 // 폰에서는 주간 표를 옆으로 밀어 보는 대신, 고른 날부터 그 주 끝까지를 날짜별 목록으로 폅니다.
 // 표를 CSS 로 줄이지 않고 아예 다른 화면을 그립니다 — 390px 에서 가로 스크롤이 사라집니다.
@@ -31,15 +33,14 @@ export default function PhoneSchedule({
   availability,
   location,
   canEdit,
-  filtersOpen,
-  filters,
+  spot,
   actions,
   blockedOf,
   onWeekChange,
   onDayChange,
   onShiftSelect,
   onAddShift,
-  onToggleFilters,
+  onRainNotice,
   onOpenTimeOff,
   onOpenAvailability,
 }: {
@@ -51,19 +52,20 @@ export default function PhoneSchedule({
   availability: Availability[];
   location: string;
   canEdit: boolean;
-  filtersOpen: boolean;
-  filters: React.ReactNode;
+  spot: { lat: number; lng: number } | null;
   actions: React.ReactNode;
   blockedOf: (shift: Shift) => 'timeoff' | 'unavailable' | null;
   onWeekChange: (week: string) => void;
   onDayChange: (date: string) => void;
   onShiftSelect: (id: string) => void;
   onAddShift: (date: string) => void;
-  onToggleFilters: () => void;
+  onRainNotice?: () => void;
   onOpenTimeOff: () => void;
   onOpenAvailability: () => void;
 }) {
   const { t, days, locale } = useLang();
+  // 날씨 칸은 눌러야 열립니다. 닫혀 있는 동안에는 예보를 부르지 않습니다.
+  const [weatherOpen, setWeatherOpen] = useState(false);
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(week, i));
   // 고른 날이 이 주를 벗어나면 주 첫날부터 보여 줍니다.
   const from = day >= week && day <= weekDates[6] ? day : week;
@@ -158,18 +160,24 @@ export default function PhoneSchedule({
       <div className="psched-place">
         <MapPin size={16} />
         <span>{location}</span>
-        {filters && (
-          <button
-            className={'psched-filter' + (filtersOpen ? ' on' : '')}
-            aria-label={t('보기 설정')}
-            aria-expanded={filtersOpen}
-            onClick={onToggleFilters}
-          >
-            <SlidersHorizontal size={18} />
-          </button>
-        )}
+        <button
+          className={'psched-sky' + (weatherOpen ? ' on' : '')}
+          aria-label={t('날씨와 일출·일몰')}
+          aria-expanded={weatherOpen}
+          onClick={() => setWeatherOpen((v) => !v)}
+        >
+          <CloudSun size={19} />
+        </button>
       </div>
-      {filtersOpen && filters}
+      {weatherOpen && (
+        <WeatherPanel
+          key={from}
+          date={from}
+          today={today}
+          spot={spot}
+          onRainNotice={onRainNotice}
+        />
+      )}
       {actions && <div className="psched-actions">{actions}</div>}
       {listDates.map((date) => {
         const onDay = shifts

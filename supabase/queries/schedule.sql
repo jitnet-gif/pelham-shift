@@ -18,6 +18,10 @@
 --   · 오늘은 서버 시간(UTC)이 아니라 America/New_York 기준입니다.
 --   · 급여 기간은 2026-09-20 일요일부터 2주씩입니다. 기준일보다 앞선 날짜도 맞게 떨어지도록 floor 로 나눕니다.
 --
+-- 형식이 깨진 값(예: '9:00')이 한 줄이라도 있으면 그냥 ::int 로 바꿀 때 조회 전체가 죽습니다.
+-- 그래서 날짜·시각은 형식을 먼저 확인하고, 아니면 null 로 둡니다.
+-- 그런 줄은 시간이 0 이 아니라 빈칸으로 나오고, 어느 줄인지는 11번이 찾아 줍니다.
+--
 -- 두 가지는 정해 두었으니 필요하면 바꾸세요
 --   1) 그만둔 직원(archived)도 지난 근무가 남아 있어 결과에 포함했습니다. 빼려면 각 조회의
 --      `-- and not coalesce(e.archived, false)` 주석을 풀면 됩니다.
@@ -42,7 +46,7 @@ select
   jsonb_array_length(coalesce(w.state::jsonb -> 'swaps',        '[]'::jsonb)) as swaps,
   (select min(x ->> 'date') from jsonb_array_elements(coalesce(w.state::jsonb -> 'shifts', '[]'::jsonb)) x) as first_shift,
   (select max(x ->> 'date') from jsonb_array_elements(coalesce(w.state::jsonb -> 'shifts', '[]'::jsonb)) x) as last_shift,
-  pg_size_pretty(octet_length(w.state)::bigint)                                     as state_size
+  pg_size_pretty(octet_length(w.state)::bigint)                               as state_size
 from public.workspaces w
 order by w.id;
 
@@ -59,15 +63,24 @@ shift_raw as (
   from public.workspaces w,
        jsonb_to_recordset(coalesce(w.state::jsonb -> 'shifts', '[]'::jsonb))
          as s(id text, "employeeId" text, date text, "start" text, "end" text,
-              area text, note text, "breakMinutes" int)
+              area text, note text, "breakMinutes" int, "originalId" text)
+),
+shift_min as (
+  select workspace, id, "employeeId", area, note, "start", "end", "originalId",
+         coalesce("breakMinutes", 0) as break_min,
+         case when date    ~ '^\d{4}-\d{2}-\d{2}$' then date::date end as day,
+         case when "start" ~ '^\d{2}:\d{2}$' then substr("start", 1, 2)::int * 60 + substr("start", 4, 2)::int end as start_min,
+         case when "end"   ~ '^\d{2}:\d{2}$' then substr("end",   1, 2)::int * 60 + substr("end",   4, 2)::int end as end_min
+  from shift_raw
 ),
 shift as (
-  select workspace, id, "employeeId", date::date as day, "start", "end", area, note,
-         coalesce("breakMinutes", 0) as break_min,
-         substr("start", 1, 2)::int * 60 + substr("start", 4, 2)::int as start_min,
-         mod(substr("end", 1, 2)::int * 60 + substr("end", 4, 2)::int
-             - (substr("start", 1, 2)::int * 60 + substr("start", 4, 2)::int) + 1440, 1440) as span_min
-  from shift_raw
+  -- 시각이 깨져 계산할 수 없는 줄은 0 이 아니라 빈칸(null)으로 둡니다.
+  -- greatest(0, null) 은 Postgres 에서 0 이라, 감싸 주지 않으면 0시간 근무처럼 보입니다.
+  select m.*, v.span_min,
+         case when v.span_min is null then null
+              else greatest(0, v.span_min - m.break_min) end / 60.0 as hours
+  from shift_min m,
+       lateral (select mod(m.end_min - m.start_min + 1440, 1440) as span_min) v
 ),
 emp as (
   select w.id as workspace, e.*
@@ -83,11 +96,14 @@ select s.workspace,
        s."start",
        s."end",
        s.break_min,
-       round(greatest(0, s.span_min - s.break_min) / 60.0, 2)          as hours,
+       round(s.hours, 2)                                               as hours,
+       -- 대체가 승인되면 근무의 employeeId 가 바뀌고 originalId 에 원래 사람이 남습니다.
+       o.name                                                          as swapped_from,
        s.note
 from shift s
 cross join params p
 left join emp e on e.workspace = s.workspace and e.id = s."employeeId"
+left join emp o on o.workspace = s.workspace and o.id = s."originalId"
 where s.day = p.day
   -- and not coalesce(e.archived, false)
 order by s.workspace, s.start_min, name;
@@ -109,12 +125,16 @@ shift_raw as (
          as s(id text, "employeeId" text, date text, "start" text, "end" text,
               area text, note text, "breakMinutes" int)
 ),
-shift as (
-  select workspace, id, "employeeId", date::date as day, "start", "end", area,
-         substr("start", 1, 2)::int * 60 + substr("start", 4, 2)::int as start_min,
-         mod(substr("end", 1, 2)::int * 60 + substr("end", 4, 2)::int
-             - (substr("start", 1, 2)::int * 60 + substr("start", 4, 2)::int) + 1440, 1440) as span_min
+shift_min as (
+  select workspace, id, "employeeId", area, "start", "end",
+         case when date    ~ '^\d{4}-\d{2}-\d{2}$' then date::date end as day,
+         case when "start" ~ '^\d{2}:\d{2}$' then substr("start", 1, 2)::int * 60 + substr("start", 4, 2)::int end as start_min,
+         case when "end"   ~ '^\d{2}:\d{2}$' then substr("end",   1, 2)::int * 60 + substr("end",   4, 2)::int end as end_min
   from shift_raw
+),
+shift as (
+  select m.*, mod(m.end_min - m.start_min + 1440, 1440) as span_min
+  from shift_min m
 ),
 emp as (
   select w.id as workspace, e.*
@@ -156,13 +176,20 @@ shift_raw as (
          as s(id text, "employeeId" text, date text, "start" text, "end" text,
               area text, note text, "breakMinutes" int)
 ),
-shift as (
-  select workspace, "employeeId", date::date as day,
-         greatest(0,
-           mod(substr("end", 1, 2)::int * 60 + substr("end", 4, 2)::int
-               - (substr("start", 1, 2)::int * 60 + substr("start", 4, 2)::int) + 1440, 1440)
-           - coalesce("breakMinutes", 0)) / 60.0 as hours
+shift_min as (
+  select workspace, "employeeId",
+         coalesce("breakMinutes", 0) as break_min,
+         case when date    ~ '^\d{4}-\d{2}-\d{2}$' then date::date end as day,
+         case when "start" ~ '^\d{2}:\d{2}$' then substr("start", 1, 2)::int * 60 + substr("start", 4, 2)::int end as start_min,
+         case when "end"   ~ '^\d{2}:\d{2}$' then substr("end",   1, 2)::int * 60 + substr("end",   4, 2)::int end as end_min
   from shift_raw
+),
+shift as (
+  -- 시각이 깨져 계산할 수 없는 줄은 0 이 아니라 빈칸(null)으로 둡니다 (greatest(0, null) 은 0 입니다).
+  select m.*,
+         case when m.start_min is null or m.end_min is null then null
+              else greatest(0, mod(m.end_min - m.start_min + 1440, 1440) - m.break_min) end / 60.0 as hours
+  from shift_min m
 ),
 emp as (
   select w.id as workspace, e.*
@@ -170,15 +197,16 @@ emp as (
        jsonb_to_recordset(coalesce(w.state::jsonb -> 'employees', '[]'::jsonb))
          as e(id text, name text, archived boolean)
 )
--- 이름을 먼저 붙인 뒤에 묶습니다. group by 에 별칭을 그냥 쓰면
--- Postgres 가 별칭이 아니라 원래 컬럼(e.name)으로 읽어, 이름 없는 근무가 한 덩어리로 뭉칩니다.
+-- 이름을 먼저 붙인 뒤에 묶습니다. group by 에 별칭을 그냥 쓰면 Postgres 가 별칭이 아니라
+-- 원래 컬럼(e.name)으로 읽어, 직원 목록에 없는 근무들이 한 덩어리로 뭉칩니다.
 select workspace,
        week_start,
        week_start + 6                         as week_end,
        name,
        count(*)                               as shifts,
        round(sum(hours), 2)                   as hours,
-       round(greatest(0, sum(hours) - 40), 2) as over_40
+       case when sum(hours) is null then null
+            else round(greatest(0, sum(hours) - 40), 2) end as over_40
 from (
   select s.workspace,
          s.day - extract(dow from s.day)::int as week_start,   -- 일요일
@@ -205,13 +233,20 @@ with shift_raw as (
          as s(id text, "employeeId" text, date text, "start" text, "end" text,
               area text, note text, "breakMinutes" int)
 ),
-shift as (
-  select workspace, "employeeId", date::date as day,
-         greatest(0,
-           mod(substr("end", 1, 2)::int * 60 + substr("end", 4, 2)::int
-               - (substr("start", 1, 2)::int * 60 + substr("start", 4, 2)::int) + 1440, 1440)
-           - coalesce("breakMinutes", 0)) / 60.0 as hours
+shift_min as (
+  select workspace, "employeeId",
+         coalesce("breakMinutes", 0) as break_min,
+         case when date    ~ '^\d{4}-\d{2}-\d{2}$' then date::date end as day,
+         case when "start" ~ '^\d{2}:\d{2}$' then substr("start", 1, 2)::int * 60 + substr("start", 4, 2)::int end as start_min,
+         case when "end"   ~ '^\d{2}:\d{2}$' then substr("end",   1, 2)::int * 60 + substr("end",   4, 2)::int end as end_min
   from shift_raw
+),
+shift as (
+  -- 시각이 깨져 계산할 수 없는 줄은 0 이 아니라 빈칸(null)으로 둡니다 (greatest(0, null) 은 0 입니다).
+  select m.*,
+         case when m.start_min is null or m.end_min is null then null
+              else greatest(0, mod(m.end_min - m.start_min + 1440, 1440) - m.break_min) end / 60.0 as hours
+  from shift_min m
 ),
 emp as (
   select w.id as workspace, e.*
@@ -235,7 +270,8 @@ from (
          s.hours
   from shift s
   left join emp e on e.workspace = s.workspace and e.id = s."employeeId"
-  -- where not coalesce(e.archived, false)
+  where s.day is not null
+    -- and not coalesce(e.archived, false)
 ) x
 group by workspace, period_from, name, rate
 order by workspace, period_from desc, hours desc;
@@ -256,13 +292,20 @@ shift_raw as (
          as s(id text, "employeeId" text, date text, "start" text, "end" text,
               area text, note text, "breakMinutes" int)
 ),
-shift as (
-  select workspace, "employeeId", date::date as day, area, "start", "end",
-         greatest(0,
-           mod(substr("end", 1, 2)::int * 60 + substr("end", 4, 2)::int
-               - (substr("start", 1, 2)::int * 60 + substr("start", 4, 2)::int) + 1440, 1440)
-           - coalesce("breakMinutes", 0)) / 60.0 as hours
+shift_min as (
+  select workspace, "employeeId", area, "start", "end",
+         coalesce("breakMinutes", 0) as break_min,
+         case when date    ~ '^\d{4}-\d{2}-\d{2}$' then date::date end as day,
+         case when "start" ~ '^\d{2}:\d{2}$' then substr("start", 1, 2)::int * 60 + substr("start", 4, 2)::int end as start_min,
+         case when "end"   ~ '^\d{2}:\d{2}$' then substr("end",   1, 2)::int * 60 + substr("end",   4, 2)::int end as end_min
   from shift_raw
+),
+shift as (
+  -- 시각이 깨져 계산할 수 없는 줄은 0 이 아니라 빈칸(null)으로 둡니다 (greatest(0, null) 은 0 입니다).
+  select m.*,
+         case when m.start_min is null or m.end_min is null then null
+              else greatest(0, mod(m.end_min - m.start_min + 1440, 1440) - m.break_min) end / 60.0 as hours
+  from shift_min m
 )
 select s.workspace,
        s.day,
@@ -291,16 +334,18 @@ with shift_raw as (
          as s(id text, "employeeId" text, date text, "start" text, "end" text,
               area text, note text, "breakMinutes" int)
 ),
-shift as (
-  select workspace, id, "employeeId", date::date as day, "start", "end", area,
-         -- 1970-01-01 부터 흐른 분. 날짜가 달라도 그대로 비교됩니다.
-         (date::date - date '1970-01-01') * 1440
-           + substr("start", 1, 2)::int * 60 + substr("start", 4, 2)::int as t0,
-         (date::date - date '1970-01-01') * 1440
-           + substr("start", 1, 2)::int * 60 + substr("start", 4, 2)::int
-           + mod(substr("end", 1, 2)::int * 60 + substr("end", 4, 2)::int
-                 - (substr("start", 1, 2)::int * 60 + substr("start", 4, 2)::int) + 1440, 1440) as t1
+shift_min as (
+  select workspace, id, "employeeId", area, "start", "end",
+         case when date    ~ '^\d{4}-\d{2}-\d{2}$' then date::date end as day,
+         case when "start" ~ '^\d{2}:\d{2}$' then substr("start", 1, 2)::int * 60 + substr("start", 4, 2)::int end as start_min,
+         case when "end"   ~ '^\d{2}:\d{2}$' then substr("end",   1, 2)::int * 60 + substr("end",   4, 2)::int end as end_min
   from shift_raw
+),
+shift as (
+  -- 1970-01-01 부터 흐른 분. 날짜가 달라도 그대로 비교됩니다.
+  select m.*, v.t0, v.t0 + mod(m.end_min - m.start_min + 1440, 1440) as t1
+  from shift_min m,
+       lateral (select (m.day - date '1970-01-01') * 1440 + m.start_min as t0) v
 ),
 emp as (
   select w.id as workspace, e.*
@@ -334,12 +379,16 @@ with shift_raw as (
          as s(id text, "employeeId" text, date text, "start" text, "end" text,
               area text, note text, "breakMinutes" int)
 ),
-shift as (
-  select workspace, id, "employeeId", date::date as day, "start", "end", area,
-         substr("start", 1, 2)::int * 60 + substr("start", 4, 2)::int as start_min,
-         mod(substr("end", 1, 2)::int * 60 + substr("end", 4, 2)::int
-             - (substr("start", 1, 2)::int * 60 + substr("start", 4, 2)::int) + 1440, 1440) as span_min
+shift_min as (
+  select workspace, id, "employeeId", area, "start", "end",
+         case when date    ~ '^\d{4}-\d{2}-\d{2}$' then date::date end as day,
+         case when "start" ~ '^\d{2}:\d{2}$' then substr("start", 1, 2)::int * 60 + substr("start", 4, 2)::int end as start_min,
+         case when "end"   ~ '^\d{2}:\d{2}$' then substr("end",   1, 2)::int * 60 + substr("end",   4, 2)::int end as end_min
   from shift_raw
+),
+shift as (
+  select m.*, mod(m.end_min - m.start_min + 1440, 1440) as span_min
+  from shift_min m
 ),
 emp as (
   select w.id as workspace, e.*
@@ -347,31 +396,36 @@ emp as (
        jsonb_to_recordset(coalesce(w.state::jsonb -> 'employees', '[]'::jsonb))
          as e(id text, name text)
 ),
-timeoff as (
-  select w.id as workspace, t.id, t."employeeId", t."from"::date as from_day, t."to"::date as to_day,
-         coalesce(t."allDay", true) as all_day, t.reason, t.status,
-         case when t."start" is null then null
-              else substr(t."start", 1, 2)::int * 60 + substr(t."start", 4, 2)::int end as start_min,
-         case when t."start" is null or t."end" is null then null
-              else mod(substr(t."end", 1, 2)::int * 60 + substr(t."end", 4, 2)::int
-                       - (substr(t."start", 1, 2)::int * 60 + substr(t."start", 4, 2)::int) + 1440, 1440) end as span_min
+timeoff_raw as (
+  select w.id as workspace, t.*
   from public.workspaces w,
        jsonb_to_recordset(coalesce(w.state::jsonb -> 'timeOff', '[]'::jsonb))
          as t(id text, "employeeId" text, "from" text, "to" text, "allDay" boolean,
               "start" text, "end" text, reason text, status text)
 ),
-avail as (
-  select w.id as workspace, a.id, a."employeeId", a.weekday, coalesce(a."allDay", true) as all_day,
-         a.note, a.status, a."effectiveFrom",
-         case when a."start" is null then null
-              else substr(a."start", 1, 2)::int * 60 + substr(a."start", 4, 2)::int end as start_min,
-         case when a."start" is null or a."end" is null then null
-              else mod(substr(a."end", 1, 2)::int * 60 + substr(a."end", 4, 2)::int
-                       - (substr(a."start", 1, 2)::int * 60 + substr(a."start", 4, 2)::int) + 1440, 1440) end as span_min
+timeoff as (
+  select workspace, id, "employeeId", reason, status,
+         coalesce("allDay", true) as all_day,
+         case when "from"  ~ '^\d{4}-\d{2}-\d{2}$' then "from"::date end as from_day,
+         case when "to"    ~ '^\d{4}-\d{2}-\d{2}$' then "to"::date   end as to_day,
+         case when "start" ~ '^\d{2}:\d{2}$' then substr("start", 1, 2)::int * 60 + substr("start", 4, 2)::int end as start_min,
+         case when "end"   ~ '^\d{2}:\d{2}$' then substr("end",   1, 2)::int * 60 + substr("end",   4, 2)::int end as end_min
+  from timeoff_raw
+),
+avail_raw as (
+  select w.id as workspace, a.*
   from public.workspaces w,
        jsonb_to_recordset(coalesce(w.state::jsonb -> 'availability', '[]'::jsonb))
          as a(id text, "employeeId" text, weekday int, "allDay" boolean,
               "start" text, "end" text, note text, "effectiveFrom" text, status text)
+),
+avail as (
+  select workspace, id, "employeeId", weekday, note, status,
+         coalesce("allDay", true) as all_day,
+         case when "effectiveFrom" ~ '^\d{4}-\d{2}-\d{2}$' then "effectiveFrom"::date end as from_day,
+         case when "start" ~ '^\d{2}:\d{2}$' then substr("start", 1, 2)::int * 60 + substr("start", 4, 2)::int end as start_min,
+         case when "end"   ~ '^\d{2}:\d{2}$' then substr("end",   1, 2)::int * 60 + substr("end",   4, 2)::int end as end_min
+  from avail_raw
 )
 select * from (
   select s.workspace, '휴무' as kind, coalesce(e.name, s."employeeId") as name,
@@ -382,8 +436,10 @@ select * from (
     on t.workspace = s.workspace and t."employeeId" = s."employeeId"
    and t.status = 'approved'
    and s.day between t.from_day and t.to_day
-   and (t.all_day or t.start_min is null or t.span_min is null
-        or (s.start_min < t.start_min + t.span_min and t.start_min < s.start_min + s.span_min))
+   -- 규칙에 시간대가 있으면 그 날 그 시간과 실제로 겹치는지까지 봅니다 (앱의 hits())
+   and (t.all_day or t.start_min is null or t.end_min is null
+        or (s.start_min < t.start_min + mod(t.end_min - t.start_min + 1440, 1440)
+            and t.start_min < s.start_min + s.span_min))
   left join emp e on e.workspace = s.workspace and e.id = s."employeeId"
 
   union all
@@ -396,9 +452,10 @@ select * from (
     on a.workspace = s.workspace and a."employeeId" = s."employeeId"
    and a.status = 'approved'
    and a.weekday = extract(dow from s.day)::int
-   and (a."effectiveFrom" is null or s.day >= a."effectiveFrom"::date)
-   and (a.all_day or a.start_min is null or a.span_min is null
-        or (s.start_min < a.start_min + a.span_min and a.start_min < s.start_min + s.span_min))
+   and (a.from_day is null or s.day >= a.from_day)
+   and (a.all_day or a.start_min is null or a.end_min is null
+        or (s.start_min < a.start_min + mod(a.end_min - a.start_min + 1440, 1440)
+            and a.start_min < s.start_min + s.span_min))
   left join emp e on e.workspace = s.workspace and e.id = s."employeeId"
 ) clash
 order by workspace, day, name;
@@ -418,7 +475,8 @@ day_list as (
   cross join generate_series(p.from_day, p.to_day, interval '1 day') d
 ),
 shift as (
-  select w.id as workspace, (s ->> 'date')::date as day, s ->> 'area' as area
+  select w.id as workspace, s ->> 'area' as area,
+         case when s ->> 'date' ~ '^\d{4}-\d{2}-\d{2}$' then (s ->> 'date')::date end as day
   from public.workspaces w,
        jsonb_array_elements(coalesce(w.state::jsonb -> 'shifts', '[]'::jsonb)) s
 )
@@ -436,6 +494,9 @@ order by d.workspace, d.day;
 
 -- ───────────────────────────────────────────────────────────────────────────
 -- 10. 예정 vs 실제 · 잡힌 근무와 그 날 찍힌 출퇴근을 나란히
+--     실제 근무는 찍힌 출퇴근(punches)이 기준이고, 그 날 찍힌 것이 하나도 없을 때만
+--     예전에 엑셀로 가져온 출근기계 기록(attendance)을 씁니다 — 앱의 paidRecords() 와 같습니다.
+--     from_excel 이 0 보다 크면 그 날은 엑셀 기록으로 센 것입니다.
 --     지각(late_min)은 그 날 첫 예정 시각과 첫 출근 시각을 견준 대략입니다.
 --     정확한 지각·급여는 lib/domain.ts 의 lateBy() / payroll() 이 겹치는 근무를 짝지어 계산합니다.
 -- ───────────────────────────────────────────────────────────────────────────
@@ -450,16 +511,22 @@ shift_raw as (
          as s(id text, "employeeId" text, date text, "start" text, "end" text,
               area text, note text, "breakMinutes" int)
 ),
-planned as (
-  select workspace, "employeeId", date::date as day,
-         min("start") as first_start,
-         min(substr("start", 1, 2)::int * 60 + substr("start", 4, 2)::int) as start_min,
-         round(sum(greatest(0,
-           mod(substr("end", 1, 2)::int * 60 + substr("end", 4, 2)::int
-               - (substr("start", 1, 2)::int * 60 + substr("start", 4, 2)::int) + 1440, 1440)
-           - coalesce("breakMinutes", 0)) / 60.0), 2) as hours
+shift_min as (
+  select workspace, "employeeId", "start",
+         coalesce("breakMinutes", 0) as break_min,
+         case when date    ~ '^\d{4}-\d{2}-\d{2}$' then date::date end as day,
+         case when "start" ~ '^\d{2}:\d{2}$' then substr("start", 1, 2)::int * 60 + substr("start", 4, 2)::int end as start_min,
+         case when "end"   ~ '^\d{2}:\d{2}$' then substr("end",   1, 2)::int * 60 + substr("end",   4, 2)::int end as end_min
   from shift_raw
-  group by workspace, "employeeId", date::date
+),
+planned as (
+  select workspace, "employeeId", day,
+         min("start")   as first_start,
+         min(start_min) as start_min,
+         round(sum(case when start_min is null or end_min is null then null
+                        else greatest(0, mod(end_min - start_min + 1440, 1440) - break_min) end / 60.0), 2) as hours
+  from shift_min
+  group by workspace, "employeeId", day
 ),
 punch_raw as (
   select w.id as workspace, p.*
@@ -468,29 +535,68 @@ punch_raw as (
          as p(id text, "employeeId" text, date text, "in" text, "out" text,
               area text, status text, breaks jsonb)
 ),
-actual as (
-  select workspace, "employeeId", date::date as day,
-         min("in")  as first_in,
-         min(substr("in", 1, 2)::int * 60 + substr("in", 4, 2)::int) as in_min,
-         max("out") as last_out,
-         count(*) filter (where "out" is null)                       as still_in,
-         count(*) filter (where status = 'disputed')                 as disputed,
-         count(*) filter (where "out" is not null
-                            and coalesce(status, 'pending') not in ('approved', 'disputed')) as unconfirmed,
-         round(sum(
-           case when "out" is null then 0 else greatest(0,
-             mod(substr("out", 1, 2)::int * 60 + substr("out", 4, 2)::int
-                 - (substr("in", 1, 2)::int * 60 + substr("in", 4, 2)::int) + 1440, 1440)
-             -- 무급 휴게만 뺍니다. 유급 휴게는 일한 시간으로 칩니다.
-             - coalesce((select sum(mod(substr(b ->> 'end', 1, 2)::int * 60 + substr(b ->> 'end', 4, 2)::int
-                                        - (substr(b ->> 'start', 1, 2)::int * 60 + substr(b ->> 'start', 4, 2)::int)
-                                        + 1440, 1440))
-                         from jsonb_array_elements(coalesce(breaks, '[]'::jsonb)) b
-                         where b ->> 'end' is not null
-                           and not coalesce((b ->> 'paid')::boolean, false)), 0)
-           ) / 60.0 end), 2) as hours
+punch as (
+  select workspace, id, "employeeId", status, "in", "out",
+         case when date  ~ '^\d{4}-\d{2}-\d{2}$' then date::date end as day,
+         case when "in"  ~ '^\d{2}:\d{2}$' then substr("in",  1, 2)::int * 60 + substr("in",  4, 2)::int end as in_min,
+         case when "out" ~ '^\d{2}:\d{2}$' then substr("out", 1, 2)::int * 60 + substr("out", 4, 2)::int end as out_min,
+         -- 무급 휴게만 뺍니다. 유급 휴게는 일한 시간으로 칩니다 (앱의 punchHours()).
+         coalesce((select sum(mod(substr(b ->> 'end', 1, 2)::int * 60 + substr(b ->> 'end', 4, 2)::int
+                                  - (substr(b ->> 'start', 1, 2)::int * 60 + substr(b ->> 'start', 4, 2)::int)
+                                  + 1440, 1440))
+                   from jsonb_array_elements(coalesce(breaks, '[]'::jsonb)) b
+                   where b ->> 'end'   ~ '^\d{2}:\d{2}$'
+                     and b ->> 'start' ~ '^\d{2}:\d{2}$'
+                     and not coalesce((b ->> 'paid')::boolean, false)), 0) as unpaid_min
   from punch_raw
-  group by workspace, "employeeId", date::date
+),
+att_raw as (
+  select w.id as workspace, a.*
+  from public.workspaces w,
+       jsonb_to_recordset(coalesce(w.state::jsonb -> 'attendance', '[]'::jsonb))
+         as a(id text, "employeeId" text, date text, "start" text, "end" text, "breakMinutes" int)
+),
+att as (
+  select workspace, id, "employeeId", "start", "end",
+         coalesce("breakMinutes", 0) as unpaid_min,
+         case when date    ~ '^\d{4}-\d{2}-\d{2}$' then date::date end as day,
+         case when "start" ~ '^\d{2}:\d{2}$' then substr("start", 1, 2)::int * 60 + substr("start", 4, 2)::int end as start_min,
+         case when "end"   ~ '^\d{2}:\d{2}$' then substr("end",   1, 2)::int * 60 + substr("end",   4, 2)::int end as end_min
+  from att_raw
+),
+-- 앱의 paidRecords() 와 같은 규칙입니다. 그 사람 그 날짜에 '퇴근까지 찍힌' 기록이 하나라도 있으면
+-- 그것만 쓰고, 하나도 없을 때만 예전에 엑셀로 가져온 출근기계 기록을 씁니다.
+-- 둘 다 세면 하루치가 두 번 잡힙니다.
+punched_day as (
+  select distinct workspace, "employeeId", day from punch where out_min is not null
+),
+record as (
+  select workspace, "employeeId", day, 'punch' as src, status,
+         "in" as start_txt, "out" as end_txt, in_min, out_min, unpaid_min
+  from punch
+  union all
+  select a.workspace, a."employeeId", a.day, 'attendance', null,
+         a."start", a."end", a.start_min, a.end_min, a.unpaid_min
+  from att a
+  where not exists (select 1 from punched_day d
+                     where d.workspace = a.workspace and d."employeeId" = a."employeeId" and d.day = a.day)
+),
+actual as (
+  select workspace, "employeeId", day,
+         min(start_txt) as first_in,
+         min(in_min)    as in_min,
+         max(end_txt)   as last_out,
+         count(*) filter (where src = 'punch' and out_min is null)      as still_in,
+         count(*) filter (where src = 'punch' and status = 'disputed')  as disputed,
+         count(*) filter (where src = 'punch' and out_min is not null
+                            and coalesce(status, 'pending') not in ('approved', 'disputed')) as unconfirmed,
+         count(*) filter (where src = 'attendance')                     as from_excel,
+         -- 아직 퇴근을 안 찍었으면 0 시간(앱의 punchHours() 와 같습니다). 시각이 깨진 줄은 빈칸.
+         round(sum(case when in_min is null then null
+                        when out_min is null then 0
+                        else greatest(0, mod(out_min - in_min + 1440, 1440) - unpaid_min) / 60.0 end), 2) as hours
+  from record
+  group by workspace, "employeeId", day
 ),
 emp as (
   select w.id as workspace, e.*
@@ -498,21 +604,22 @@ emp as (
        jsonb_to_recordset(coalesce(w.state::jsonb -> 'employees', '[]'::jsonb))
          as e(id text, name text)
 )
-select coalesce(pl.workspace, ac.workspace)                          as workspace,
-       coalesce(pl.day, ac.day)                                      as day,
-       coalesce(e.name, coalesce(pl."employeeId", ac."employeeId"))   as name,
-       pl.first_start                                                as planned_in,
-       ac.first_in                                                   as actual_in,
-       ac.last_out                                                   as actual_out,
-       pl.hours                                                      as planned_hours,
-       ac.hours                                                      as actual_hours,
-       round(coalesce(ac.hours, 0) - coalesce(pl.hours, 0), 2)       as gap_hours,
-       greatest(0, ac.in_min - pl.start_min)                         as late_min,
-       case when ac."employeeId" is null then '결근(찍힘 없음)'
+select coalesce(pl.workspace, ac.workspace)                         as workspace,
+       coalesce(pl.day, ac.day)                                     as day,
+       coalesce(e.name, coalesce(pl."employeeId", ac."employeeId"))  as name,
+       pl.first_start                                               as planned_in,
+       ac.first_in                                                  as actual_in,
+       ac.last_out                                                  as actual_out,
+       pl.hours                                                     as planned_hours,
+       ac.hours                                                     as actual_hours,
+       round(coalesce(ac.hours, 0) - coalesce(pl.hours, 0), 2)      as gap_hours,
+       greatest(0, ac.in_min - pl.start_min)                        as late_min,
+       case when ac."employeeId" is null then '결근(기록 없음)'
             when pl."employeeId" is null then '예정 없는 출근'
+            when ac.still_in > 0          then '근무 중(퇴근 안 찍힘)'
             when ac.in_min > pl.start_min then '지각'
-            else '정상' end                                           as flag,
-       ac.still_in, ac.unconfirmed, ac.disputed
+            else '정상' end                                          as flag,
+       ac.still_in, ac.unconfirmed, ac.disputed, ac.from_excel
 from planned pl
 full join actual ac
   on ac.workspace = pl.workspace and ac."employeeId" = pl."employeeId" and ac.day = pl.day
@@ -527,6 +634,7 @@ order by workspace, day desc, name;
 -- ───────────────────────────────────────────────────────────────────────────
 -- 11. 짝이 안 맞는 데이터 · 고치기 전에 확인할 것들
 --     직원 목록에 없는 employeeId, 형식이 깨진 시각·날짜, 끝나지 않은 출퇴근.
+--     여기 나오는 줄은 위 조회들에서 계산에 끼지 못하고 빠집니다.
 -- ───────────────────────────────────────────────────────────────────────────
 with emp as (
   select w.id as workspace, e ->> 'id' as id, e ->> 'name' as name
@@ -555,7 +663,7 @@ select * from (
 
   select s.workspace, '시각이 HH:MM 이 아님', s.id, s."start" || ' / ' || s."end", s.date, ''
   from shift s
-  where s."start" !~ '^[0-2][0-9]:[0-5][0-9]$' or s."end" !~ '^[0-2][0-9]:[0-5][0-9]$'
+  where s."start" !~ '^\d{2}:\d{2}$' or s."end" !~ '^\d{2}:\d{2}$'
 
   union all
 
@@ -592,9 +700,10 @@ with swap as (
               "createdAt" text, bonus numeric)
 ),
 shift as (
-  select w.id as workspace, s ->> 'id' as id, (s ->> 'date')::date as day,
+  select w.id as workspace, s ->> 'id' as id,
          s ->> 'start' as "start", s ->> 'end' as "end", s ->> 'area' as area,
-         s ->> 'employeeId' as "employeeId"
+         s ->> 'employeeId' as "employeeId",
+         case when s ->> 'date' ~ '^\d{4}-\d{2}-\d{2}$' then (s ->> 'date')::date end as day
   from public.workspaces w,
        jsonb_array_elements(coalesce(w.state::jsonb -> 'shifts', '[]'::jsonb)) s
 ),

@@ -2,8 +2,9 @@
 // next/image 를 쓰지 않습니다. 방금 찍은 사진은 data URL 이라 서버에 보낼 것도 캐시할 것도 없습니다.
 // oxlint-disable next/no-img-element
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Camera, Coffee, Hourglass, LogOut } from 'lucide-react';
+import { Camera, Check, Coffee, Hourglass, LogOut } from 'lucide-react';
 import type { Employee, Punch, Shift } from '@/lib/domain';
+import { say } from './say';
 import { duration } from '@/lib/domain';
 import { useLang } from './use-lang';
 
@@ -17,7 +18,8 @@ const clock = (v: string) => {
 // 저장할 사진 크기. 얼굴을 알아볼 만하면서 기록이 무거워지지 않는 선입니다.
 const SHOT_WIDTH = 360;
 // 찍힌 사진을 화면에 크게 띄워 두는 시간. 이 뒤에는 다시 카메라가 보입니다.
-const REVIEW_MS = 3000;
+// 기록되었다는 말도 같은 시간만큼만 머뭅니다. 공용 단말은 이 시간이 지난 뒤에 다음 사람에게 넘어갑니다.
+export const REVIEW_MS = 3000;
 // 매장 시각(뉴욕)의 HH:MM. 찍히는 시각과 같은 기준이어야 '근무한 시간'이 어긋나지 않습니다.
 const hhmm = (d: Date) =>
   new Intl.DateTimeFormat('en-GB', {
@@ -51,7 +53,8 @@ export default function StaffClock({
     action: 'punchIn' | 'punchOut',
     photo: string,
     place?: { lat: number; lng: number; accuracy?: number },
-  ) => void;
+    // 서버가 받아 주었는지 돌려줍니다. 받아 준 것만 '기록했습니다' 라고 말합니다.
+  ) => void | Promise<boolean | void>;
   onBreak: (action: 'start' | 'end') => void;
 }) {
   const { t, locale } = useLang();
@@ -67,6 +70,9 @@ export default function StaffClock({
   // 방금 찍힌 사진. 누른 자리에서 잠깐 크게 보여 주고 다시 카메라로 돌아갑니다.
   const [review, setReview] = useState('');
   const reviewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 보내는 중인지, 무엇으로 남았는지. 찍힌 사진 위에 한 줄로 뜹니다.
+  const [saved, setSaved] = useState<'' | 'saving' | 'in' | 'out'>('');
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audio = useRef<AudioContext | null>(null);
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
@@ -125,22 +131,37 @@ export default function StaffClock({
   useEffect(
     () => () => {
       if (reviewTimer.current) clearTimeout(reviewTimer.current);
+      if (savedTimer.current) clearTimeout(savedTimer.current);
       void audio.current?.close().catch(() => 0);
       audio.current = null;
     },
     [],
   );
 
-  // 찰깍. 사진이 찍힌 순간을 소리로 알려 줍니다.
-  // 소리 파일을 받아 두지 않고 그 자리에서 만들어 냅니다 — 기기가 조용하면 소리도 나지 않습니다.
-  const shutter = () => {
+  // 소리 장치는 누른 그 자리에서 깨워 둡니다.
+  // 말하기가 실패해 뒤늦게 찰깍으로 돌아갈 때는 이미 누른 손가락과 이어지지 않아,
+  // 그 자리에서 열어 두지 않으면 장치를 새로 열지 못하는 기기가 있습니다.
+  const wake = () => {
     try {
       const Maker =
         window.AudioContext ??
         (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (!Maker) return;
+      if (!Maker) return null;
       const ctx = (audio.current ??= new Maker());
       void ctx.resume().catch(() => 0);
+      return ctx;
+    } catch {
+      audio.current = null;
+      return null;
+    }
+  };
+
+  // 찰깍. 사진이 찍힌 순간을 소리로 알려 줍니다.
+  // 소리 파일을 받아 두지 않고 그 자리에서 만들어 냅니다 — 기기가 조용하면 소리도 나지 않습니다.
+  const click = () => {
+    try {
+      const ctx = wake();
+      if (!ctx) return;
       // 짧게 터졌다 바로 잦아드는 소리. 셔터가 열리고 닫히는 두 번입니다.
       const tick = (at: number, loud: number) => {
         const length = Math.round(ctx.sampleRate * 0.03);
@@ -166,6 +187,12 @@ export default function StaffClock({
       // 소리를 내지 못해도 사진과 기록은 그대로입니다. 다음 번에 다시 만들어 봅니다.
       audio.current = null;
     }
+  };
+
+  // 찍힌 순간을 사람 말로 알려 줍니다. 읽어 줄 목소리가 없는 기기에서는 예전 찰깍 소리가 납니다.
+  const shutter = () => {
+    wake();
+    say('pelham', click);
   };
 
   // 지금 보이는 화면을 한 장 잡습니다. 까맣거나 가려져 있으면 사진으로 치지 않습니다.
@@ -234,8 +261,11 @@ export default function StaffClock({
     // 아래 await 를 지나고 나면 누른 손가락과 이어지지 않아 소리가 나지 않는 기기가 있습니다.
     shutter();
     if (reviewTimer.current) clearTimeout(reviewTimer.current);
+    if (savedTimer.current) clearTimeout(savedTimer.current);
     setReview(taken.photo);
+    // 사진은 찍힌 순간부터 3초입니다. 저장이 늦어도 화면이 사진에 붙들려 있지 않습니다.
     reviewTimer.current = setTimeout(() => setReview(''), REVIEW_MS);
+    setSaved('saving');
     // 자리는 근무지를 지정하지 않은 곳에서도 기록에 남깁니다.
     // 다만 '그 자리에서만 찍을 수 있게' 막는 것은 근무지를 지정한 곳에서만입니다.
     let place: { lat: number; lng: number; accuracy?: number } | undefined = spot ?? undefined;
@@ -246,13 +276,22 @@ export default function StaffClock({
         place = (await locate()) ?? undefined;
       }
       if (!place) {
+        setSaved('');
         setProblem('위치를 확인하지 못했습니다. 위치 권한을 허용하고 다시 눌러주세요.');
         return;
       }
     }
     setProblem('');
     setShot(taken.photo);
-    onPunch(action, taken.photo, place);
+    // 서버가 받아 준 뒤에야 기록되었다고 말합니다. 보내다 실패하면 이 말은 나오지 않고 아래 줄에 까닭이 뜹니다.
+    const kept = await onPunch(action, taken.photo, place);
+    if (savedTimer.current) clearTimeout(savedTimer.current);
+    if (kept === false) {
+      setSaved('');
+      return;
+    }
+    setSaved(action === 'punchIn' ? 'in' : 'out');
+    savedTimer.current = setTimeout(() => setSaved(''), REVIEW_MS);
   };
 
   const working = punch && !punch.out ? punch : undefined;
@@ -333,6 +372,23 @@ export default function StaffClock({
                 : t('카메라를 켜는 중입니다…')}
             </p>
           )}
+          {/* 보낸 결과. 얼굴을 가리지 않게 사진 아래쪽에 한 줄로 얹습니다.
+              읽어 주는 것은 화면 아래 알림 줄이 맡습니다 — 같은 말을 두 번 읽지 않습니다. */}
+          {saved && (
+            <span
+              className={'stclock-saved' + (saved === 'saving' ? '' : ' done')}
+              aria-hidden="true"
+            >
+              {saved !== 'saving' && <Check size={16} />}
+              {t(
+                saved === 'saving'
+                  ? '저장 중…'
+                  : saved === 'in'
+                    ? '출근을 기록했습니다.'
+                    : '퇴근을 기록했습니다.',
+              )}
+            </span>
+          )}
         </div>
         <p className="stclock-camnote">{t('출근·퇴근은 사진이 찍혀야 기록됩니다.')}</p>
         <h3>{t('지금 근무')}</h3>
@@ -363,24 +419,34 @@ export default function StaffClock({
             {t(problem)}
           </p>
         )}
+        {/* 찍힌 사진이 떠 있는 동안에는 버튼을 잠급니다.
+            앞사람 화면이 아직 남아 있는 3초 사이에 뒷사람이 눌러 버리는 일을 막습니다. */}
         <div className="stclock-actions">
         {working ? (
           <>
             <button
               className="stclock-break"
-              disabled={busy}
+              disabled={busy || !!saved}
               onClick={() => onBreak(onBreakNow ? 'end' : 'start')}
             >
               <Coffee size={19} />
               {onBreakNow ? t('휴게 끝내기') : t('유급 휴게 시작')}
             </button>
-            <button className="stclock-end" disabled={busy} onClick={() => void press('punchOut')}>
+            <button
+              className="stclock-end"
+              disabled={busy || !!saved}
+              onClick={() => void press('punchOut')}
+            >
               {t('endshift::퇴근 찍기')}
               <LogOut size={20} />
             </button>
           </>
         ) : (
-          <button className="stclock-start" disabled={busy} onClick={() => void press('punchIn')}>
+          <button
+            className="stclock-start"
+            disabled={busy || !!saved}
+            onClick={() => void press('punchIn')}
+          >
             <Camera size={20} />
             {t('start::출근 찍기')}
           </button>

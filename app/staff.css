@@ -505,6 +505,33 @@
   object-fit: cover;
   transform: none;
 }
+/* 보낸 결과 한 줄. 사진 위에 얹히지만 아래쪽에 두어 얼굴을 가리지 않습니다. */
+.stclock-cam .stclock-saved {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  max-width: calc(100% - 24px);
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(29, 33, 38, .82);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  animation: stclock-saved-in .18s ease-out;
+}
+.stclock-cam .stclock-saved.done { background: rgba(8, 126, 109, .94); }
+@keyframes stclock-saved-in {
+  from { opacity: 0; transform: translate(-50%, 6px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stclock-cam .stclock-saved { animation: none; }
+}
 .stclock-cam p {
   position: absolute;
   inset: 0;

@@ -7,7 +7,7 @@ import { LOCATION, localDate, seed, type State } from '@/lib/domain';
 import { pushOn, relangPush, subscribePush } from '@/lib/push-client';
 import { useLang } from './use-lang';
 import GpsGuard, { useGps } from './gps-guard';
-import StaffClock from './staff-clock';
+import StaffClock, { REVIEW_MS } from './staff-clock';
 import BirthLogin from './birth-login';
 import LoginQr from './login-qr';
 
@@ -236,8 +236,10 @@ export default function PunchApp() {
                 const mine = (next.punches ?? []).filter((x) => x.employeeId === chosen.id).at(-1);
                 if (mine) void savePunchPhoto(mine.id, action === 'punchIn' ? 'in' : 'out', photo);
                 // 공용 단말은 다음 사람을 위해 비워 둡니다.
-                if (!me) { setWho(''); setCode(''); }
+                // 찍힌 사진과 기록했다는 말을 다 보고 나서 넘어갑니다 — 곧바로 비우면 둘 다 못 봅니다.
+                if (!me) setTimeout(() => { setWho(''); setCode(''); }, REVIEW_MS);
               }
+              return !!next;
             }}
             onBreak={(action) =>
               void command('punchBreak', { employeeId: chosen.id, action, paid: '1' })

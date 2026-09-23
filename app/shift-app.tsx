@@ -87,6 +87,7 @@ import {
   payPeriodStart,
   DEFAULT_WORKPLACE_RADIUS,
   LOCATION,
+  WEATHER_SPOT,
   AREAS,
   SHIFT_AREAS,
   type Employee,
@@ -111,6 +112,7 @@ import StaffSchedule from './staff-schedule';
 import StaffMessaging from './staff-messaging';
 import StaffTimesheets from './staff-timesheets';
 import StaffClock from './staff-clock';
+import { say } from './say';
 import StaffMore, { type MoreItem } from './staff-more';
 import TimePicker from './time-picker';
 import GpsGuard, { useGps } from './gps-guard';
@@ -237,12 +239,13 @@ export default function ShiftApp() {
   const [offFilter, setOffFilter] = useState('pending');
   // 폰에서는 주간 표 대신 날짜별 목록을 그립니다. 첫 렌더는 서버와 같게 데스크톱으로 두고 마운트 뒤 바뀝니다.
   const phone = useIsMobile();
-  const [schedFilters, setSchedFilters] = useState(false);
   // 폰에서는 팀이 목록과 한 사람 화면으로 갈립니다. 빈 값이면 목록입니다.
   const [teamPick, setTeamPick] = useState('');
   const [inapp, setInapp] = useState<Message | null>(null);
   const [payDetail, setPayDetail] = useState('');
   const seenMessages = useRef<Set<string>>(new Set());
+  // 앱을 연 시각. 열기 전부터 쌓여 있던 메시지와 방금 온 메시지를 가릅니다.
+  const bootedAt = useRef('');
   const chooseLayout = (next: Layout) => {
     setUi(next);
     try {
@@ -685,10 +688,15 @@ export default function ShiftApp() {
   const unreadKey = unread.map((m) => m.id).join(',');
   // 앱을 열어 둔 동안 새 메시지가 오면 화면 안에 알림을 띄웁니다. 기기 푸시가 꺼져 있어도 보입니다.
   useEffect(() => {
+    const booted = (bootedAt.current ||= new Date().toISOString());
     const fresh = unread.filter((m) => !seenMessages.current.has(m.id));
     if (!fresh.length) return;
     for (const m of fresh) seenMessages.current.add(m.id);
     setInapp(fresh[fresh.length - 1]);
+    // 방금 온 메시지에만 한 마디 읽어 줍니다. 화면을 안 보고 있어도 새 메시지가 온 것을 압니다.
+    // 열기 전부터 안 읽은 채 쌓여 있던 것까지 읽으면 앱을 열 때마다 소리가 나서, 그건 배너만 띄웁니다.
+    // 아이폰은 앱을 연 뒤 아직 아무 곳도 누르지 않았으면 소리가 막힐 수 있습니다.
+    if (fresh.some((m) => m.createdAt > booted)) say('pelham');
   }, [unreadKey]);
   // 설치한 앱 아이콘(배지), 브라우저 탭 제목과 파비콘에도 안 읽은 개수를 올립니다.
   useEffect(() => {
@@ -709,8 +717,22 @@ export default function ShiftApp() {
       clearAppBadge?: () => Promise<void>;
     };
     // 홈 화면·작업 표시줄에 설치했을 때만 동작하고, 지원하지 않는 브라우저에서는 조용히 넘어갑니다.
-    if (count) void badge.setAppBadge?.(count).catch(() => 0);
-    else void badge.clearAppBadge?.().catch(() => 0);
+    // 앱을 닫아 둔 동안에는 서비스 워커가 푸시마다 숫자를 올립니다.
+    // 화면이 열려 있는 동안에는 여기 개수가 맞으니, 0 일 때도 그 값을 보내 워커가 센 값을 맞춰 둡니다.
+    const sync = () => {
+      if (count) void badge.setAppBadge?.(count).catch(() => 0);
+      else void badge.clearAppBadge?.().catch(() => 0);
+      void navigator.serviceWorker
+        ?.getRegistration()
+        .then((reg) => (reg?.active ?? navigator.serviceWorker.controller)?.postMessage({ type: 'badge', count }))
+        .catch(() => 0);
+    };
+    sync();
+    // 알림을 받고 앱으로 돌아온 순간에도 맞춥니다. 안 읽은 글이 없으면 그때 숫자가 사라집니다.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') sync();
+    };
+    document.addEventListener('visibilitychange', onVisible);
     const paint = (href: string) => {
       let link = document.querySelector<HTMLLinkElement>('link[data-unread-icon]');
       if (!link) {
@@ -721,9 +743,13 @@ export default function ShiftApp() {
       }
       link.href = href;
     };
+    const stop = () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      watcher.disconnect();
+    };
     if (!count) {
       paint(self.icon);
-      return () => watcher.disconnect();
+      return stop;
     }
     let live = true;
     const icon = new Image();
@@ -751,7 +777,7 @@ export default function ShiftApp() {
     };
     return () => {
       live = false;
-      watcher.disconnect();
+      stop();
     };
   }, [unread.length, t]);
   // 기호로 쓰면 CAD 와 USD 가 똑같이 $ 로 보입니다. 어느 나라 돈인지 드러나게 통화 코드로 적습니다.
@@ -3417,6 +3443,18 @@ export default function ShiftApp() {
     if (tab === 'timesheets' && sheet) setSheet('');
     else setTab('more');
   };
+  // 날씨를 물어볼 자리. 출퇴근 반경을 잡아 둔 워크스페이스는 그 좌표가 곧 근무지입니다.
+  const weatherSpot: { lat: number; lng: number } | null = data.workplace
+    ? { lat: data.workplace.lat, lng: data.workplace.lng }
+    : WEATHER_SPOT;
+  // 우천 근무 종료 공지. 데스크톱 머리줄과 폰 날씨 칸이 같은 내용을 엽니다.
+  const rainNotice = () =>
+    open('rain', {
+      date: localDate(new Date()),
+      end: '15:00',
+      body: t('안전하게 장비를 정리하고 퇴근 기록을 남겨주세요.'),
+      targets: staff.map((e) => e.id).join(','),
+    });
   const schedActionsNode = actor.admin ? (
                     <div className="sched-actions">
                       <button
@@ -3465,14 +3503,7 @@ export default function ShiftApp() {
                       className="button toolbutton"
                       title={t('우천 근무 종료')}
                       aria-label={t('우천 근무 종료')}
-                      onClick={() =>
-                        open('rain', {
-                          date: localDate(new Date()),
-                          end: '15:00',
-                          body: t('안전하게 장비를 정리하고 퇴근 기록을 남겨주세요.'),
-                          targets: staff.map((e) => e.id).join(','),
-                        })
-                      }
+                      onClick={rainNotice}
                     >
                       <CloudRain size={18} />
                     </button>
@@ -3732,13 +3763,13 @@ export default function ShiftApp() {
                     availability={availability}
                     location="Pelham Hills Golf Club"
                     canEdit={!staffReadOnly}
-                    filtersOpen={schedFilters}
-                    filters={schedFiltersNode}
+                    spot={weatherSpot}
                     actions={schedActionsNode}
                     blockedOf={(shift) => blockedBy(data, shift)}
                     onWeekChange={setWeek}
                     onDayChange={setDay}
                     onShiftSelect={(id) => open('detail', { id })}
+                    onRainNotice={actor.admin ? rainNotice : undefined}
                     onAddShift={(date) =>
                       open('shift', {
                         employeeId: filter === 'all' ? '' : filter,
@@ -3749,7 +3780,6 @@ export default function ShiftApp() {
                         note: '',
                       })
                     }
-                    onToggleFilters={() => setSchedFilters((v) => !v)}
                     onOpenTimeOff={() => setTab('timeoff')}
                     onOpenAvailability={() => setTab('availability')}
                   />
@@ -4132,6 +4162,7 @@ export default function ShiftApp() {
                     if (mine)
                       void savePunchPhoto(mine.id, action === 'punchIn' ? 'in' : 'out', photo);
                   }
+                  return !!next;
                 }}
                 onBreak={(action) => void command('punchBreak', { action, paid: '1' })}
               />

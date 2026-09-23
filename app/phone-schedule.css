@@ -89,7 +89,7 @@
 .psched-chip.on small,
 .psched-chip.on b { color: #fff; }
 
-/* 근무지와 보기 설정 */
+/* 근무지와 날씨 */
 .psched-place {
   display: flex;
   align-items: center;
@@ -106,7 +106,7 @@
   min-width: 0;
   white-space: nowrap;
 }
-.psched-filter {
+.psched-sky {
   display: grid;
   place-items: center;
   width: 40px;
@@ -117,16 +117,7 @@
   background: none;
   color: #1f2b2e;
 }
-.psched-filter.on { background: #e8f2ef; color: #087e6d; }
-.psched .sched-filters {
-  margin: 0;
-  padding: 12px 14px;
-  background: #fff;
-  border-bottom: 1px solid var(--line);
-}
-.psched .sched-filters .field,
-.psched .sched-filters .button,
-.psched .sched-filters .filterpick { flex: 1 1 calc(50% - 5px); min-width: 0; }
+.psched-sky.on { background: #e8f2ef; color: #087e6d; }
 
 /* 하루 묶음 */
 .psched-dayhead {

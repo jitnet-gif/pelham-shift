@@ -88,6 +88,35 @@ const en: Record<string, string> = {
   '스케줄부터 실제 근무시간까지, 같은 기록으로 연결합니다.':
     'From the schedule to actual hours worked, all in one record.',
   '우천 근무 종료': 'Rain closure',
+  // 스케줄 화면의 날씨 칸
+  '날씨': 'Weather',
+  '날씨와 일출·일몰': 'Weather, sunrise and sunset',
+  '일출': 'Sunrise',
+  '일몰': 'Sunset',
+  '낮 길이': 'Daylight',
+  '최고 · 최저': 'High · low',
+  '강수 확률': 'Chance of rain',
+  '바람': 'Wind',
+  '체감': 'Feels like',
+  '날씨를 불러오는 중입니다.': 'Loading the weather…',
+  '날씨를 불러오지 못했습니다.': 'The weather could not be loaded.',
+  '다시 시도': 'Try again',
+  '이 날짜는 예보 범위를 벗어났습니다.': 'This date is outside the forecast range.',
+  '근무지 좌표가 없어 날씨를 불러올 수 없습니다. 출퇴근 반경을 먼저 설정해주세요.':
+    'The weather needs the workplace coordinates. Set the check-in radius first.',
+  '맑음': 'Clear',
+  '대체로 맑음': 'Mostly clear',
+  '구름 조금': 'Partly cloudy',
+  '흐림': 'Overcast',
+  '안개': 'Fog',
+  '이슬비': 'Drizzle',
+  '비': 'Rain',
+  '눈': 'Snow',
+  '소나기': 'Showers',
+  '진눈깨비': 'Sleet',
+  '뇌우': 'Thunderstorms',
+  '우박을 동반한 뇌우': 'Thunderstorms with hail',
+  '날씨 정보 없음': 'No weather reading',
   '안전하게 장비를 정리하고 퇴근 기록을 남겨주세요.':
     'Please put the equipment away safely and check out.',
   '샘플 미리보기 · 실제 운영을 시작하면 샘플 일정은 비워집니다.':
@@ -727,7 +756,6 @@ const en: Record<string, string> = {
   '배정': 'Assignment',
   '변경': 'Change',
   '{money} / 시간': '{money} / hour',
-  '출근기계 ID': 'Time clock ID',
   '직원은 로그인 화면에서 본인 직원 ID 를 쳐서 들어옵니다. 처음 비밀번호도 본인 직원 ID 이고, 직원이 직접 바꿉니다.':
     'Staff sign in by typing their own employee ID on the login screen. That same ID is also the first password, and they change it themselves.',
   '직원 삭제': 'Remove employee',
@@ -827,6 +855,8 @@ const en: Record<string, string> = {
   '일정이 없어도 찍을 수 있습니다.': 'You can still check in.',
   '출근·퇴근은 사진이 찍혀야 기록됩니다.': 'A photo is required to check in or out.',
   '방금 찍은 사진': 'The photo just taken',
+  '출근을 기록했습니다.': 'Checked in.',
+  '퇴근을 기록했습니다.': 'Checked out.',
   '카메라를 켜는 중입니다…': 'Starting the camera…',
   '카메라를 켤 수 없습니다. 기기 설정에서 카메라 권한을 허용해 주세요.':
     'The camera is not available. Allow camera access in this device’s settings.',
