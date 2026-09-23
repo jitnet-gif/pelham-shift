@@ -89,6 +89,9 @@ import {
   LOCATION,
   TIME_ZONE,
   areaList,
+  roleList,
+  roleLabel,
+  hasRole,
   workplaceOf,
   type Employee,
   type Message,
@@ -687,16 +690,20 @@ export default function ShiftApp() {
   const swappable = data.shifts.filter(
     (s) => canSwap(s.date) && (actor.admin || s.employeeId === actor.id) && !s.originalId,
   );
-  const roles = [...new Set(staff.map((e) => e.role))].sort((a, b) =>
+  // 겸직하는 사람이 있어 직군은 사람 수보다 많을 수 있습니다 — 맡은 직군을 모두 펼쳐 모읍니다.
+  const roles = [...new Set(staff.flatMap((e) => roleList(e)))].sort((a, b) =>
     a.localeCompare(b),
   );
   // 고를 수 있는 업무. 작업 화면에서 늘린 목록이 있으면 그것이고, 없으면 기본 두 가지입니다.
   const areas = areaList(data);
+  // 명단에서 그 사람이 설 자리. 업무를 좁혀 보면 그 업무 아래, 전체로 보면 기본 업무 아래 한 번만 섭니다.
+  const bandOf = (e: Employee) =>
+    dept === 'all' ? roleList(e)[0] || '' : hasRole(e, dept) ? dept : '';
   const visibleEmployees = staff
     .filter(
       (e) =>
         (filter === 'all' || e.id === filter) &&
-        (dept === 'all' || e.role === dept) &&
+        (dept === 'all' || hasRole(e, dept)) &&
         e.name.toLowerCase().includes(search.trim().toLowerCase()),
     )
     .sort((a, b) =>
@@ -1017,6 +1024,45 @@ export default function ShiftApp() {
       />
     );
   };
+  // 직군은 겸할 수 있습니다 — Proshop 과 Workshop 을 함께 뛰는 사람은 둘 다 켜 둡니다.
+  // 먼저 고른 업무가 기본 업무가 되어, 새 근무와 출퇴근 기록에 장소로 적힙니다.
+  const rolePick = () => {
+    const picked = (form.roles ?? form.role ?? '')
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean);
+    // 예전에 저장된 업무가 목록에서 빠졌을 수 있어, 그 값도 선택지에 함께 둡니다.
+    const list = [...areas, ...picked.filter((role) => !areas.includes(role))];
+    const toggle = (role: string, on: boolean) => {
+      const next = on ? [...picked, role] : picked.filter((r) => r !== role);
+      put('roles', next.join(','));
+      put('role', next[0] ?? '');
+    };
+    return (
+      <fieldset className="recipients">
+        <legend>{t('업무 (겸직이면 여러 개를 고릅니다)')}</legend>
+        <div className="recipientlist">
+          {list.map((role) => (
+            <label className="recipient" key={role}>
+              <Checkbox
+                checked={picked.includes(role)}
+                onCheckedChange={(on) => toggle(role, on === true)}
+              />
+              {role}
+            </label>
+          ))}
+        </div>
+        <p className="hint">
+          {picked.length > 1
+            ? t('{roles} 를 함께 맡습니다. 먼저 고른 {main} 이 새 근무의 기본 업무가 됩니다.', {
+                roles: picked.join(' · '),
+                main: picked[0],
+              })
+            : t('여러 업무를 겸하면 함께 고르세요. 먼저 고른 업무가 새 근무의 기본이 됩니다.')}
+        </p>
+      </fieldset>
+    );
+  };
   const rainTargets = (form.targets || '').split(',').filter(Boolean);
   const rainAll =
     staff.length > 0 && staff.every((e) => rainTargets.includes(e.id));
@@ -1091,7 +1137,7 @@ export default function ShiftApp() {
       '"' + (/^[=+@-]/.test(v) ? "'" : '') + v.replaceAll('"', '""') + '"';
     const csv = [
       ['이름', '직원 ID', '업무'].map((h) => t(h)),
-      ...staff.map((e) => [e.name, e.punchId || t('미등록'), e.role]),
+      ...staff.map((e) => [e.name, e.punchId || t('미등록'), roleLabel(e)]),
     ]
       .map((r) => r.map((v) => safe(String(v))).join(','))
       .join('\r\n');
@@ -2064,12 +2110,14 @@ export default function ShiftApp() {
                     rate: '0',
                     color: '#087e6d',
                     role: areas[0],
+                    roles: areas[0],
                   })
                 }
                 onEdit={(e) =>
                   open('employee', {
                     ...e,
                     rate: String(e.rate),
+                    roles: roleList(e).join(','),
                     taskManager: e.taskManager ? '1' : '',
                     admin: e.admin ? '1' : '',
                     archived: e.archived ? '1' : '',
@@ -2096,6 +2144,7 @@ export default function ShiftApp() {
                       rate: '0',
                       color: '#087e6d',
                       role: areas[0],
+                      roles: areas[0],
                     })
                   }
                 >
@@ -2242,7 +2291,7 @@ export default function ShiftApp() {
                         {e.punchId || <span className="muted">{t('미등록')}</span>}
                       </TableCell>
                       <TableCell>
-                        {e.role}
+                        {roleLabel(e)}
                         {e.admin && (
                           <span className="badge taskbadge">{t('관리자')}</span>
                         )}
@@ -2261,6 +2310,7 @@ export default function ShiftApp() {
                             open('employee', {
                               ...e,
                               rate: String(e.rate),
+                              roles: roleList(e).join(','),
                               taskManager: e.taskManager ? '1' : '',
                               admin: e.admin ? '1' : '',
                               archived: e.archived ? '1' : '',
@@ -2315,7 +2365,7 @@ export default function ShiftApp() {
                             <TableCell>
                               {e.punchId || <span className="muted">{t('미등록')}</span>}
                             </TableCell>
-                            <TableCell>{e.role}</TableCell>
+                            <TableCell>{roleLabel(e)}</TableCell>
                             <TableCell>{e.email || t('미등록')}</TableCell>
                             <TableCell>
                               <button
@@ -2726,7 +2776,7 @@ export default function ShiftApp() {
                     'number',
                   )}
                 </div>
-                {areaPick('role', t('업무'))}
+                {rolePick()}
                 <label className="recipient all">
                   <Checkbox
                     checked={form.admin === '1'}
@@ -3306,7 +3356,7 @@ export default function ShiftApp() {
                       <div className="gridrow" key={e.id}>
                         <div className="staff">
                           {box(e)}
-                          <small>{e.role}</small>
+                          <small>{roleLabel(e)}</small>
                         </div>
                         {days.map((_, d) => {
                           const shifts = data.shifts.filter(
@@ -3961,6 +4011,7 @@ export default function ShiftApp() {
                                   rate: '0',
                                   color: '#087e6d',
                                   role: dept === 'all' ? areas[0] : dept,
+                                  roles: dept === 'all' ? areas[0] : dept,
                                 })
                               }
                             >
@@ -3992,10 +4043,11 @@ export default function ShiftApp() {
                           </div>
                         ))}
                         <div className="roster-location">Pelham Hills</div>
-                        {roles
-                          .filter((role) => visibleEmployees.some((e) => e.role === role))
+                        {/* 한 사람은 한 번만 섭니다 — 겸직자는 기본 업무 아래 두고, 업무를 좁혀 보면 그 업무 자리에 나타납니다. */}
+                        {(dept === 'all' ? roles : [dept])
+                          .filter((role) => visibleEmployees.some((e) => bandOf(e) === role))
                           .map((role) => {
-                            const members = visibleEmployees.filter((e) => e.role === role);
+                            const members = visibleEmployees.filter((e) => bandOf(e) === role);
                             return (
                               <div className="roster-group" key={role}>
                                 <div className="roster-band">

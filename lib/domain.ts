@@ -1,6 +1,8 @@
 // admin: 직원이면서 관리자 권한을 가진 사람. archived: 삭제한 직원 — 지난 기록을 위해 데이터에는 남기고 화면 목록에서만 감춥니다.
 // 흔적까지 지우는 쪽은 employeePurge 입니다 — 그 사람의 근무·출퇴근·급여·작업·메시지가 함께 사라지고 되돌릴 수 없습니다.
-export type Employee = {id:string;name:string;color:string;role:string;rate:number;email:string;birthDate:string;phone?:string;punchId?:string;taskManager?:boolean;admin?:boolean;archived?:boolean};
+// roles: 그 사람이 맡은 직군 전부. Proshop 과 Workshop 을 함께 맡는 멀티 플레이어를 위해 둡니다.
+// role: 그중 첫째 직군. 근무와 출퇴근은 장소를 하나만 적기에, 비워 둔 자리를 이 값으로 채웁니다.
+export type Employee = {id:string;name:string;color:string;role:string;roles?:string[];rate:number;email:string;birthDate:string;phone?:string;punchId?:string;taskManager?:boolean;admin?:boolean;archived?:boolean};
 // draft: 새로 넣은 근무는 직원에게 공개하기 전까지 Unpublished 딱지를 답니다. publish 하면 지워집니다.
 export type Shift = {id:string;employeeId:string;date:string;start:string;end:string;area:string;note?:string;breakMinutes?:number;originalId?:string;draft?:boolean};
 export type Swap = {id:string;shiftId:string;from:string;to:string;status:'requested'|'accepted'|'approved'|'rejected';createdAt:string;bonus:number};
@@ -128,6 +130,14 @@ export const AREAS=['Proshop','Workshop'] as const;
 // 예전에 다른 이름으로 저장된 근무는 그 값을 그대로 유지하고, 그 근무를 열었을 때만 선택지에 함께 보입니다.
 export const MAX_AREAS=40;
 export function areaList(state:{areas?:string[]}):string[]{return state.areas?.length?state.areas:[...AREAS]}
+// 한 사람이 맡은 직군 목록. roles 를 아직 저장하지 않은 예전 직원은 role 한 줄만 맡은 것으로 봅니다.
+export type Roled = {role:string;roles?:string[]};
+export function roleList(e:Roled):string[]{return e.roles?.length?e.roles:(e.role?[e.role]:[])}
+// 화면에 적는 직군. 둘 다 맡은 사람은 'Proshop · Workshop' 처럼 나란히 보입니다.
+export const roleLabel=(e:Roled)=>roleList(e).join(' · ');
+export const hasRole=(e:Roled,area:string)=>roleList(e).includes(area);
+// 한 직군만 맡은 사람과 구분해 표시할 때 씁니다.
+export const isMultiRole=(e:Roled)=>roleList(e).length>1;
 export function seed():State{const names=['Josh','Grace','Claudio','Francis','James','Karen','Dylan','Dustin','Sam'];const colors=['#5579cf','#c48537','#20a69a','#9864c3','#e17b57','#5c9d61','#d26395','#628597','#a89643'];const employees=names.map((name,i)=>({id:'E'+String(i+1).padStart(3,'0'),name,color:colors[i],role:AREAS[i%AREAS.length],rate:0,email:'',birthDate:'',phone:'',punchId:String(1001+i)}));const week=weekStart(localDate(new Date()));const shifts:Shift[]=[];for(let d=0;d<7;d++) employees.forEach((e,i)=>{if((i+d)%4!==1) shifts.push({id:`s${d}-${i}`,employeeId:e.id,date:addDays(week,d),start:i%3===0?'10:00':i%3===1?'06:00':'12:00',end:i%3===0?'18:00':i%3===1?'14:00':'20:00',area:e.role})});
  // 지난 두 급여 기간과 이번 기간의 출퇴근 기록. 지난 기간은 이미 확인이 끝나 닫혀 있습니다.
  const today=localDate(new Date());const start=addDays(payPeriodStart(today),-2*PAY_PERIOD_DAYS);const punches:Punch[]=[];

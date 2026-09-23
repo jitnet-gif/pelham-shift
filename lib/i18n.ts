@@ -511,6 +511,13 @@ const en: Record<string, string> = {
   '업무 추가': 'Add job',
   '이미 있는 업무입니다.': 'That job is already on the list.',
   '업무는 40개까지 만들 수 있습니다.': 'You can keep up to 40 jobs.',
+  // 한 사람이 여러 업무를 겸할 수 있습니다 — Proshop 과 Workshop 을 함께 뛰는 멀티 플레이어.
+  '업무 (겸직이면 여러 개를 고릅니다)': 'Roles (tick more than one for staff who cover both)',
+  '여러 업무를 겸하면 함께 고르세요. 먼저 고른 업무가 새 근무의 기본이 됩니다.':
+    'Tick every role this person covers. The first one is the default on their new shifts.',
+  '{roles} 를 함께 맡습니다. 먼저 고른 {main} 이 새 근무의 기본 업무가 됩니다.':
+    'Covers {roles}. {main} was picked first, so it is the default on their new shifts.',
+  '업무를 하나 이상 고르세요.': 'Pick at least one role.',
   '대체근무 신청': 'Request a swap',
   '대체근무 승인': 'Approve swap',
   '근무 상세': 'Shift details',

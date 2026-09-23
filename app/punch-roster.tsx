@@ -8,6 +8,7 @@ import {
   payPeriodStart,
   periodOpen,
   punchHours,
+  roleLabel,
 } from '@/lib/domain';
 import { useLang } from './use-lang';
 
@@ -64,7 +65,7 @@ export function PunchRoster({
             <span className="punchroster-name">
               <i style={{ background: e.color }} />
               <b>{e.name}</b>
-              {e.role && <small>{e.role}</small>}
+              {roleLabel(e) && <small>{roleLabel(e)}</small>}
               {e.archived && <small className="punchroster-gone">{t('퇴사')}</small>}
             </span>
             <span className="punchroster-stat">
@@ -130,7 +131,7 @@ export function PunchPeriodBar({
         <span className="punchperiod-who">
           <i style={{ background: employee?.color }} />
           <b>{employee?.name ?? t('관리자')}</b>
-          {employee?.role && <small>{employee.role}</small>}
+          {employee && roleLabel(employee) && <small>{roleLabel(employee)}</small>}
         </span>
       </div>
       <div className="punchperiod-nav">

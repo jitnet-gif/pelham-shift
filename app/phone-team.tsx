@@ -12,6 +12,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import type { Employee } from '@/lib/domain';
+import { roleLabel } from '@/lib/domain';
 import { useLang } from './use-lang';
 
 // 폰에서 보는 팀. 표를 옆으로 미는 대신 이름 목록과 한 사람 화면으로 나눕니다.
@@ -122,7 +123,7 @@ export default function PhoneTeam({
               {person.role.slice(0, 1).toUpperCase()}
             </i>
             <span>
-              <b>{person.role}</b>
+              <b>{roleLabel(person)}</b>
               <small>{location}</small>
             </span>
             <ChevronRight size={18} />
