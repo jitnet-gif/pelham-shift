@@ -488,6 +488,14 @@ const en: Record<string, string> = {
     "When this is on, the employee signs in to the admin screens with their own password. They can see and change the schedule, payroll and staff records, which includes every employee's birth date, phone number and hourly rate.",
   '{name} 직원을 삭제할까요? 지난 근무·급여 기록은 그대로 남고 목록에서만 사라집니다.':
     'Remove {name}? Their past shifts and payroll records stay as they are; they only disappear from the lists.',
+  // 감추는 삭제와 달리 이쪽은 정말로 지웁니다. 되돌릴 수 없다는 말을 먼저 둡니다.
+  '{name} 직원을 완전히 삭제합니다. 지난 근무·출퇴근·급여·작업·메시지 기록이 함께 지워지고 되돌릴 수 없습니다. 계속하려면 이름을 그대로 입력하세요.':
+    'Delete {name} for good. Their shifts, check-ins, payroll, tasks and messages go with them, and this cannot be undone. Type their name exactly to continue.',
+  '이름이 맞지 않아 삭제하지 않았습니다.': 'That name did not match, so nothing was deleted.',
+  '완전 삭제': 'Delete for good',
+  '보관된 직원': 'Archived staff',
+  '삭제해 목록에서 감춘 직원입니다. 지난 근무·급여 기록은 아직 남아 있습니다.':
+    'Staff you removed from the lists. Their past shifts and payroll records are still here.',
   '본인 계정은 삭제할 수 없습니다.': 'You cannot remove your own account.',
   '작업 지시 권한': 'Can assign tasks',
   '켜면 이 직원이 작업 수신함에서 다른 직원에게 작업을 보내고 전체 작업 진행 상황을 볼 수 있습니다. 스케줄·급여·직원 정보는 계속 읽기 전용입니다.':

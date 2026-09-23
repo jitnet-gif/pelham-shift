@@ -320,3 +320,14 @@
   font-weight: 600;
 }
 .pteam-remove:active { background: #fbf1ed; }
+
+/* 감추는 삭제와 지우는 삭제를 나란히 둡니다. 아래쪽 완전 삭제만 붉게 채워 되돌릴 수 없음을 알립니다. */
+.pteam-danger { display: flex; flex-direction: column; }
+.pteam-danger .pteam-remove { margin: 18px 16px 0; }
+.pteam-danger .pteam-remove:last-child { margin-bottom: 24px; }
+.pteam-remove.hard {
+  border-color: #b4543a;
+  background: #b4543a;
+  color: #fff;
+}
+.pteam-remove.hard:active { background: #9a4630; }

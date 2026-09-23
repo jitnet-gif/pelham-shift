@@ -12,11 +12,11 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
  const spotOf=(v:Record<string,unknown>)=>{const lat=Number(v.lat),lng=Number(v.lng),acc=Number(v.accuracy);return Number.isFinite(lat)&&Number.isFinite(lng)&&lat>=-90&&lat<=90&&lng>=-180&&lng<=180?{lat,lng,...(Number.isFinite(acc)&&acc>=0?{accuracy:Math.round(acc)}:{})}:undefined};
  const punchTarget=(v:unknown)=>{const wanted=typeof v==='string'&&v?v:actor.id;if(!actor.admin&&wanted!==actor.id)fail('본인 출퇴근만 찍을 수 있습니다.');return employee(wanted).id};
  // Staff are read-only except for their own tasks and messages. Staff with task permission also run the schedule:
- // they assign tasks, add a job, put shifts in and take the schedule public. Payroll, staff records and
- // deleting a shift stay with the administrator.
+ // they assign tasks, add a job, put shifts in, take them out and take the schedule public.
+ // Payroll and staff records stay with the administrator.
  const taskManager=actor.admin||!!s.employees.find(e=>e.id===actor.id)?.taskManager;
  const scheduler=()=>{if(!taskManager)fail('작업 지시 권한이 필요합니다.')};
- const MANAGED=['taskCreate','areaAdd','shift','shiftUpdate','publish','unpublish'];
+ const MANAGED=['taskCreate','areaAdd','shift','shiftUpdate','shiftRemove','publish','unpublish'];
  if(!actor.admin&&!['taskUpdate','message','read','timeOffRequest','timeOffDecision','availabilitySet','availabilityDecision','punchIn','punchOut','punchBreak','punchReview','punchApproveAll'].includes(command.type)&&!(MANAGED.includes(command.type)&&taskManager))fail('직원 계정은 전체 일정, 본인 근태 및 급여를 읽기 전용으로만 볼 수 있습니다.');
  switch(command.type){
  case 'employee': {admin();const prev=s.employees.find(x=>x.id===p.id);const e={id:p.id||id(),name:text(p.name,80),color:text(p.color,7),role:text(p.role,60),email:String(p.email||'').trim().toLowerCase(),birthDate:String(p.birthDate||'').trim(),phone:String(p.phone||'').trim(),punchId:String(p.punchId||'').trim(),rate:number(p.rate),taskManager:p.taskManager===true||p.taskManager==='1',admin:p.admin===true||p.admin==='1',archived:prev?.archived};if(!/^#[0-9a-f]{6}$/i.test(e.color))fail('직원 색상을 확인하세요.');if(e.phone&&!/^[0-9+()\-\s]{7,30}$/.test(e.phone))fail('연락처를 확인하세요. 숫자와 + - ( ) 만 입력할 수 있습니다.');if(!/^\d{4,8}$/.test(e.punchId||''))fail('직원 ID는 숫자 4~8자리로 입력하세요.');if(s.employees.some(x=>x.id!==e.id&&!x.archived&&x.punchId===e.punchId))fail('이미 쓰이고 있는 직원 ID 입니다.');if(e.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.email))fail('이메일을 확인하세요.');if(e.birthDate&&!/^\d{8}$/.test(e.birthDate))fail('생년월일 8자리를 입력하세요.');if(e.email&&s.employees.some(x=>x.id!==e.id&&!x.archived&&x.email===e.email))fail('이미 등록된 이메일입니다.');if(e.birthDate&&s.employees.some(x=>x.id!==e.id&&!x.archived&&x.birthDate===e.birthDate))fail('같은 생년월일이 이미 등록되어 있습니다.');s.employees=s.employees.filter(x=>x.id!==e.id).concat(e);break;}
@@ -27,15 +27,29 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
   if(!empty.length)fail('모든 직원에게 이미 직원 ID 가 있습니다.');
   for(const e of empty){while(used.has(String(next))){next++;if(next>99999999)fail('쓸 수 있는 번호가 없습니다.')}e.punchId=String(next);used.add(e.punchId)}break;}
  case 'employeeRemove': {admin();const e=employee(p.id);if(e.id===actor.id)fail('본인 계정은 삭제할 수 없습니다.');s.employees=s.employees.map(x=>x.id===e.id?{...x,archived:true,admin:false}:x);break;}
+ // 완전 삭제. 위의 삭제가 이름을 남기는 삭제라면 이쪽은 흔적까지 지웁니다 — 근무·출퇴근·급여·작업·메시지가 함께 사라지고 되돌릴 수 없습니다.
+ // 남의 줄에 이름만 얹혀 있던 자리(대체 원 근무자, 읽음 표시, 지시한 사람, 고친 사람)는 줄을 지우지 않고 그 이름만 떼어 냅니다.
+ case 'employeePurge': {admin();const gone=employee(p.id).id;if(gone===actor.id)fail('본인 계정은 삭제할 수 없습니다.');
+  s.employees=s.employees.filter(x=>x.id!==gone);
+  s.shifts=s.shifts.filter(x=>x.employeeId!==gone);for(const x of s.shifts)if(x.originalId===gone)delete x.originalId;
+  const alive=new Set(s.shifts.map(x=>x.id));s.swaps=s.swaps.filter(x=>x.from!==gone&&x.to!==gone&&alive.has(x.shiftId));
+  s.attendance=s.attendance.filter(x=>x.employeeId!==gone);
+  s.messages=s.messages.filter(x=>x.sender!==gone&&x.to!==gone).map(x=>({...x,readBy:(x.readBy??[]).filter(v=>v!==gone),...(x.recipients?{recipients:x.recipients.filter(v=>v!==gone)}:{})})).filter(x=>!x.recipients||x.recipients.length>0);
+  s.tasks=s.tasks.filter(x=>x.assignedTo!==gone);for(const x of s.tasks)if(x.createdBy===gone)delete x.createdBy;
+  s.timeOff=s.timeOff!.filter(x=>x.employeeId!==gone);
+  s.availability=s.availability!.filter(x=>x.employeeId!==gone);
+  s.punches=s.punches!.filter(x=>x.employeeId!==gone);for(const x of s.punches)if(x.editedBy===gone)delete x.editedBy;
+  s.clockNames=s.clockNames!.filter(x=>x.employeeId!==gone);
+  break;}
  case 'shift': {scheduler();employee(p.employeeId);const shift:Shift={id:id(),employeeId:p.employeeId,date:date(p.date),start:time(p.start,true),end:time(p.end,true),area:text(p.area,60),note:p.note?text(p.note,250):undefined,breakMinutes:p.breakMinutes?number(p.breakMinutes,720):undefined,draft:true};if(!duration(shift.start,shift.end))fail('출근과 퇴근 시간이 같습니다.');if((shift.breakMinutes??0)>=duration(shift.start,shift.end)*60)fail('휴게시간이 근무시간보다 깁니다.');if(s.shifts.some(x=>x.employeeId===shift.employeeId&&overlap(x,shift)))fail('해당 직원의 근무시간이 겹칩니다.');s.shifts.push(shift);s.published=false;break;}
  case 'shiftUpdate': {scheduler();const ids=[...new Set(String(p.ids||'').split(',').filter(Boolean))];if(!ids.length)fail('수정할 근무를 선택하세요.');if(ids.length>1000)fail('한 번에 최대 1,000개 근무를 수정할 수 있습니다.');const single=ids.length===1;const start=p.start?time(p.start,true):'',end=p.end?time(p.end,true):'',area=p.area?text(p.area,60):'',day=single&&p.date?date(p.date):'',note=single&&p.note!==undefined?String(p.note).trim().slice(0,250):null,rest=single&&p.breakMinutes!==undefined?number(p.breakMinutes,720):null;if(!start&&!end&&!area&&!day&&note===null&&rest===null)fail('변경할 내용을 입력하세요.');const targets=ids.map(v=>s.shifts.find(x=>x.id===v)??fail('근무를 찾을 수 없습니다. 새로고침 후 다시 시도하세요.'));
   // Edit every target first, then check overlaps, so shifts moved together are compared at their new times and never against themselves.
   for(const x of targets){if(s.swaps.some(r=>r.shiftId===x.id&&(r.status==='requested'||r.status==='accepted')))fail(`${x.date}: 진행 중인 대체근무 요청이 있어 수정할 수 없습니다.`);if(start)x.start=start;if(end)x.end=end;if(area)x.area=area;if(day)x.date=day;if(note!==null)x.note=note||undefined;if(rest!==null)x.breakMinutes=rest||undefined;if((x.breakMinutes??0)>=duration(x.start,x.end)*60)fail('휴게시간이 근무시간보다 깁니다.');if(!duration(x.start,x.end))fail(`${x.date}: 출근과 퇴근 시간이 같습니다.`)}
   for(const x of targets)if(s.shifts.some(y=>y.id!==x.id&&y.employeeId===x.employeeId&&overlap(x,y)))fail(`${x.date} ${employee(x.employeeId).name}: 근무시간이 겹칩니다.`);s.published=false;break;}
- // 근무 삭제는 관리자만 할 수 있습니다. 진행 중인 대체근무 요청이 있으면 먼저 정리해야 지울 수 있고,
+ // 근무 삭제는 근무를 편성하는 사람의 몫입니다. 진행 중인 대체근무 요청이 있으면 먼저 정리해야 지울 수 있고,
  // 지운 근무에 딸린 대체 기록은 빈 줄로 남지 않도록 함께 치웁니다.
  // 지우기는 공개 상태를 건드리지 않습니다 — 근무 하나를 지우려다 온 팀의 스케줄이 가려지면 안 되기 때문입니다.
- case 'shiftRemove': {admin();const shift=s.shifts.find(x=>x.id===text(p.id,120))??fail('근무를 찾을 수 없습니다. 새로고침 후 다시 시도하세요.');if(s.swaps.some(r=>r.shiftId===shift.id&&(r.status==='requested'||r.status==='accepted')))fail(`${shift.date}: 진행 중인 대체근무 요청이 있어 삭제할 수 없습니다.`);s.shifts=s.shifts.filter(x=>x.id!==shift.id);s.swaps=s.swaps.filter(r=>r.shiftId!==shift.id);break;}
+ case 'shiftRemove': {scheduler();const shift=s.shifts.find(x=>x.id===text(p.id,120))??fail('근무를 찾을 수 없습니다. 새로고침 후 다시 시도하세요.');if(s.swaps.some(r=>r.shiftId===shift.id&&(r.status==='requested'||r.status==='accepted')))fail(`${shift.date}: 진행 중인 대체근무 요청이 있어 삭제할 수 없습니다.`);s.shifts=s.shifts.filter(x=>x.id!==shift.id);s.swaps=s.swaps.filter(r=>r.shiftId!==shift.id);break;}
  // 출퇴근을 찍을 수 있는 자리. 푸는 것은 끄기가 아니라 클럽 기본 자리(1km)로 되돌리기입니다 —
  // 어디서든 찍을 수 있던 예전 방식으로는 돌아가지 않습니다.
  case 'workplace': {admin();

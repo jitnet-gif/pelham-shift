@@ -37,7 +37,7 @@ import {
   UserPlus,
   ChevronDown,
   ArrowLeft,
-  House,
+  Clock,
   X,
   EyeOff,
 } from 'lucide-react';
@@ -262,8 +262,8 @@ export default function ShiftApp() {
   const [push, setPush] = useState<{ on: boolean; tickUrl?: string }>({
     on: false,
   });
-  // 작업 지시 권한은 근무 편성까지 봅니다 — 근무를 넣고 고치고, 스케줄을 공개하고 내립니다.
-  // 급여·직원 정보와 근무 삭제는 그대로 관리자 몫이라, 그 둘은 계속 actor.admin 으로 가릅니다.
+  // 작업 지시 권한은 근무 편성까지 봅니다 — 근무를 넣고 고치고 지우고, 스케줄을 공개하고 내립니다.
+  // 급여와 직원 정보는 그대로 관리자 몫이라, 그 둘은 계속 actor.admin 으로 가릅니다.
   const canSchedule =
     actor.admin || !!data.employees.find((e) => e.id === actor.id)?.taskManager;
   const staffReadOnly = !canSchedule;
@@ -521,7 +521,36 @@ export default function ShiftApp() {
   const emp = (id: string) => data.employees.find((e) => e.id === id);
   // 삭제한 직원은 지난 기록을 위해 데이터에 남기고, 고르는 자리에서만 감춥니다.
   const staff = data.employees.filter((e) => !e.archived);
+  const gone = data.employees.filter((e) => e.archived);
   const name = (id: string) => emp(id)?.name || t('관리자');
+  // 감추는 삭제. 이름은 지난 근무·급여 기록에 그대로 남습니다.
+  const removeEmployee = (e: Employee) => {
+    if (
+      confirm(
+        t('{name} 직원을 삭제할까요? 지난 근무·급여 기록은 그대로 남고 목록에서만 사라집니다.', { name: e.name }),
+      )
+    ) {
+      setTeamPick('');
+      void command('employeeRemove', { id: e.id });
+    }
+  };
+  // 지우는 삭제. 되돌릴 수 없으므로 이름을 그대로 쳐야 지나갑니다 — 잘못 누른 손은 여기서 멈춥니다.
+  const purgeEmployee = (e: Employee) => {
+    const typed = prompt(
+      t(
+        '{name} 직원을 완전히 삭제합니다. 지난 근무·출퇴근·급여·작업·메시지 기록이 함께 지워지고 되돌릴 수 없습니다. 계속하려면 이름을 그대로 입력하세요.',
+        { name: e.name },
+      ),
+      '',
+    );
+    if (typed === null) return;
+    if (typed.trim() !== e.name) {
+      setStatus(t('이름이 맞지 않아 삭제하지 않았습니다.'));
+      return;
+    }
+    setTeamPick('');
+    void command('employeePurge', { id: e.id });
+  };
   const options = staff.map((e) => ({
     value: e.id,
     label: e.name + ' · ' + e.id,
@@ -2047,16 +2076,8 @@ export default function ShiftApp() {
                   })
                 }
                 onMessage={(e) => open('message', { to: e.id, body: '' })}
-                onRemove={(e) => {
-                  if (
-                    confirm(
-                      t('{name} 직원을 삭제할까요? 지난 근무·급여 기록은 그대로 남고 목록에서만 사라집니다.', { name: e.name }),
-                    )
-                  ) {
-                    setTeamPick('');
-                    void command('employeeRemove', { id: e.id });
-                  }
-                }}
+                onRemove={removeEmployee}
+                onPurge={purgeEmployee}
               />
             ) : (
             <div className="panel contentpanel">
@@ -2251,12 +2272,17 @@ export default function ShiftApp() {
                         <button
                           className="button"
                           disabled={busy || e.id === actor.id}
-                          onClick={() => {
-                            if (confirm(t('{name} 직원을 삭제할까요? 지난 근무·급여 기록은 그대로 남고 목록에서만 사라집니다.', { name: e.name })))
-                              void command('employeeRemove', { id: e.id });
-                          }}
+                          onClick={() => removeEmployee(e)}
                         >
                           {t('삭제')}
+                        </button>
+                        {/* 감추는 삭제 옆의 지우는 삭제. 되돌릴 수 없어 이름을 다시 받습니다. */}
+                        <button
+                          className="button danger"
+                          disabled={busy || e.id === actor.id}
+                          onClick={() => purgeEmployee(e)}
+                        >
+                          {t('완전 삭제')}
                         </button>
                       </TableCell>
                     </TableRow>
@@ -2264,6 +2290,49 @@ export default function ShiftApp() {
                 </TableBody>
               </Table>
               </div>
+              {/* 보관된 직원은 목록에서만 감춘 사람들입니다. 여기서만 흔적까지 지울 수 있습니다. */}
+              {gone.length > 0 && (
+                <>
+                  <div className="sectionhead">
+                    <div>
+                      <h2>{t('보관된 직원')}</h2>
+                      <p>{t('삭제해 목록에서 감춘 직원입니다. 지난 근무·급여 기록은 아직 남아 있습니다.')}</p>
+                    </div>
+                  </div>
+                  <div className="stafftable">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          {['직원', '직원 ID', '업무', '이메일', '설정'].map((h) => (
+                            <TableHead key={h}>{t(h)}</TableHead>
+                          ))}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {gone.map((e) => (
+                          <TableRow key={e.id}>
+                            <TableCell>{box(e)}</TableCell>
+                            <TableCell>
+                              {e.punchId || <span className="muted">{t('미등록')}</span>}
+                            </TableCell>
+                            <TableCell>{e.role}</TableCell>
+                            <TableCell>{e.email || t('미등록')}</TableCell>
+                            <TableCell>
+                              <button
+                                className="button danger"
+                                disabled={busy}
+                                onClick={() => purgeEmployee(e)}
+                              >
+                                {t('완전 삭제')}
+                              </button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              )}
             </div>
             )}
           </TabsContent>
@@ -2451,7 +2520,7 @@ export default function ShiftApp() {
                 : modal === 'shiftUpdate'
                   ? t('저장하면 스케줄이 작성 중 상태로 바뀝니다. 수정 후 직원에게 공개를 다시 누르세요.')
                   : modal === 'detail'
-                    ? actor.admin
+                    ? canSchedule
                       ? t('근무 내용을 확인하고, 시간을 고치거나 근무를 삭제할 수 있습니다.')
                       : t('근무 내용입니다.')
                     : t('내용을 확인한 후 저장하세요.')}
@@ -2814,7 +2883,7 @@ export default function ShiftApp() {
               </p>
             )}
             {/* 폰에서는 이 묶음이 시트 바닥에 붙는 푸터가 됩니다. 데스크톱에서는 display:contents 라 아무 영향이 없습니다. */}
-            {!actor.admin && modal === 'detail' ? (
+            {staffReadOnly && modal === 'detail' ? (
               <div className="dialog-actions">
                 <button
                   className="button primary submit"
@@ -3458,13 +3527,13 @@ export default function ShiftApp() {
   const canPunch = !!emp(actor.id);
   const tabBarItems = (actor.admin
     ? [
-        { key: 'home', label: 'tab::출퇴근', Icon: House, count: 0 },
+        { key: 'home', label: 'tab::출퇴근', Icon: Clock, count: 0 },
         { key: 'schedule', label: '스케줄', Icon: CalendarDays, count: 0 },
         { key: 'team', label: '팀', Icon: Users, count: 0 },
         { key: 'messages', label: '메시지', Icon: MessageSquare, count: unread.length },
       ]
     : [
-        { key: 'home', label: 'tab::출퇴근', Icon: House, count: 0 },
+        { key: 'home', label: 'tab::출퇴근', Icon: Clock, count: 0 },
         { key: 'schedule', label: '스케줄', Icon: CalendarDays, count: 0 },
         { key: 'messages', label: '메시지', Icon: MessageSquare, count: unread.length },
       ]
@@ -3633,7 +3702,7 @@ export default function ShiftApp() {
             </button>
           </div>
           <TabsList className="sidenav">
-            {canPunch && navItem('home', 'tab::출퇴근', House)}
+            {canPunch && navItem('home', 'tab::출퇴근', Clock)}
             {actor.admin && navItem('dashboard', '대시보드', LayoutDashboard)}
             {actor.admin && navItem('working', '근무 현황', Radar, { sub: true })}
             {navItem('schedule', '스케줄', CalendarDays)}

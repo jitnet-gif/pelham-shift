@@ -29,6 +29,7 @@ export default function PhoneTeam({
   onEdit,
   onMessage,
   onRemove,
+  onPurge,
 }: {
   employees: Employee[];
   archived: Employee[];
@@ -43,6 +44,7 @@ export default function PhoneTeam({
   onEdit: (employee: Employee) => void;
   onMessage: (employee: Employee) => void;
   onRemove: (employee: Employee) => void;
+  onPurge: (employee: Employee) => void;
 }) {
   const { t, locale } = useLang();
   const [kept, setKept] = useState(true);
@@ -139,15 +141,28 @@ export default function PhoneTeam({
           </div>
         </dl>
 
-        {!person.archived && person.id !== meId && (
-          <button
-            className="pteam-remove"
-            disabled={busy}
-            onClick={() => onRemove(person)}
-          >
-            <Trash2 size={16} />
-            {t('직원 삭제')}
-          </button>
+        {person.id !== meId && (
+          <div className="pteam-danger">
+            {/* 삭제는 이름을 남기고 감추는 쪽, 완전 삭제는 지난 기록까지 지우는 쪽입니다. 보관된 사람에게는 완전 삭제만 남습니다. */}
+            {!person.archived && (
+              <button
+                className="pteam-remove"
+                disabled={busy}
+                onClick={() => onRemove(person)}
+              >
+                <Trash2 size={16} />
+                {t('직원 삭제')}
+              </button>
+            )}
+            <button
+              className="pteam-remove hard"
+              disabled={busy}
+              onClick={() => onPurge(person)}
+            >
+              <Trash2 size={16} />
+              {t('완전 삭제')}
+            </button>
+          </div>
         )}
       </section>
     );

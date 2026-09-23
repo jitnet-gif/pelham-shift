@@ -18,6 +18,10 @@
 .presetchip{padding:7px 12px;border:1px solid #d3dfd9;border-radius:20px;background:#fff;font-size:13px;color:#33564a}
 .breakfield input{max-width:140px}
 .button.cancel{background:#fff;border:1px solid #d3dfd9;color:#3d5a4e;margin-right:10px;min-height:44px;padding:0 24px}
+/* 되돌릴 수 없는 단추. 눌러도 되는 단추들 사이에서 눈에 먼저 띄게 둡니다. */
+.button.danger{border-color:#e0c3b8;color:#b4543a}.button.danger:hover{background:#fbf1ed}
+/* 보관된 직원 표는 재직 표 아래에 한 칸 띄워 둡니다. */
+.stafftable+.sectionhead{margin-top:32px}
 
 /* 출근기계에 찍힌 이름을 직원과 잇는 승인 줄 */
 .namematch{border-top:1px solid var(--border);margin:18px 0 0;padding-top:6px}.namematch h4{font-size:15px;font-weight:600;margin:12px 0 6px}.namematch-row{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid #e8eeeb;flex-wrap:wrap}.namematch-row:last-child{border-bottom:0}.namematch-row .field{margin:0;flex:1;min-width:210px}.namematch-name{min-width:150px;display:flex;flex-direction:column;gap:4px}.namematch-name small{font-size:12px;color:#83958a}.namematch-saved{margin-top:16px;font-size:14px;color:#50685b}.namematch-saved summary{cursor:pointer;padding:6px 0}@media(max-width:700px){.namematch-row{align-items:stretch;flex-direction:column;gap:10px}}

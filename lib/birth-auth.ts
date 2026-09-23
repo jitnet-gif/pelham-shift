@@ -246,3 +246,14 @@ export async function updatePassword(request: Request, currentPassword: string, 
     .bind(session.team, session.actor.id, salt, hash, new Date().toISOString())
     .run();
 }
+
+// 직원을 완전히 삭제할 때 워크스페이스 바깥에 남는 것까지 치웁니다 — 열린 세션과 바꿔 둔 비밀번호입니다.
+// 세션은 직원 기록이 사라지는 순간 이미 통하지 않지만, 줄까지 지워야 남는 것이 없습니다.
+export async function forgetMember(workspace: string, actor: string) {
+  await env.DB.prepare('DELETE FROM birth_sessions WHERE workspace = ? AND actor = ?')
+    .bind(workspace, actor)
+    .run();
+  await env.DB.prepare('DELETE FROM password_credentials WHERE workspace = ? AND actor = ?')
+    .bind(workspace, actor)
+    .run();
+}
