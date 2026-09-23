@@ -107,10 +107,10 @@ export function payroll(state:State,employeeId:string,from:string,to:string){con
  return {hours,regularHours,otHours,lateMinutes,lateDays,base:cents(base),otPay:cents(otPay),bonus,lateDeduction:cents(lateDeduction),total:cents(earned-lateDeduction),...punchReviewCounts(state,employeeId,from,to)}}
 // 근무지 이름. 직원 화면과 출퇴근 단말이 같은 이름을 씁니다.
 export const LOCATION='Pelham Hills Golf Club';
-// 날씨와 일출·일몰에 쓸 근무지 좌표. 관리자가 출퇴근 반경을 잡아 두었으면 그 좌표(state.workplace)를 씁니다.
-// 반경을 잡기 전에도 날씨를 보고 싶으면 클럽의 위도·경도를 여기에 적어주세요.
-// 비워 두면 날씨 칸이 좌표부터 요청합니다 — 엉뚱한 곳의 일출·일몰을 그럴듯하게 보여주지 않기 위해서입니다.
-export const WEATHER_SPOT: {lat:number;lng:number} | null = null;
+// 날씨와 일출·일몰은 클럽이 서 있는 자리의 것입니다.
+// 196 Webber Road, Pelham, Ontario L3B 5N8, Canada — OpenStreetMap 에 등록된 클럽 자체의 좌표입니다.
+// 관리자가 출퇴근 반경을 잡아 두었으면 그 좌표(state.workplace)를 먼저 쓰고, 없을 때 이 값으로 떨어집니다.
+export const WEATHER_SPOT: {lat:number;lng:number} | null = {lat:42.98515,lng:-79.30084};
 // 근무지 장소. 새 직원·새 근무의 기본값이자 시범 데이터의 배정 기준입니다.
 export const AREAS=['Proshop','Workshop'] as const;
 // 근무를 추가·수정할 때 고를 수 있는 장소. 나머지 업무는 목록에서 감춥니다.
