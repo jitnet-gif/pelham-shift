@@ -71,20 +71,12 @@ export default function StaffSchedule({
       timeZone: 'UTC',
     }).format(new Date(date + 'T12:00:00Z'));
   const of = (id: string) => employees.find((e) => e.id === id);
-  // 화면에 세울 근무. '내 근무'에서는 이름이 줄마다 되풀이되지 않게 감춥니다.
-  // 어느 보기든 그날 근무는 모두 세웁니다. '내 근무'에서는 내 것을 위에 두고
-  // 나머지는 흐리게 남겨, 같은 날 누가 나오는지도 함께 보이게 합니다.
+  // 화면에 세울 근무. '내 근무'는 내 것만 세웁니다 — 남의 근무는 흐리게도 남기지 않습니다.
+  // 같은 날 누가 나오는지는 '전체 일정'에서 봅니다. 거기서는 이름을 줄마다 붙입니다.
   const onDate = (date: string) =>
     shifts
-      .filter((s) => s.date === date)
-      .sort((a, b) =>
-        scope === 'mine' && (a.employeeId === me) !== (b.employeeId === me)
-          ? a.employeeId === me
-            ? -1
-            : 1
-          : a.start.localeCompare(b.start),
-      );
-  const mineOn = (date: string) => onDate(date).filter((s) => s.employeeId === me);
+      .filter((s) => s.date === date && (scope === 'all' || s.employeeId === me))
+      .sort((a, b) => a.start.localeCompare(b.start));
 
   return (
     <section className="stsched">
@@ -149,19 +141,13 @@ export default function StaffSchedule({
             <small>{days[i]}</small>
             <b>{Number(date.slice(8))}</b>
             {/* 근무가 있는 날에만 점을 찍습니다. 고른 날에는 흰 점으로 뒤집습니다. */}
-            <i
-              className={
-                (scope === 'mine' ? mineOn(date) : onDate(date)).length ? 'on' : ''
-              }
-            />
+            <i className={onDate(date).length ? 'on' : ''} />
           </button>
         ))}
       </div>
       <div className="stsched-list">
         {weekDates.map((date) => {
           const rows = onDate(date);
-          // '내 근무'인데 그날 내 근무가 없으면, 흐린 줄 위에 '근무 없음'을 먼저 적어 둡니다.
-          const noneOfMine = scope === 'mine' && !mineOn(date).length;
           return (
             <div
               className={
@@ -180,16 +166,11 @@ export default function StaffSchedule({
               </div>
               {rows.length ? (
                 <div className="stsched-shifts">
-                  {noneOfMine && (
-                    <p className="stsched-none inline">{t('근무 일정이 없습니다.')}</p>
-                  )}
                   {rows.map((s) => {
                     const e = of(s.employeeId);
-                    // 내 근무가 아니면 흐리게. 대신 누구 것인지 이름을 붙여 둡니다.
-                    const others = s.employeeId !== me;
                     return (
                       <button
-                        className={'stsched-shift' + (scope === 'mine' && others ? ' dim' : '')}
+                        className="stsched-shift"
                         key={s.id}
                         onClick={() => onShiftSelect(s.id)}
                       >
@@ -198,7 +179,7 @@ export default function StaffSchedule({
                           <span className="stsched-where">{location}</span>
                           <small className="stsched-role">
                             <i style={{ background: e?.color }} />
-                            {(scope === 'all' || others) && e?.name ? `${e.name} · ` : ''}
+                            {scope === 'all' && e?.name ? `${e.name} · ` : ''}
                             {s.area}
                             {e?.role && e.role !== s.area ? ` | ${e.role}` : ''}
                           </small>
