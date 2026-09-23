@@ -772,6 +772,10 @@ const en: Record<string, string> = {
   '메시지가 없습니다.': 'Message not found.',
   '작업을 찾을 수 없습니다.': 'Task not found.',
   '본인에게 배정된 작업만 처리할 수 있습니다.': 'You can only update tasks assigned to you.',
+  '본인이 지시한 작업만 삭제할 수 있습니다.':
+    'You can only delete tasks you assigned.',
+  '이 작업 지시를 삭제할까요? 받은 직원의 수신함에서도 사라집니다.':
+    'Delete this task? It disappears from the assignee’s inbox too.',
   '잘못된 작업 처리입니다.': 'Invalid task action.',
   '5MB 이하 파일만 업로드할 수 있습니다.': 'Only files up to 5 MB can be uploaded.',
   '.xlsx 또는 .csv 형식으로 저장한 파일을 선택하세요.':
