@@ -858,6 +858,17 @@ const en: Record<string, string> = {
     'The app opens only while you are at work. Turn on location in your device settings and allow this app to use it.',
   '이 기기에서 위치가 꺼져 있습니다. 직원은 위치를 켜야 앱을 쓸 수 있습니다.':
     'Location is off on this device. Staff need it on to use the app.',
+  // 한 번 막아 둔 권한은 앱이 다시 물어도 창이 뜨지 않습니다. 어디서 푸는지 알려 줍니다.
+  '아이폰: 설정 > 개인정보 보호 및 보안 > 위치 서비스를 켜고, 설정 > Safari > 위치에서 이 사이트를 허용으로 바꿉니다.':
+    'iPhone: turn on Settings > Privacy & Security > Location Services, then set Settings > Safari > Location to Allow for this site.',
+  '안드로이드: 주소창의 자물쇠 > 사이트 설정 > 위치를 허용으로 바꾸고, 기기 설정에서 위치를 켭니다.':
+    'Android: tap the lock in the address bar > Site settings > Location and set it to Allow, then turn on location in your device settings.',
+  '위치가 꺼져 있어 출퇴근을 찍을 수 없습니다. 기기 설정에서 위치를 켜고 이 앱에 허용해 주세요.':
+    'Location is off, so you cannot check in or out. Turn it on in your device settings and allow it for this app.',
+  '위치를 확인하는 중입니다. 자리가 잡히면 출퇴근을 찍을 수 있습니다.':
+    'Checking your location. You can check in and out once it is found.',
+  '위치를 다시 잡는 중입니다. 자리가 잡히면 출퇴근을 찍을 수 있습니다.':
+    'Getting a fresh location fix. You can check in and out once it is found.',
   '다시 확인': 'Check again',
   '출퇴근 가능 위치': 'Where staff can check in and out',
   '지금 내 위치로 지정': 'Use my location',

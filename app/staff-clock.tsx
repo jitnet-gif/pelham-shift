@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Camera, Check, Coffee, Hourglass, LogOut } from 'lucide-react';
 import type { Employee, Punch, Shift, Workplace } from '@/lib/domain';
 import { say } from './say';
+import { FIX_MAX_AGE_MS, type GpsState } from './gps-guard';
 import { TIME_ZONE, distanceMeters, duration } from '@/lib/domain';
 import { useLang } from './use-lang';
 
@@ -37,6 +38,8 @@ export default function StaffClock({
   busy,
   workplace,
   spot,
+  gpsState,
+  onLocate,
   onPunch,
   onBreak,
 }: {
@@ -48,7 +51,11 @@ export default function StaffClock({
   // 출퇴근을 찍을 수 있는 자리와 그 반경. 사진과 함께 지금 서 있는 자리도 보냅니다.
   workplace: Workplace;
   // 앱이 내내 지켜보고 있는 자리. 찍는 순간에만 위치를 켜는 일이 없도록 이 값을 씁니다.
-  spot: { lat: number; lng: number; accuracy?: number } | null;
+  spot: { lat: number; lng: number; accuracy?: number; at?: number } | null;
+  // 위치가 지금 켜져 있는지. 꺼져 있으면 출퇴근 버튼을 잠급니다.
+  gpsState: GpsState;
+  // 위치를 다시 확인해 달라는 부탁. 설정에서 켜고 돌아온 사람이 그 자리에서 누릅니다.
+  onLocate: () => void;
   onPunch: (
     action: 'punchIn' | 'punchOut',
     photo: string,
@@ -85,6 +92,11 @@ export default function StaffClock({
   // 서버가 재는 것과 같은 방법으로 잽니다 — 화면에서 통과한 것이 서버에서 막히면 안 됩니다.
   const away = here ? Math.round(distanceMeters(workplace, here)) : null;
   const tooFar = away !== null && away > workplace.radius;
+  // 오래된 자리로는 찍지 못합니다. 아까 근무지에서 받아 둔 자리를 들고 나가는 일을 막습니다.
+  // now 가 20초마다 움직이므로 자리가 늙는 것도 그 걸음으로 알아차립니다.
+  const fresh = !!spot && spot.at !== undefined && now.getTime() - spot.at < FIX_MAX_AGE_MS;
+  // 출퇴근을 찍을 수 있는 상태. 위치가 켜져 있고, 방금 받은 자리가 있고, 근무지 안이어야 합니다.
+  const ready = gpsState === 'on' && fresh && !tooFar;
 
   const stop = useCallback(() => {
     stream.current?.getTracks().forEach((track) => track.stop());
@@ -260,8 +272,9 @@ export default function StaffClock({
     });
   // 출근·퇴근은 사진이 먼저입니다. 사진이 없으면 서버로 보내지도 않습니다.
   const press = async (action: 'punchIn' | 'punchOut') => {
-    // 근무지 밖에서는 사진도 찍지 않습니다 — 어차피 기록되지 않고, 경고는 화면에 이미 떠 있습니다.
-    if (tooFar) return;
+    // 위치가 없거나 근무지 밖이면 사진도 찍지 않습니다 —
+    // 어차피 기록되지 않고, 까닭은 화면에 이미 떠 있습니다.
+    if (!ready) return;
     const taken = capture();
     if (!taken.photo) {
       setProblem(taken.problem || '사진이 찍히지 않았습니다.');
@@ -428,6 +441,25 @@ export default function StaffClock({
             </small>
           </span>
         </div>
+        {/* 위치가 꺼져 있으면 출퇴근을 찍을 수 없습니다. 어디서 푸는지는 앱을 덮는 안내가 말합니다. */}
+        {gpsState !== 'on' && (
+          <p role="alert" className="stclock-error">
+            {t(
+              gpsState === 'blocked'
+                ? '위치가 꺼져 있어 출퇴근을 찍을 수 없습니다. 기기 설정에서 위치를 켜고 이 앱에 허용해 주세요.'
+                : '위치를 확인하는 중입니다. 자리가 잡히면 출퇴근을 찍을 수 있습니다.',
+            )}{' '}
+            <button type="button" className="stclock-relocate" onClick={onLocate}>
+              {t('다시 확인')}
+            </button>
+          </p>
+        )}
+        {/* 켜져 있어도 자리가 오래되었으면 지금 서 있는 곳이라 할 수 없습니다. */}
+        {gpsState === 'on' && !fresh && (
+          <p role="alert" className="stclock-error">
+            {t('위치를 다시 잡는 중입니다. 자리가 잡히면 출퇴근을 찍을 수 있습니다.')}
+          </p>
+        )}
         {/* 근무지에서 멀면 버튼을 잠그고 얼마나 떨어졌는지 알립니다. 눌러도 기록되지 않기 때문입니다. */}
         {tooFar && (
           <p role="alert" className="stclock-error">
@@ -457,7 +489,7 @@ export default function StaffClock({
             </button>
             <button
               className="stclock-end"
-              disabled={busy || !!saved || tooFar}
+              disabled={busy || !!saved || !ready}
               onClick={() => void press('punchOut')}
             >
               {t('endshift::퇴근 찍기')}
@@ -467,7 +499,7 @@ export default function StaffClock({
         ) : (
           <button
             className="stclock-start"
-            disabled={busy || !!saved || tooFar}
+            disabled={busy || !!saved || !ready}
             onClick={() => void press('punchIn')}
           >
             <Camera size={20} />

@@ -36,7 +36,7 @@ export default function PunchApp() {
   const [tick, setTick] = useState(() => Date.now());
   const [push, setPush] = useState(false);
   // 출퇴근은 근무지 안에서만 찍히므로, 앱을 여는 동안 위치를 계속 지켜봅니다.
-  const gps = useGps(true);
+  const gps = useGps();
   const query = () => (typeof window === 'undefined' ? '' : window.location.search);
 
   const ingest = (r: Payload) => {
@@ -232,6 +232,8 @@ export default function PunchApp() {
         busy={busy}
         workplace={workplaceOf(data)}
         spot={gps.spot}
+        gpsState={gps.state}
+        onLocate={gps.retry}
         onPunch={async (action, photo, place) => {
           const next = await command(action, {
             employeeId: me.id,

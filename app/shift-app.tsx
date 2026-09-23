@@ -211,7 +211,7 @@ export default function ShiftApp() {
   // 근무지를 지정하는 동안 기기에 자리를 물어보는 중인지.
   const [locating, setLocating] = useState(false);
   // 근무지를 지정해 둔 곳에서는 앱을 여는 동안 위치를 계속 지켜봅니다.
-  const gps = useGps(true);
+  const gps = useGps();
   const [version, setVersion] = useState(0);
   const [team, setTeam] = useState('');
   const [actor, setActor] = useState({ id: 'admin', admin: true });
@@ -4301,6 +4301,8 @@ export default function ShiftApp() {
                 busy={busy}
                 workplace={workplaceOf(data)}
                 spot={gps.spot}
+                gpsState={gps.state}
+                onLocate={gps.retry}
                 onPunch={async (action, photo, place) => {
                   const next = await command(action, {
                     photo,

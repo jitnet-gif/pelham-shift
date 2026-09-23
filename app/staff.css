@@ -718,3 +718,15 @@
   font-variant-numeric: tabular-nums;
 }
 .stclock-code input:focus-visible { outline: none; border-color: #087e6d; box-shadow: 0 0 0 2px #d9ece6; }
+
+/* 경고 줄 안에서 그 자리에서 위치를 다시 물어보는 작은 버튼. */
+.stclock-relocate {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
