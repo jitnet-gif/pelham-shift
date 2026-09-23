@@ -190,9 +190,11 @@ export default function StaffClock({
   };
 
   // 찍힌 순간을 사람 말로 알려 줍니다. 읽어 줄 목소리가 없는 기기에서는 예전 찰깍 소리가 납니다.
-  const shutter = () => {
+  // 출근인지 퇴근인지까지 읽어 주어, 화면을 보지 않아도 무엇이 찍혔는지 압니다.
+  const shutter = (action: 'punchIn' | 'punchOut') => {
     wake();
-    say('pelham', click);
+    // 세 마디를 한 마디 속도로 읽으면 한 덩어리로 뭉칩니다. 조금 눌러 읽습니다.
+    say(action === 'punchIn' ? 'pelham check in' : 'pelham check out', click, 1.15);
   };
 
   // 지금 보이는 화면을 한 장 잡습니다. 까맣거나 가려져 있으면 사진으로 치지 않습니다.
@@ -259,7 +261,7 @@ export default function StaffClock({
     }
     // 소리와 사진은 누른 그 자리에서 바로 내보냅니다.
     // 아래 await 를 지나고 나면 누른 손가락과 이어지지 않아 소리가 나지 않는 기기가 있습니다.
-    shutter();
+    shutter(action);
     if (reviewTimer.current) clearTimeout(reviewTimer.current);
     if (savedTimer.current) clearTimeout(savedTimer.current);
     setReview(taken.photo);
