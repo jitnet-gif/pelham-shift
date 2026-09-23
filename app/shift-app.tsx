@@ -3223,10 +3223,15 @@ export default function ShiftApp() {
                                 shifts.map((s) => (
                                   <button
                                     key={s.id}
-                                    className="shift"
+                                    className={
+                                      'shift' + (s.draft ? ' is-draft' : '')
+                                    }
                                     onClick={() => open('detail', { id: s.id })}
                                     style={{
-                                      background: e.color + '13',
+                                      // 아직 공개하지 않은 근무는 노란 바탕으로 눈에 띄게 둡니다.
+                                      background: s.draft
+                                        ? '#fff4d4'
+                                        : e.color + '13',
                                       borderLeftColor: e.color,
                                     }}
                                   >
@@ -3237,6 +3242,9 @@ export default function ShiftApp() {
                                       {s.originalId ? t('대체 · ') : ''}
                                       {s.area}
                                     </span>
+                                    {s.draft && (
+                                      <em className="shift-flag">Unpublished</em>
+                                    )}
                                     <small>{duration(s.start, s.end)}h</small>
                                   </button>
                                 ))
@@ -3298,6 +3306,7 @@ export default function ShiftApp() {
                                     <button
                                       key={s.id}
                                       onClick={() => open('detail', { id: s.id })}
+                                      className={s.draft ? 'is-draft' : ''}
                                       style={{
                                         left:
                                           ((Number(s.start.slice(0, 2)) +
@@ -3315,9 +3324,12 @@ export default function ShiftApp() {
                                             24) *
                                             100 +
                                           '%',
-                                        background: e.color,
+                                        background: s.draft
+                                          ? '#f3c73f'
+                                          : e.color,
                                       }}
                                     >
+                                      {s.draft ? 'Unpublished · ' : ''}
                                       {s.start}–{s.end} · {s.area}
                                     </button>
                                   ))}

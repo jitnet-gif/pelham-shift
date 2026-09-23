@@ -90,9 +90,12 @@ export default function MonthSchedule({
                     if (!employee) return null;
                     return (
                       <button
-                        className="month-shift"
+                        className={
+                          'month-shift' + (shift.draft ? ' is-draft' : '')
+                        }
                         key={shift.id}
                         onClick={() => onShiftSelect(shift.id)}
+                        title={shift.draft ? 'Unpublished' : undefined}
                       >
                         <i style={{ background: employee.color }} />
                         <b>{employee.name}</b>

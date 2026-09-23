@@ -155,6 +155,22 @@
   text-align: left;
 }
 .psched-row:active { background: #f6f7f5; }
+/* 아직 공개하지 않은 근무 */
+.psched-row.is-draft { background: #fff4d4; }
+.psched-row.is-draft:active { background: #ffecb8; }
+.psched-flag {
+  display: inline-block;
+  margin-left: 7px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #f3c73f;
+  color: #4a380a;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
 .psched-avatar {
   flex: none;
   display: grid;

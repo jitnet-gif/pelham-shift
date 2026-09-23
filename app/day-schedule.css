@@ -287,6 +287,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.dv-shift.is-draft {
+  color: #4a380a;
+  box-shadow: inset 0 0 0 1px #d8a516;
+}
+.dv-shift.is-draft span { opacity: 1; font-weight: 600; }
 /* 합계 줄 */
 .dv-foot {
   display: flex;

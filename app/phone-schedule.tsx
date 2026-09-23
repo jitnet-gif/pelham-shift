@@ -249,7 +249,7 @@ export default function PhoneSchedule({
               const blocked = blockedOf(s);
               return (
                 <button
-                  className="psched-row"
+                  className={'psched-row' + (s.draft ? ' is-draft' : '')}
                   key={s.id}
                   onClick={() => onShiftSelect(s.id)}
                 >
@@ -257,7 +257,10 @@ export default function PhoneSchedule({
                     {e?.name.slice(0, 1)}
                   </span>
                   <span className="psched-main">
-                    <b>{e?.name}</b>
+                    <b>
+                      {e?.name}
+                      {s.draft && <em className="psched-flag">Unpublished</em>}
+                    </b>
                     <span className="psched-time">
                       {clock(s.start)} - {clock(s.end)}
                     </span>

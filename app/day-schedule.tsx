@@ -225,20 +225,24 @@ export default function DaySchedule({
                       return (
                         <button
                           key={s.id}
-                          className="dv-shift"
+                          className={'dv-shift' + (s.draft ? ' is-draft' : '')}
                           style={{
                             left: ((start - FROM) / SPAN) * 100 + '%',
                             width: ((end - start) / SPAN) * 100 + '%',
-                            background: e.color,
+                            // 아직 공개하지 않은 근무는 노란 바탕으로 눈에 띄게 둡니다.
+                            background: s.draft ? '#f3c73f' : e.color,
                           }}
                           onClick={(event) => {
                             event.stopPropagation();
                             onShiftSelect(s.id);
                           }}
-                          title={`${clock(s.start)} - ${clock(s.end)} · ${s.area}`}
+                          title={`${clock(s.start)} - ${clock(s.end)} · ${s.area}${s.draft ? ' · Unpublished' : ''}`}
                         >
                           <b>{clock(s.start)} - {clock(s.end)}</b>
-                          <span>{s.area}</span>
+                          <span>
+                            {s.draft ? 'Unpublished · ' : ''}
+                            {s.area}
+                          </span>
                         </button>
                       );
                     })}
