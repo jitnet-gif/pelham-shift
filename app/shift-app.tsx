@@ -85,6 +85,7 @@ import {
   blockedBy,
   weekdayOf,
   payPeriodStart,
+  payPeriodEnd,
   DEFAULT_WORKPLACE_RADIUS,
   LOCATION,
   WEATHER_SPOT,
@@ -111,6 +112,7 @@ import { savePunchPhoto } from './punch-photo-store';
 import StaffSchedule from './staff-schedule';
 import StaffMessaging from './staff-messaging';
 import StaffTimesheets from './staff-timesheets';
+import { PunchRoster, PunchPeriodBar } from './punch-roster';
 import StaffClock from './staff-clock';
 import { say } from './say';
 import StaffMore, { type MoreItem } from './staff-more';
@@ -243,6 +245,9 @@ export default function ShiftApp() {
   const [teamPick, setTeamPick] = useState('');
   const [inapp, setInapp] = useState<Message | null>(null);
   const [payDetail, setPayDetail] = useState('');
+  // 관리자 출근 기록: 어느 이름의 출근부를 어느 2주 기간으로 보고 있는지.
+  // 로그인한 사람(actor)을 함께 들고 있어, 사람이 바뀌면 앞사람 출근부에 서 있지 않고 이름 목록부터 다시 엽니다.
+  const [att, setAtt] = useState({ actor: '', who: '', from: '' });
   const seenMessages = useRef<Set<string>>(new Set());
   // 앱을 연 시각. 열기 전부터 쌓여 있던 메시지와 방금 온 메시지를 가릅니다.
   const bootedAt = useRef('');
@@ -1159,6 +1164,24 @@ export default function ShiftApp() {
       end: '13:00',
       note: '',
     });
+  // 출근 기록 화면이 보는 범위. 관리자는 고른 이름 + 2주 기간, 직원은 언제나 자기 기록입니다.
+  const attMine = att.actor === actor.id;
+  const attWho = attMine ? att.who : '';
+  const attFrom = (attMine && att.from) || payPeriodStart(today);
+  const attTo = payPeriodEnd(attFrom);
+  const inAtt = (employeeId: string, date: string) =>
+    actor.admin
+      ? employeeId === attWho && date >= attFrom && date <= attTo
+      : employeeId === actor.id;
+  const attPunches = (data.punches ?? []).filter((p) => inAtt(p.employeeId, p.date));
+  const attClock = data.attendance.filter((a) => inAtt(a.employeeId, a.date));
+  // 이름 목록. 퇴사자도 남은 기록이 있으면 세웁니다 — 여기는 지난 기록을 읽는 자리라 감추면 닿을 길이 없습니다.
+  const attRoster = data.employees.filter(
+    (e) =>
+      !e.archived ||
+      (data.punches ?? []).some((p) => p.employeeId === e.id) ||
+      data.attendance.some((a) => a.employeeId === e.id),
+  );
   const otherTabs = (
     <>
             <TabsContent value="working">
@@ -1441,7 +1464,7 @@ export default function ShiftApp() {
                   <h2>{actor.admin ? t('출근 기록') : t('내 출근 기록')}</h2>
                   <p>
                     {actor.admin
-                      ? t('단말에서 찍힌 출퇴근과 그때 찍힌 사진을 봅니다.')
+                      ? t('이름을 고르면 그 사람 출근부를 2주 급여 기간씩 봅니다.')
                       : t('출근기계 기록을 읽기 전용으로 확인합니다.')}
                   </p>
                 </div>
@@ -1475,71 +1498,98 @@ export default function ShiftApp() {
                   </button>
                 </div>
               )}
-              <h3 className="punchlog-head">{t('찍힌 출퇴근')}</h3>
-              <PunchLog
-                punches={(data.punches ?? []).filter(
-                  (p) => actor.admin || p.employeeId === actor.id,
-                )}
-                employees={data.employees}
-                isAdmin={actor.admin}
-              />
-              <h3 className="punchlog-head">{t('출근기계에서 가져온 기록')}</h3>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {[
-                      '직원',
-                      '근무일',
-                      '예정 출근',
-                      '출근',
-                      '퇴근',
-                      '휴게',
-                      '실근무',
-                      '지각',
-                    ].map((h) => (
-                      <TableHead key={h}>{t(h)}</TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.attendance
-                    .filter((a) => actor.admin || a.employeeId === actor.id)
-                    .map((a) => {
-                      // 예정 근무가 없는 기록은 지각 기준이 없어 '정시'가 아니라 '예정 없음'입니다.
-                      const planned = scheduledFor(data, a);
-                      const late = lateBy(data, a);
-                      return (
-                        <TableRow key={a.id}>
-                          <TableCell>{box(emp(a.employeeId))}</TableCell>
-                          <TableCell>{a.date}</TableCell>
-                          <TableCell>{planned ? planned.start : '—'}</TableCell>
-                          <TableCell>{a.start}</TableCell>
-                          <TableCell>
-                            {a.end}
-                            {a.end < a.start ? t(' (+1일)') : ''}
-                          </TableCell>
-                          <TableCell>
-                            {t('{n}분', { n: a.breakMinutes })}
-                          </TableCell>
-                          <TableCell>
-                            {duration(a.start, a.end, a.breakMinutes).toFixed(2)}
-                            h
-                          </TableCell>
-                          <TableCell className={late ? 'red' : undefined}>
-                            {late === null
-                              ? t('예정 없음')
-                              : late
-                                ? t('{n}분 지각', { n: late })
-                                : t('정시')}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                </TableBody>
-              </Table>
-              {!data.attendance.filter((a) => actor.admin || a.employeeId === actor.id)
-                .length && (
-                <div className="empty">{t('아직 저장된 출근기록이 없습니다.')}</div>
+              {actor.admin && !attWho ? (
+                <>
+                  <h3 className="punchlog-head">{t('직원별 출근 기록')}</h3>
+                  <PunchRoster
+                    employees={attRoster}
+                    punches={data.punches ?? []}
+                    today={today}
+                    onPick={(who) =>
+                      setAtt({ actor: actor.id, who, from: payPeriodStart(today) })
+                    }
+                  />
+                </>
+              ) : (
+                <>
+                  {actor.admin && (
+                    <PunchPeriodBar
+                      employee={emp(attWho)}
+                      rows={attPunches}
+                      from={attFrom}
+                      today={today}
+                      onBack={() => setAtt({ actor: actor.id, who: '', from: '' })}
+                      onPeriod={(start) => setAtt({ actor: actor.id, who: attWho, from: start })}
+                    />
+                  )}
+                  <h3 className="punchlog-head">{t('찍힌 출퇴근')}</h3>
+                  {/* 한 사람 출근부를 보는 중이면 카드마다 같은 이름을 붙일 까닭이 없습니다. */}
+                  <PunchLog
+                    punches={attPunches}
+                    employees={data.employees}
+                    isAdmin={actor.admin && !attWho}
+                  />
+                  <h3 className="punchlog-head">{t('출근기계에서 가져온 기록')}</h3>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {[
+                          // 한 사람 출근부를 보는 중이면 이름 칸은 같은 이름만 되풀이해 빼 둡니다.
+                          ...(attWho ? [] : ['직원']),
+                          '근무일',
+                          '예정 출근',
+                          '출근',
+                          '퇴근',
+                          '휴게',
+                          '실근무',
+                          '지각',
+                        ].map((h) => (
+                          <TableHead key={h}>{t(h)}</TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {attClock.map((a) => {
+                          // 예정 근무가 없는 기록은 지각 기준이 없어 '정시'가 아니라 '예정 없음'입니다.
+                          const planned = scheduledFor(data, a);
+                          const late = lateBy(data, a);
+                          return (
+                            <TableRow key={a.id}>
+                              {!attWho && <TableCell>{box(emp(a.employeeId))}</TableCell>}
+                              <TableCell>{a.date}</TableCell>
+                              <TableCell>{planned ? planned.start : '—'}</TableCell>
+                              <TableCell>{a.start}</TableCell>
+                              <TableCell>
+                                {a.end}
+                                {a.end < a.start ? t(' (+1일)') : ''}
+                              </TableCell>
+                              <TableCell>
+                                {t('{n}분', { n: a.breakMinutes })}
+                              </TableCell>
+                              <TableCell>
+                                {duration(a.start, a.end, a.breakMinutes).toFixed(2)}
+                                h
+                              </TableCell>
+                              <TableCell className={late ? 'red' : undefined}>
+                                {late === null
+                                  ? t('예정 없음')
+                                  : late
+                                    ? t('{n}분 지각', { n: late })
+                                    : t('정시')}
+                              </TableCell>
+                            </TableRow>
+                          );
+                      })}
+                    </TableBody>
+                  </Table>
+                  {!attClock.length && (
+                    <div className="empty">
+                      {actor.admin
+                        ? t('이 기간에 출근기계 기록이 없습니다.')
+                        : t('아직 저장된 출근기록이 없습니다.')}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </TabsContent>

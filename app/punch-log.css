@@ -217,3 +217,163 @@
   background: rgb(255 255 255 / .16);
   color: #fff;
 }
+
+/* 관리자 출근 기록: 이름 목록과, 고른 사람의 2주 기간 머리말. */
+.punchroster {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 10px;
+  margin: 4px 0 8px;
+}
+.punchroster-empty {
+  margin: 8px 0 0;
+  padding: 26px 0;
+  color: #8b9691;
+  font-size: 14px;
+}
+.punchroster-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 13px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+.punchroster-card:hover { border-color: #b7c6c0; background: #fafcfb; }
+.punchroster-card > svg { flex: none; margin-left: auto; color: #b0bcb7; }
+.punchroster-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.punchroster-name i { flex: none; width: 10px; height: 10px; border-radius: 2px; background: #9fb0aa; }
+.punchroster-name b {
+  font-size: 15px;
+  font-weight: 650;
+  color: #1f2b2e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.punchroster-name small { font-size: 12px; color: #8b9691; white-space: nowrap; }
+.punchroster-stat {
+  font-size: 12px;
+  color: #69767a;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.punchroster-flag {
+  flex: none;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #fdf1e3;
+  color: #9a5b18;
+  font-size: 11px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.punchperiod {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 4px 0 10px;
+}
+.punchperiod-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.punchperiod-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 11px 6px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  color: #3d4b4e;
+  font-size: 13px;
+  cursor: pointer;
+}
+.punchperiod-back:hover { border-color: #b7c6c0; background: #fafcfb; }
+.punchperiod-who {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+}
+.punchperiod-who i {
+  align-self: center;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: #9fb0aa;
+}
+.punchperiod-who b { font-size: 16px; font-weight: 650; color: #1f2b2e; }
+.punchperiod-who small { font-size: 12px; color: #8b9691; }
+.punchperiod-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}
+.punchperiod-step {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: #3d4b4e;
+  cursor: pointer;
+}
+.punchperiod-step:hover:not(:disabled) { border-color: #b7c6c0; background: #fafcfb; }
+.punchperiod-step:disabled { opacity: .4; cursor: default; }
+.punchperiod-range {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+.punchperiod-range b {
+  font-size: 14px;
+  font-weight: 650;
+  color: #1f2b2e;
+  font-variant-numeric: tabular-nums;
+}
+.punchperiod-range small { font-size: 12px; color: #8b9691; }
+/* 퇴사한 직원도 남은 기록 때문에 목록에 서 있습니다. 한눈에 갈라 보이게 표시합니다. */
+.punchroster-gone {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #eef1f0;
+  color: #77837f;
+  font-size: 11px;
+}
+/* 지금 일하는 중이라 아직 시간이 세지지 않은 사람. */
+.punchroster-live {
+  flex: none;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #e6f3ec;
+  color: #1f6b47;
+  font-size: 11px;
+  font-style: normal;
+  white-space: nowrap;
+}
