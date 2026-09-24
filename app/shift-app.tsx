@@ -2817,7 +2817,8 @@ export default function ShiftApp() {
                   label={t('직원')}
                   value={form.employeeId || ''}
                   onChange={(v) => put('employeeId', v)}
-                  options={options}
+                  // 근무 추가에서는 이름만 보입니다 — 직원 코드는 적지 않습니다.
+                  options={staff.map((e) => ({ value: e.id, label: e.name, group: roleGroup(e) }))}
                 />
                 {areaPick('area', t('업무 / 장소'))}
                 {/* 근무일은 열던 자리에서 정해져 있어 고르지 않고 보여만 줍니다. */}
