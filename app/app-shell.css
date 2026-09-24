@@ -282,6 +282,11 @@
 .iconbutton.bell{position:relative}
 .bellcount{position:absolute;top:-2px;right:-3px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#c0503a;color:#fff;font-style:normal;font-size:11px;font-weight:700;line-height:18px;text-align:center}
 .navrow .navcount{font-style:normal;font-size:11px;font-weight:700;background:#c0503a;color:#fff;border-radius:9px;padding:1px 7px;margin-left:7px}
+/* 오른쪽 아래에 뜨는 알림 상자들을 한 줄로 쌓습니다 — 저장 확인과 새 메시지가 같은 자리에서 겹치지 않게 합니다. */
+.alertstack{position:fixed;right:20px;bottom:20px;z-index:60;display:flex;flex-direction:column;gap:10px;align-items:flex-end}
+.alertstack .inapp-alert{position:static}
+@media(max-width:900px){.alertstack{bottom:calc(68px + env(safe-area-inset-bottom,0px))}}
+@media(max-width:600px){.alertstack{left:12px;right:12px;align-items:stretch}}
 .inapp-alert{position:fixed;right:20px;bottom:20px;z-index:60;display:flex;gap:12px;align-items:flex-start;width:380px;max-width:calc(100vw - 40px);background:#fff;border:1px solid #d9e4df;border-left:4px solid #087e6d;border-radius:11px;box-shadow:0 14px 34px -14px rgba(16,40,33,.5);padding:15px 16px}
 .inapp-alert .inapp-icon{color:#087e6d;margin-top:3px;flex-shrink:0}
 .inapp-alert b{display:block;font-size:14px;margin-bottom:5px}

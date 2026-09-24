@@ -13,6 +13,7 @@ import {
   CloudRain,
   Bell,
   Download,
+  Mail,
   Check,
   RefreshCw,
   MapPin,
@@ -40,6 +41,7 @@ import {
   Clock,
   X,
   EyeOff,
+  CheckCircle2,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
@@ -92,9 +94,15 @@ import {
   roleList,
   roleLabel,
   hasRole,
+  AREAS,
+  HYBRID_ROLE,
   workplaceOf,
+  nameKey,
+  dueShifts,
+  missedShifts,
   type Employee,
   type Message,
+  type Shift,
   type State,
 } from '@/lib/domain';
 import { download } from '@/lib/importer';
@@ -141,6 +149,10 @@ const TAB_LABELS: Record<string, string> = {
   payroll: '급여 관리',
   help: '도움말',
 };
+// 급여를 받아 보는 사람들. 관리자 화면의 '급여 이메일로 보내기' 가 이 이름으로 직원 명부를 찾아 받는 사람을 채웁니다.
+// 주소를 여기에 박아 두지 않는 것은, 사람이 바뀌면 직원 관리의 이메일 한 칸만 고치면 되게 하기 위해서입니다.
+const PAYROLL_MAIL_TO = ['Emiline', 'Bright', 'Francis'];
+
 function Pick({
   label,
   value,
@@ -186,6 +198,7 @@ const nav = [
 // 메뉴 목록이 아니라 직원이 머물 수 있는 화면의 명단입니다. 여기 없는 화면은
 // 스케줄로 되돌립니다. 휴무와 근무 가능 시간은 메뉴에서 뺐어도 스케줄에서
 // 열리므로 남겨 둡니다.
+// 급여는 관리자만 봅니다. 직원은 '내 근무표'에서 자기 출퇴근을 확인하고 이의를 냅니다.
 const employeeNav = new Set([
   'home',
   'more',
@@ -194,7 +207,6 @@ const employeeNav = new Set([
   'timeoff',
   'availability',
   'attendance',
-  'payroll',
   'messages',
   'help',
 ]);
@@ -245,6 +257,9 @@ export default function ShiftApp() {
   // 폰에서는 팀이 목록과 한 사람 화면으로 갈립니다. 빈 값이면 목록입니다.
   const [teamPick, setTeamPick] = useState('');
   const [inapp, setInapp] = useState<Message | null>(null);
+  // 저장이 끝났다는 말. 띠 한 줄이 아니라 오른쪽 아래 상자로 떠서, 대화상자가 닫힌 뒤에도 눈에 들어옵니다.
+  // 실패는 지금까지처럼 statusbar 에 남깁니다 — 성공과 실패가 같은 자리에 같은 모양으로 뜨면 구분이 되지 않습니다.
+  const [saved, setSaved] = useState('');
   const [payDetail, setPayDetail] = useState('');
   // 관리자 출근 기록: 어느 이름의 출근부를 어느 2주 기간으로 보고 있는지.
   // 로그인한 사람(actor)을 함께 들고 있어, 사람이 바뀌면 앞사람 출근부에 서 있지 않고 이름 목록부터 다시 엽니다.
@@ -442,9 +457,11 @@ export default function ShiftApp() {
       if (!r.ok) throw Error(json.error);
       ingest(json);
       setModal('');
-      setStatus('저장했습니다.');
+      setSaved('저장했습니다.');
       return json.state ?? null;
     } catch (e) {
+      // 실패했을 때 직전 저장 상자가 남아 있으면 무엇이 들어갔는지 헷갈립니다. 상자를 걷고 띠만 남깁니다.
+      setSaved('');
       setStatus(notice(e, '저장하지 못했습니다.'));
       return null;
     } finally {
@@ -537,20 +554,8 @@ export default function ShiftApp() {
       void command('employeeRemove', { id: e.id });
     }
   };
-  // 지우는 삭제. 되돌릴 수 없으므로 이름을 그대로 쳐야 지나갑니다 — 잘못 누른 손은 여기서 멈춥니다.
+  // 지우는 삭제. 누르는 그 자리에서 지난 근무·출퇴근·급여·작업·메시지 기록까지 함께 사라지고 되돌릴 수 없습니다.
   const purgeEmployee = (e: Employee) => {
-    const typed = prompt(
-      t(
-        '{name} 직원을 완전히 삭제합니다. 지난 근무·출퇴근·급여·작업·메시지 기록이 함께 지워지고 되돌릴 수 없습니다. 계속하려면 이름을 그대로 입력하세요.',
-        { name: e.name },
-      ),
-      '',
-    );
-    if (typed === null) return;
-    if (typed.trim() !== e.name) {
-      setStatus(t('이름이 맞지 않아 삭제하지 않았습니다.'));
-      return;
-    }
     setTeamPick('');
     void command('employeePurge', { id: e.id });
   };
@@ -581,10 +586,10 @@ export default function ShiftApp() {
     const h = Number(v.slice(0, 2));
     return `${h % 12 || 12}:${v.slice(3, 5)} ${h < 12 ? 'AM' : 'PM'}`;
   };
-  const openClock = (key: string, label: string, step = 30) =>
+  const openClock = (key: string, label: string, step = 10) =>
     setClockField({ key, label, step });
   // 시간 칸은 눌리면 앱 시계를 엽니다. 값은 시계에서만 바뀌고, 비어 있으면 제출이 막힙니다.
-  const timeInput = (key: string, label: string, step = 30) => (
+  const timeInput = (key: string, label: string, step = 10) => (
     <input
       type="text"
       required
@@ -621,7 +626,7 @@ export default function ShiftApp() {
           {timeInput('start', t('시작 시간'))}
           <em>→</em>
           {timeInput('end', t('종료 시간'))}
-          {paidHours > 0 && <b>{t('({n}시간)', { n: paidHours })}</b>}
+          {paidHours > 0 && <b>{t('({n}시간)', { n: Math.round(paidHours * 100) / 100 })}</b>}
         </span>
       </div>
       {commonTimes.length > 0 && (
@@ -749,6 +754,12 @@ export default function ShiftApp() {
     (m) => m.sender !== actor.id && !m.readBy.includes(actor.id),
   );
   const unreadKey = unread.map((m) => m.id).join(',');
+  // 저장 알림은 4초만 머뭅니다. 다음 저장이 들어오면 앞 타이머는 걷어 냅니다.
+  useEffect(() => {
+    if (!saved) return;
+    const timer = setTimeout(() => setSaved(''), 4000);
+    return () => clearTimeout(timer);
+  }, [saved]);
   // 앱을 열어 둔 동안 새 메시지가 오면 화면 안에 알림을 띄웁니다. 기기 푸시가 꺼져 있어도 보입니다.
   useEffect(() => {
     const booted = (bootedAt.current ||= new Date().toISOString());
@@ -866,8 +877,12 @@ export default function ShiftApp() {
     t(({ pending: '대기 중', approved: '승인됨', declined: '거절됨' } as Record<string, string>)[v] || v);
   // 급여 상세. 고른 구간의 출근기록을 날짜순으로 펼치고, 그 옆에 예정 근무·지각·그날 금액을 같이 둡니다.
   // 상세도 합계와 같은 기록을 봐야 합니다. 둘이 다른 데이터를 쓰면 숫자가 어긋납니다.
-  const payDays = (employeeId: string) =>
-    paidRecords(data)
+  const payDays = (employeeId: string) => {
+    // 지각 차감도 합계가 쓴 값을 그대로 가져옵니다. 화면에서 다시 계산하면 열을 더한 값이 아래 합계와 어긋납니다.
+    const deductions = new Map(
+      payroll(data, employeeId, from, to).lates.map((r) => [r.id, r.deduction]),
+    );
+    return paidRecords(data)
       .filter((a) => a.employeeId === employeeId && a.date >= from && a.date <= to)
       .slice()
       .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start))
@@ -876,7 +891,9 @@ export default function ShiftApp() {
         shift: scheduledFor(data, a),
         worked: duration(a.start, a.end, a.breakMinutes),
         late: lateBy(data, a),
+        lateDeduction: deductions.get(a.id) ?? 0,
       }));
+  };
   // 초과근무가 어떤 근거로 잡혔는지. 하루 8시간 초과분의 합과 주 40시간 초과분 중 큰 쪽만 가산합니다.
   const payWeeks = (employeeId: string) => {
     const byDay = new Map<string, number>();
@@ -1024,7 +1041,7 @@ export default function ShiftApp() {
       />
     );
   };
-  // 직군은 겸할 수 있습니다 — Proshop 과 Workshop 을 함께 뛰는 사람은 둘 다 켜 둡니다.
+  // 직군은 겸할 수 있습니다 — Proshop 과 Workshop 을 함께 뛰는 사람은 Hybrid 한 칸으로 고릅니다.
   // 먼저 고른 업무가 기본 업무가 되어, 새 근무와 출퇴근 기록에 장소로 적힙니다.
   const rolePick = () => {
     const picked = (form.roles ?? form.role ?? '')
@@ -1035,6 +1052,17 @@ export default function ShiftApp() {
     const list = [...areas, ...picked.filter((role) => !areas.includes(role))];
     const toggle = (role: string, on: boolean) => {
       const next = on ? [...picked, role] : picked.filter((r) => r !== role);
+      put('roles', next.join(','));
+      put('role', next[0] ?? '');
+    };
+    // Hybrid 는 새 업무 이름이 아니라 Proshop 과 Workshop 을 한 번에 켜고 끄는 칸입니다.
+    // 저장되는 값은 지금까지와 같은 두 업무라, 업무로 거르는 화면과 예전 기록이 그대로 맞물립니다.
+    const base = [...AREAS] as string[];
+    const bothListed = base.every((role) => list.includes(role));
+    const hybrid = base.every((role) => picked.includes(role));
+    const toggleHybrid = (on: boolean) => {
+      const rest = picked.filter((role) => !base.includes(role));
+      const next = on ? [...base, ...rest] : rest;
       put('roles', next.join(','));
       put('role', next[0] ?? '');
     };
@@ -1051,14 +1079,28 @@ export default function ShiftApp() {
               {role}
             </label>
           ))}
+          {bothListed && (
+            <label className="recipient" key={HYBRID_ROLE}>
+              <Checkbox
+                checked={hybrid}
+                onCheckedChange={(on) => toggleHybrid(on === true)}
+              />
+              {HYBRID_ROLE}
+            </label>
+          )}
         </div>
         <p className="hint">
-          {picked.length > 1
-            ? t('{roles} 를 함께 맡습니다. 먼저 고른 {main} 이 새 근무의 기본 업무가 됩니다.', {
-                roles: picked.join(' · '),
+          {hybrid
+            ? t('{roles} 를 함께 맡는 Hybrid 입니다. 먼저 고른 {main} 이 새 근무의 기본 업무가 됩니다.', {
+                roles: base.join(' · '),
                 main: picked[0],
               })
-            : t('여러 업무를 겸하면 함께 고르세요. 먼저 고른 업무가 새 근무의 기본이 됩니다.')}
+            : picked.length > 1
+              ? t('{roles} 를 함께 맡습니다. 먼저 고른 {main} 이 새 근무의 기본 업무가 됩니다.', {
+                  roles: picked.join(' · '),
+                  main: picked[0],
+                })
+              : t('두 업무를 함께 뛰면 Hybrid 를 고르세요. 먼저 고른 업무가 새 근무의 기본이 됩니다.')}
         </p>
       </fieldset>
     );
@@ -1079,24 +1121,20 @@ export default function ShiftApp() {
   const drafts = data.shifts.filter((s) => s.draft).length;
   // 띄울지 말지는 한 곳에서 정합니다 — 띄우는 자리와, 목록 끝이 가리지 않게 둘 여백이 같은 답을 봐야 합니다.
   const publishBar = phone && canSchedule && tab === 'schedule' && drafts > 0;
-  const reminders = data.published
-    ? data.shifts
-        .filter(
-          (s) =>
-            s.employeeId === actor.id && s.date === localDate(new Date(tick)),
-        )
-        .filter((s) => {
-          const parts = new Intl.DateTimeFormat('en-GB', {
-            timeZone: TIME_ZONE,
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-          }).format(new Date(tick));
-          const m = (t: string) =>
-            Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
-          return m(s.start) - m(parts) > 0 && m(s.start) - m(parts) <= 60;
-        })
-    : [];
+  // 출근 알림 띠. 시작 1시간 전부터 뜨고, 출근을 찍으면 사라집니다 — 이미 찍은 사람에게는 할 말이 없습니다.
+  // 찍지 않은 채 시작 시각이 지나면 깜빡한 것으로 보고 한 번 더, 이번에는 출근이 비었다는 말로 띄웁니다.
+  // 띠와 푸시가 같은 함수를 봐서, 화면에 뜬 것과 기기로 간 것이 어긋나지 않습니다.
+  const forMe = (list: Shift[]) => list.filter((s) => s.employeeId === actor.id);
+  const reminders = [
+    ...forMe(dueShifts(data, new Date(tick))).map((s) => ({
+      shift: s,
+      missed: false,
+    })),
+    ...forMe(missedShifts(data, new Date(tick))).map((s) => ({
+      shift: s,
+      missed: true,
+    })),
+  ];
   useEffect(() => {
     const context = (document as any).modelContext;
     if (!context?.registerTool) return;
@@ -1193,6 +1231,62 @@ export default function ShiftApp() {
     download(
       new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }),
       t('예상급여_') + from + '.csv',
+    );
+  }
+  // 급여 담당자에게 보내는 메일. 메일 앱은 파일을 스스로 붙이지 못해, CSV 를 먼저 내려받고 초안을 띄웁니다.
+  // 받는 사람은 PAYROLL_MAIL_TO 의 이름을 직원 명부에서 찾아 그 사람의 이메일로 채웁니다.
+  function mailPayroll() {
+    const wanted = PAYROLL_MAIL_TO.map((label) => ({
+      label,
+      email:
+        data.employees.find(
+          (e) => !e.archived && nameKey(e.name) === nameKey(label),
+        )?.email || '',
+    }));
+    const sendTo = wanted.filter((w) => w.email).map((w) => w.email);
+    const missing = wanted.filter((w) => !w.email).map((w) => w.label);
+    // 한 사람도 찾지 못하면 메일 앱을 열어 봐야 헛걸음입니다. 어디를 고쳐야 하는지만 알려 줍니다.
+    if (!sendTo.length) {
+      setStatus(
+        t('급여를 보낼 주소가 없습니다. 직원 관리에서 {names} 의 이메일을 먼저 등록하세요.', {
+          names: missing.join(', '),
+        }),
+      );
+      return;
+    }
+    // 본문은 CSV 와 같은 totals 를 봅니다. 화면 필터로 걸러진 값을 쓰면 줄의 합과 합계가 어긋납니다.
+    const rows = totals.filter((r) => r.hours > 0 || r.total !== 0);
+    const sum = money(rows.reduce((n, r) => n + r.total, 0));
+    const head = t('{from} ~ {to} 기간의 예상 급여입니다.', { from, to });
+    const tail = t('사람별 자세한 내역은 함께 보내는 CSV 파일에 있습니다.');
+    const link = (lines: string[]) =>
+      'mailto:' +
+      sendTo.join(',') +
+      '?subject=' +
+      encodeURIComponent(t('예상 급여 {from} ~ {to}', { from, to })) +
+      '&body=' +
+      encodeURIComponent(lines.join('\n'));
+    let url = link([
+      head,
+      '',
+      ...rows.map((r) => r.e.name + ' · ' + r.hours.toFixed(2) + 'h · ' + money(r.total)),
+      '',
+      t('급여 합계') + ' ' + sum,
+      '',
+      tail,
+    ]);
+    // 주소가 길면 본문을 잘라 버리는 메일 앱이 있습니다. 사람별 줄은 CSV 에 그대로 있으니 합계만 남깁니다.
+    if (url.length > 1800) url = link([head, '', t('급여 합계') + ' ' + sum, '', tail]);
+    exportPayroll();
+    window.location.assign(url);
+    setStatus(
+      t('급여 CSV 를 내려받았습니다. 열린 메일 초안에 그 파일을 첨부해 보내세요.') +
+        (missing.length
+          ? ' ' +
+            t('{names} 는 등록된 이메일이 없어 받는 사람에서 빠졌습니다.', {
+              names: missing.join(', '),
+            })
+          : ''),
     );
   }
   if (auth !== 'in')
@@ -1699,10 +1793,10 @@ export default function ShiftApp() {
             <div className="panel contentpanel">
               <div className="sectionhead">
                 <div>
-                  <h2>{actor.admin ? t('예상 급여') : t('내 예상 급여')}</h2>
+                  <h2>{t('예상 급여')}</h2>
                   <p>
                     {t(
-                      '정규 {r}시간까지 시급 × 실근무, 초과분 {m}배 가산, 지각 차감, 승인된 대체 추가수당',
+                      '정규 {r}시간까지 시급 × 실근무, 초과분 {m}배 가산, 체크인별 지각 차감, 승인된 대체 추가수당',
                       { r: OT_WEEKLY_HOURS, m: OT_MULTIPLIER },
                     )}
                   </p>
@@ -1710,6 +1804,16 @@ export default function ShiftApp() {
                 {actor.admin && (
                   <button className="button" onClick={exportPayroll}>
                     <Download size={16} /> {t('CSV 다운로드')}
+                  </button>
+                )}
+                {/* 급여는 늘 같은 사람들에게 갑니다. 주소를 다시 적지 않도록 버튼 하나에 담아 둡니다. */}
+                {actor.admin && (
+                  <button
+                    className="button"
+                    onClick={mailPayroll}
+                    title={t('받는 사람: {names}', { names: PAYROLL_MAIL_TO.join(', ') })}
+                  >
+                    <Mail size={16} /> {t('급여 이메일로 보내기')}
                   </button>
                 )}
               </div>
@@ -1756,7 +1860,7 @@ export default function ShiftApp() {
               )}
               <div className="policy">
                 {t(
-                  '지급액은 단말에서 찍힌 출퇴근을 기준으로 계산합니다. 유급 휴게는 근무로 치고 무급 휴게만 뺍니다. 그 사람 그 날짜에 찍힌 기록이 없을 때만 예전에 가져온 기록을 씁니다. 초과근무는 하루 {d}시간 초과분과 한 주(일요일 시작) {w}시간 초과분 중 큰 쪽만 {m}배로 가산합니다. 지각은 예정 출근 시각을 넘긴 분만큼 시급으로 차감하며, 예정 근무가 없는 출근기록은 지각으로 보지 않습니다. 세금·유급휴가를 제외한 예상 금액이고, 시급 0인 직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급 대상이 아니며 실제 출근기록만 지급합니다.',
+                  '지급액은 단말에서 찍힌 출퇴근을 기준으로 계산합니다. 유급 휴게는 근무로 치고 무급 휴게만 뺍니다. 그 사람 그 날짜에 찍힌 기록이 없을 때만 예전에 가져온 기록을 씁니다. 초과근무는 하루 {d}시간 초과분과 한 주(일요일 시작) {w}시간 초과분 중 큰 쪽만 {m}배로 가산합니다. 지각은 체크인 하나하나 따로 보아 예정 출근 시각을 넘긴 분만큼 그 체크인에서 번 금액까지만 차감하며, 예정 근무가 없는 출근기록은 지각으로 보지 않습니다. 세금·유급휴가를 제외한 예상 금액이고, 시급 0인 직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급 대상이 아니며 실제 출근기록만 지급합니다.',
                   { d: OT_DAILY_HOURS, w: OT_WEEKLY_HOURS, m: OT_MULTIPLIER },
                 )}
                 {/* 주 단위로 끊기지 않은 구간은 걸쳐 있는 주의 초과근무가 적게 잡힙니다. */}
@@ -2040,7 +2144,9 @@ export default function ShiftApp() {
                         </span>
                       ) : m.sender === actor.id ? (
                         <span>
-                          {m.readBy.includes(m.to)
+                          {(m.to === 'admin'
+                            ? m.readBy.some((id) => emp(id)?.admin)
+                            : m.readBy.includes(m.to))
                             ? t('상대방 확인')
                             : t('확인 대기')}
                         </span>
@@ -2051,7 +2157,13 @@ export default function ShiftApp() {
                             : t('확인 대기')}
                         </span>
                       )}
-                      {!m.readBy.includes(actor.id) && (
+                      {/* 받는 사람만 누를 수 있습니다. 관리자에게 온 메시지는 to 가 'admin' 이라 관리자면 받는 사람입니다. */}
+                      {!m.readBy.includes(actor.id) &&
+                        (m.to === 'all'
+                          ? !m.recipients || m.recipients.includes(actor.id)
+                          : m.to === 'admin'
+                            ? actor.admin
+                            : m.to === actor.id) && (
                         <button
                           disabled={busy}
                           className="button"
@@ -2119,6 +2231,7 @@ export default function ShiftApp() {
                     rate: String(e.rate),
                     roles: roleList(e).join(','),
                     taskManager: e.taskManager ? '1' : '',
+                    overtimeManager: e.overtimeManager ? '1' : '',
                     admin: e.admin ? '1' : '',
                     archived: e.archived ? '1' : '',
                   })
@@ -2298,6 +2411,9 @@ export default function ShiftApp() {
                         {e.taskManager && (
                           <span className="badge taskbadge">{t('작업 지시')}</span>
                         )}
+                        {e.overtimeManager && (
+                          <span className="badge taskbadge">{t('초과 근무')}</span>
+                        )}
                       </TableCell>
                       <TableCell>{e.birthDate || t('미등록')}</TableCell>
                       <TableCell>{e.phone || t('미등록')}</TableCell>
@@ -2312,6 +2428,7 @@ export default function ShiftApp() {
                               rate: String(e.rate),
                               roles: roleList(e).join(','),
                               taskManager: e.taskManager ? '1' : '',
+                              overtimeManager: e.overtimeManager ? '1' : '',
                               admin: e.admin ? '1' : '',
                               archived: e.archived ? '1' : '',
                             })
@@ -2326,7 +2443,7 @@ export default function ShiftApp() {
                         >
                           {t('삭제')}
                         </button>
-                        {/* 감추는 삭제 옆의 지우는 삭제. 되돌릴 수 없어 이름을 다시 받습니다. */}
+                        {/* 감추는 삭제 옆의 지우는 삭제. 묻지 않고 그 자리에서 기록까지 지웁니다. */}
                         <button
                           className="button danger"
                           disabled={busy || e.id === actor.id}
@@ -2407,7 +2524,7 @@ export default function ShiftApp() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        {['날짜', '예정 근무', '출퇴근', '휴게', '실근무', '지각', '초과', '금액'].map(
+                        {['날짜', '예정 근무', '출퇴근', '휴게', '실근무', '지각', '지각 차감', '초과', '금액'].map(
                           (h) => (
                             <TableHead key={h}>{t(h)}</TableHead>
                           ),
@@ -2415,7 +2532,7 @@ export default function ShiftApp() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {payDays(payDetail).map(({ a, shift, worked, late }) => (
+                      {payDays(payDetail).map(({ a, shift, worked, late, lateDeduction }) => (
                         <TableRow key={a.id}>
                           <TableCell>{monthDay(a.date)}</TableCell>
                           <TableCell>
@@ -2435,6 +2552,9 @@ export default function ShiftApp() {
                                 ? t('{n}분 지각', { n: late })
                                 : t('정시')}
                           </TableCell>
+                          <TableCell className={lateDeduction ? 'red' : undefined}>
+                            {lateDeduction ? '-' + money(lateDeduction) : '—'}
+                          </TableCell>
                           <TableCell>
                             {worked > OT_DAILY_HOURS
                               ? (worked - OT_DAILY_HOURS).toFixed(2) + 'h'
@@ -2447,7 +2567,7 @@ export default function ShiftApp() {
                   </Table>
                 </div>
                 <p className="hint">
-                  {t('날짜별 금액은 시급 × 실근무입니다. 초과분에 붙는 0.5배 가산과 지각 차감은 주 단위로 아래에서 더하고 뺍니다.')}
+                  {t('날짜별 금액은 시급 × 실근무이고, 지각 차감은 그 체크인에서 번 금액까지만 그 줄에서 바로 뺍니다. 초과분에 붙는 0.5배 가산만 주 단위로 아래에서 더합니다.')}
                 </p>
                 {payWeeks(payDetail).map((w) => (
                   <p className="hint" key={w.week}>
@@ -2507,33 +2627,52 @@ export default function ShiftApp() {
           }}
         />
       )}
-      {inapp && (
-        <div className="inapp-alert" role="status">
-          <span className="inapp-icon"><BellRing size={18} /></span>
-          <div>
-            <b>
-              {inapp.kind === 'rain'
-                ? t('우천 근무 종료')
-                : inapp.sender === 'admin'
-                  ? t('관리자 메시지')
-                  : t('{name} 메시지', { name: name(inapp.sender) })}
-            </b>
-            <p>{inapp.body}</p>
-          </div>
-          <div className="inapp-actions">
-            <button
-              className="button primary"
-              onClick={() => {
-                setTab('messages');
-                setInapp(null);
-              }}
-            >
-              {t('보기')}
-            </button>
-            <button className="iconbutton" aria-label={t('닫기')} onClick={() => setInapp(null)}>
-              <X size={16} />
-            </button>
-          </div>
+      {/* 저장 확인과 새 메시지는 같은 자리에 뜹니다. 한 통에 담아 세로로 쌓아, 둘이 겹쳐 서로를 가리지 않게 합니다. */}
+      {(saved || inapp) && (
+        <div className="alertstack">
+          {saved && (
+            <div className="inapp-alert" role="status">
+              <span className="inapp-icon"><CheckCircle2 size={18} /></span>
+              <div>
+                <b>{t(saved)}</b>
+                <p>{t('바꾼 내용을 팀 워크스페이스에 기록했습니다.')}</p>
+              </div>
+              <div className="inapp-actions">
+                <button className="iconbutton" aria-label={t('닫기')} onClick={() => setSaved('')}>
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+          )}
+          {inapp && (
+            <div className="inapp-alert" role="status">
+              <span className="inapp-icon"><BellRing size={18} /></span>
+              <div>
+                <b>
+                  {inapp.kind === 'rain'
+                    ? t('우천 근무 종료')
+                    : inapp.sender === 'admin'
+                      ? t('관리자 메시지')
+                      : t('{name} 메시지', { name: name(inapp.sender) })}
+                </b>
+                <p>{inapp.body}</p>
+              </div>
+              <div className="inapp-actions">
+                <button
+                  className="button primary"
+                  onClick={() => {
+                    setTab('messages');
+                    setInapp(null);
+                  }}
+                >
+                  {t('보기')}
+                </button>
+                <button className="iconbutton" aria-label={t('닫기')} onClick={() => setInapp(null)}>
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
       <Dialog
@@ -2796,6 +2935,19 @@ export default function ShiftApp() {
                 </label>
                 <p className="hint">
                   {t('켜면 이 직원이 작업 수신함에서 다른 직원에게 작업을 보내고 전체 작업 진행 상황을 볼 수 있습니다. 스케줄·급여·직원 정보는 계속 읽기 전용입니다.')}
+                </p>
+                <label className="recipient all">
+                  <Checkbox
+                    checked={form.overtimeManager === '1'}
+                    onCheckedChange={(on) => put('overtimeManager', on ? '1' : '')}
+                  />
+                  {t('초과 근무 편성 권한')}
+                </label>
+                <p className="hint">
+                  {t(
+                    '끄면 이 직원이 짜는 근무는 하루 {d}시간, 한 주(일요일 시작) {w}시간까지만 들어갑니다. 켜면 그 선을 넘는 근무도 낼 수 있고, 넘긴 시간에는 급여에서 {m}배가 붙습니다. 관리자는 이 설정과 상관없이 넘겨 짤 수 있습니다.',
+                    { d: OT_DAILY_HOURS, w: OT_WEEKLY_HOURS, m: OT_MULTIPLIER },
+                  )}
                 </p>
               </>
             )}
@@ -3108,13 +3260,18 @@ export default function ShiftApp() {
               </button>
             </div>
           )}
-          {reminders.map((s) => (
-            <div className="demo-banner" key={s.id}>
+          {reminders.map(({ shift, missed }) => (
+            <div className={'demo-banner' + (missed ? ' missed' : '')} key={shift.id}>
               <Bell size={16} />{' '}
-              {t('출근 알림 · 오늘 {start}, {area} 근무가 1시간 이내에 시작됩니다.', {
-                start: s.start,
-                area: s.area,
-              })}
+              {missed
+                ? t('출근 기록 없음 · {start}, {area} 근무가 시작됐습니다. 출근을 찍어 주세요.', {
+                    start: shift.start,
+                    area: shift.area,
+                  })
+                : t('출근 알림 · 오늘 {start}, {area} 근무가 1시간 이내에 시작됩니다.', {
+                    start: shift.start,
+                    area: shift.area,
+                  })}
             </div>
           ))}
           <TabsContent value="schedule">
@@ -3618,7 +3775,6 @@ export default function ShiftApp() {
       label: '기록',
       items: [
         { key: 'attendance', label: '출근 기록', Icon: Clock3, onSelect: () => setTab('attendance') },
-        { key: 'payroll', label: '내 예상 급여', Icon: Wallet, onSelect: () => setTab('payroll') },
       ],
     },
     {
@@ -3765,7 +3921,7 @@ export default function ShiftApp() {
             {navItem('messages', '메시지', MessageSquare, { count: unread.length })}
             <hr />
             {navItem('attendance', '출근 기록', Timer)}
-            {navItem('payroll', '급여 관리', Wallet)}
+            {actor.admin && navItem('payroll', '급여 관리', Wallet)}
             <hr />
             {navItem('help', '도움말', CircleQuestionMark)}
           </TabsList>
@@ -3873,13 +4029,18 @@ export default function ShiftApp() {
                 </button>
               </div>
             )}
-            {reminders.map((s) => (
-              <div className="demo-banner" key={s.id}>
+            {reminders.map(({ shift, missed }) => (
+              <div className={'demo-banner' + (missed ? ' missed' : '')} key={shift.id}>
                 <Bell size={16} />{' '}
-                {t('출근 알림 · 오늘 {start}, {area} 근무가 1시간 이내에 시작됩니다.', {
-                  start: s.start,
-                  area: s.area,
-                })}
+                {missed
+                  ? t('출근 기록 없음 · {start}, {area} 근무가 시작됐습니다. 출근을 찍어 주세요.', {
+                      start: shift.start,
+                      area: shift.area,
+                    })
+                  : t('출근 알림 · 오늘 {start}, {area} 근무가 1시간 이내에 시작됩니다.', {
+                      start: shift.start,
+                      area: shift.area,
+                    })}
               </div>
             ))}
             <TabsContent value="schedule">

@@ -55,6 +55,9 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+/* 퇴근을 못 찍은 채 날이 바뀐 기록. '근무 중'처럼 읽히면 지금 일하는 사람으로 보여,
+   시각 자리에 들어가는 글자를 흐리게 낮춰 둡니다. */
+.punchlog-stamp b.punchlog-noout { font-size: 14px; font-weight: 600; color: #9a5b18; }
 .punchlog-times em { font-style: normal; color: #b0bcb7; padding-bottom: 2px; }
 .punchlog-worked {
   margin-left: auto;
@@ -245,6 +248,15 @@
 }
 .punchroster-card:hover { border-color: #b7c6c0; background: #fafcfb; }
 .punchroster-card > svg { flex: none; margin-left: auto; color: #b0bcb7; }
+/* 카드 안은 이름 줄과 딸린 글 줄, 두 칸으로 나눠 세웁니다. 한 줄에 몰아 세우면
+   자리가 모자랄 때 서로를 밀어내다 글자끼리 겹쳐 읽혔습니다. */
+.punchroster-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
 .punchroster-name {
   display: flex;
   align-items: center;
@@ -253,6 +265,8 @@
 }
 .punchroster-name i { flex: none; width: 10px; height: 10px; border-radius: 2px; background: #9fb0aa; }
 .punchroster-name b {
+  flex: 0 1 auto;
+  min-width: 0;
   font-size: 15px;
   font-weight: 650;
   color: #1f2b2e;
@@ -260,13 +274,40 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.punchroster-name small { font-size: 12px; color: #8b9691; white-space: nowrap; }
+/* 넘치는 글은 잘라 말줄임으로 알립니다. 자르지 않으면 제 칸 밖으로 흘러나옵니다. */
+.punchroster-name small {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  color: #8b9691;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* 맡은 자리·건수·표지가 서는 아랫칸. 폭이 모자라면 다음 줄로 접힙니다. */
+.punchroster-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+}
+.punchroster-role {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  color: #8b9691;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 .punchroster-stat {
   font-size: 12px;
   color: #69767a;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+/* 맡은 자리와 건수가 맞닿으면 한 문장처럼 읽혀, 가운뎃점으로 갈라 둡니다.
+   점은 건수 쪽에 붙여 두 글이 다음 줄로 접힐 때 홀로 남지 않게 합니다. */
+.punchroster-role + .punchroster-stat::before { content: '· '; color: #b0bcb7; }
 .punchroster-flag {
   flex: none;
   padding: 2px 7px;

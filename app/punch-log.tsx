@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react';
 import { Camera, Coffee, MapPin, X } from 'lucide-react';
 import type { Employee, Punch, PunchSpot } from '@/lib/domain';
-import { duration } from '@/lib/domain';
+import { duration, localDate, missingOut } from '@/lib/domain';
 import { useLang } from './use-lang';
 import { prunePunchPhotos, readPunchPhoto } from './punch-photo-store';
 
@@ -54,6 +54,8 @@ export default function PunchLog({
     };
   }, [wanted]);
   const of = (id: string) => employees.find((e) => e.id === id);
+  // 매장 시각으로 본 오늘. 퇴근을 못 찍은 채 날이 바뀐 기록을 '근무 중'과 갈라 보여 주는 기준입니다.
+  const today = localDate(new Date());
   const dayLabel = (date: string) =>
     new Intl.DateTimeFormat(locale, {
       weekday: 'short',
@@ -114,7 +116,9 @@ export default function PunchLog({
               <em>→</em>
               <span className="punchlog-stamp">
                 <small>{t('퇴근')}</small>
-                <b>{p.out ? clock(p.out) : t('근무 중')}</b>
+                <b className={missingOut(p, today) ? 'punchlog-noout' : undefined}>
+                  {p.out ? clock(p.out) : missingOut(p, today) ? t('퇴근 미기록') : t('근무 중')}
+                </b>
               </span>
               {p.out && (
                 <span className="punchlog-worked">

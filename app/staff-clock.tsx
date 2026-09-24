@@ -2,11 +2,11 @@
 // next/image 를 쓰지 않습니다. 방금 찍은 사진은 data URL 이라 서버에 보낼 것도 캐시할 것도 없습니다.
 // oxlint-disable next/no-img-element
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Camera, Check, Coffee, Hourglass, LogOut } from 'lucide-react';
+import { AlarmClock, Camera, Check, Coffee, Hourglass, LogOut } from 'lucide-react';
 import type { Employee, Punch, Shift, Workplace } from '@/lib/domain';
 import { say } from './say';
 import { FIX_MAX_AGE_MS, type GpsState } from './gps-guard';
-import { TIME_ZONE, distanceMeters, duration } from '@/lib/domain';
+import { TIME_ZONE, distanceMeters, duration, earlyOut, minutes } from '@/lib/domain';
 import { useLang } from './use-lang';
 
 // 직원이 자기 폰으로 출퇴근을 찍는 화면입니다.
@@ -21,6 +21,11 @@ const SHOT_WIDTH = 360;
 // 찍힌 사진을 화면에 크게 띄워 두는 시간. 이 뒤에는 다시 카메라가 보입니다.
 // 기록되었다는 말도 같은 시간만큼만 머뭅니다. 공용 단말은 이 시간이 지난 뒤에 다음 사람에게 넘어갑니다.
 export const REVIEW_MS = 3000;
+// 방금 찍고 나서 다시 누른 것으로 보는 시간.
+// 찍혔는지 몰라 한 번 더 누르러 오는 사이 버튼은 반대로 바뀌어 있어서,
+// 그대로 받으면 막 온 사람이 퇴근으로, 막 간 사람이 다시 출근으로 남습니다.
+// 이 시간 안에 누른 것은 사진도 기록도 남기지 않고 지금 상태만 읽어 줍니다.
+const REPEAT_MIN = 10;
 // 매장 시각(온타리오)의 HH:MM. 찍히는 시각과 같은 기준이어야 '근무한 시간'이 어긋나지 않습니다.
 const hhmm = (d: Date) =>
   new Intl.DateTimeFormat('en-GB', {
@@ -78,7 +83,9 @@ export default function StaffClock({
   const [review, setReview] = useState('');
   const reviewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 보내는 중인지, 무엇으로 남았는지. 찍힌 사진 위에 한 줄로 뜹니다.
-  const [saved, setSaved] = useState<'' | 'saving' | 'in' | 'out'>('');
+  const [saved, setSaved] = useState<
+    '' | 'saving' | 'in' | 'out' | 'earlyOut' | 'againIn' | 'againOut'
+  >('');
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audio = useRef<AudioContext | null>(null);
   const video = useRef<HTMLVideoElement>(null);
@@ -97,6 +104,23 @@ export default function StaffClock({
   const fresh = !!spot && spot.at !== undefined && now.getTime() - spot.at < FIX_MAX_AGE_MS;
   // 출퇴근을 찍을 수 있는 상태. 위치가 켜져 있고, 방금 받은 자리가 있고, 근무지 안이어야 합니다.
   const ready = gpsState === 'on' && fresh && !tooFar;
+  // 마지막으로 찍힌 것. 무엇을 눌렀는지가 아니라 이것이 무엇으로 남았는지를 보고 다시 누른 것을 가립니다.
+  const last = punch?.out
+    ? ({ state: 'out', at: punch.out } as const)
+    : punch
+      ? ({ state: 'in', at: punch.in } as const)
+      : null;
+  // 찍힌 시각은 서버 시계, 지금은 이 기기 시계입니다. 조금 어긋난 폰에서 음수로 나와도 다시 누른 것은 다시 누른 것입니다.
+  // 자정을 넘긴 값은 1440분쯤 벌어져 이 창에 들어오지 않고, 날이 바뀌면 punch 자체가 오늘 기록으로 새로 잡힙니다.
+  const ago = last ? minutes(hhmm(now)) - minutes(last.at) : Infinity;
+  // 10분 안에 다시 누른 것. 기록을 남기지 않고 지금 상태만 읽어 주므로 위치가 잡히지 않아도 받습니다 —
+  // 찍혔는지 몰라 한 번 더 누르러 온 사람에게 잠긴 버튼은 아무 말도 해 주지 않습니다.
+  const repeat = !!last && ago > -REPEAT_MIN && ago < REPEAT_MIN;
+  // 지금 퇴근을 찍으면 예정 퇴근 시각보다 몇 분 이른지. 퇴근은 근무시간이 끝난 뒤에 찍는 것이고,
+  // 그보다 일찍 찍은 것은 조퇴입니다. 막지는 않습니다 — 먼저 가는 사람도 퇴근은 찍혀야 하기 때문입니다.
+  // 예정 근무가 없으면 기준이 없어 null 이고, 그때 퇴근은 지금까지와 똑같이 찍힙니다.
+  const earlyNow = (at: Date) =>
+    punch && !punch.out ? earlyOut(shift, punch.in, hhmm(at)) : null;
 
   const stop = useCallback(() => {
     stream.current?.getTracks().forEach((track) => track.stop());
@@ -215,6 +239,11 @@ export default function StaffClock({
     say(action === 'punchIn' ? 'pelham check in' : 'pelham check out', click, 1.15);
   };
 
+  // 이미 찍혀 있다는 말. 사진을 찍지 않았으니 찰깍은 내지 않습니다 — 그 소리는 사진이 남았다는 뜻입니다.
+  const alreadySaid = (state: 'in' | 'out') => {
+    say(state === 'in' ? 'pelham check in already' : 'pelham check out already', undefined, 1.15);
+  };
+
   // 지금 보이는 화면을 한 장 잡습니다. 까맣거나 가려져 있으면 사진으로 치지 않습니다.
   const capture = (): { photo?: string; problem?: string } => {
     const node = video.current;
@@ -272,9 +301,24 @@ export default function StaffClock({
     });
   // 출근·퇴근은 사진이 먼저입니다. 사진이 없으면 서버로 보내지도 않습니다.
   const press = async (action: 'punchIn' | 'punchOut') => {
+    // 이미 찍혀 있다는 말이 먼저입니다. 위치보다 앞에 두어야,
+    // 찍혔는지 몰라 자리를 옮긴 사람도 까닭 없이 조용한 화면을 보지 않습니다.
+    if (last && repeat) {
+      if (reviewTimer.current) clearTimeout(reviewTimer.current);
+      if (savedTimer.current) clearTimeout(savedTimer.current);
+      setReview('');
+      setProblem('');
+      alreadySaid(last.state);
+      setSaved(last.state === 'in' ? 'againIn' : 'againOut');
+      savedTimer.current = setTimeout(() => setSaved(''), REVIEW_MS);
+      return;
+    }
     // 위치가 없거나 근무지 밖이면 사진도 찍지 않습니다 —
     // 어차피 기록되지 않고, 까닭은 화면에 이미 떠 있습니다.
     if (!ready) return;
+    // 조퇴인지는 누른 그 순간으로 가립니다. now 는 20초마다 걸어서, 예정 퇴근 시각을 막 지난 자리에서
+    // 아직 걸어오지 않은 값을 보면 정시 퇴근이 조퇴로 남습니다.
+    const early = action === 'punchOut' ? earlyNow(new Date()) : null;
     const taken = capture();
     if (!taken.photo) {
       setProblem(taken.problem || '사진이 찍히지 않았습니다.');
@@ -317,13 +361,27 @@ export default function StaffClock({
       setSaved('');
       return;
     }
-    setSaved(action === 'punchIn' ? 'in' : 'out');
+    // 조퇴도 퇴근은 퇴근입니다 — 기록은 그대로 남고, 조퇴라는 말만 한 줄 더 붙습니다.
+    setSaved(action === 'punchIn' ? 'in' : early ? 'earlyOut' : 'out');
     savedTimer.current = setTimeout(() => setSaved(''), REVIEW_MS);
   };
 
   const working = punch && !punch.out ? punch : undefined;
+  // 버튼 위 안내. 근무 중이고 아직 예정 퇴근 시각 전이면, 지금 찍으면 조퇴로 남는다고 미리 알립니다.
+  const earlyBefore = earlyNow(now);
   const onBreakNow = (working?.breaks ?? []).find((b) => !b.end);
-  const since = working ? duration(working.in, hhmm(now)) * 60 : 0;
+  // 지금까지 일한 시간(분). 화면에 오는 punch 는 늘 오늘 찍은 것이라 자정을 넘는 뺄셈은 없습니다.
+  // 음수는 이 기기 시계가 매장 서버보다 조금 뒤처졌다는 뜻입니다 — 찍힌 시각은 서버 시계이기 때문입니다.
+  // duration() 에 그대로 넣으면 음수를 하루로 되감아 23시간이 되고,
+  // 막 출근한 사람의 '근무한 시간' 이 23시간으로 뜨며 아래 종료 안내까지 함께 뜹니다.
+  const since = working ? Math.max(0, minutes(hhmm(now)) - minutes(working.in)) : 0;
+  // 예정된 근무가 끝났는데 아직 퇴근이 찍히지 않은 상태입니다.
+  // 견주는 것은 '지금 시각과 종료 시각' 이 아니라 '일한 시간과 근무 길이' 입니다.
+  // 시계 글자(HH:MM)만으로는 02:00 이 오늘인지 어제인지 알 수 없어, 앞의 방법으로는
+  // 22:00–02:00 근무가 출근하자마자 끝난 것으로 보입니다. 길이는 duration() 이 자정을 넘겨 재 줍니다.
+  // 길이가 0 이면 예정 종료에 이르러서야 출근을 찍은 것입니다. 이미 지난 근무를 두고 다그치지 않습니다.
+  const planned = working && shift ? duration(working.in, shift.end) : 0;
+  const overdue = planned > 0 && since >= planned * 60;
   const stamp =
     new Intl.DateTimeFormat(locale, {
       weekday: 'short',
@@ -412,7 +470,13 @@ export default function StaffClock({
                   ? '저장 중…'
                   : saved === 'in'
                     ? '출근을 기록했습니다.'
-                    : '퇴근을 기록했습니다.',
+                    : saved === 'out'
+                      ? '퇴근을 기록했습니다.'
+                      : saved === 'earlyOut'
+                        ? '조퇴 — 퇴근을 기록했습니다.'
+                        : saved === 'againIn'
+                          ? '이미 출근으로 찍혀 있습니다.'
+                          : '이미 퇴근으로 찍혀 있습니다.',
               )}
             </span>
           )}
@@ -469,10 +533,32 @@ export default function StaffClock({
             })}
           </p>
         )}
+        {/* 퇴근은 근무시간이 끝난 뒤에 찍는 것입니다. 아직 그 전이라면 지금 찍으면 무엇으로 남는지 미리 말해 줍니다.
+            막지는 않습니다 — 먼저 가는 사람도 퇴근은 찍고 가야 합니다. */}
+        {shift && !!earlyBefore && (
+          <p className="stclock-note">
+            {t('예정 퇴근은 {t} 입니다. 지금 퇴근을 찍으면 {n}분 조퇴로 남습니다.', {
+              t: clock(shift.end),
+              n: earlyBefore,
+            })}
+          </p>
+        )}
         {problem && (
           <p role="alert" className="stclock-error">
             {t(problem)}
           </p>
+        )}
+        {/* 근무가 예정대로 끝났는데 퇴근이 찍히지 않았습니다. 막는 말이 아니라 잊은 것을 짚어 주는 말이라,
+            빨간 경고(.stclock-error)와 색도 역할도 나눕니다 — 눌러야 할 버튼 바로 위에 둡니다. */}
+        {overdue && shift && (
+          <output className="stclock-due">
+            <AlarmClock size={19} aria-hidden="true" />
+            <span>
+              {t('근무 종료 시간({time})입니다. 퇴근을 찍어주세요.', {
+                time: clock(shift.end),
+              })}
+            </span>
+          </output>
         )}
         {/* 찍힌 사진이 떠 있는 동안에는 버튼을 잠급니다.
             앞사람 화면이 아직 남아 있는 3초 사이에 뒷사람이 눌러 버리는 일을 막습니다. */}
@@ -489,7 +575,7 @@ export default function StaffClock({
             </button>
             <button
               className="stclock-end"
-              disabled={busy || !!saved || !ready}
+              disabled={busy || !!saved || (!ready && !repeat)}
               onClick={() => void press('punchOut')}
             >
               {t('endshift::퇴근 찍기')}
@@ -499,7 +585,7 @@ export default function StaffClock({
         ) : (
           <button
             className="stclock-start"
-            disabled={busy || !!saved || !ready}
+            disabled={busy || !!saved || (!ready && !repeat)}
             onClick={() => void press('punchIn')}
           >
             <Camera size={20} />

@@ -19,6 +19,8 @@ const en: Record<string, string> = {
   '근무 스케줄': 'Schedule',
   '근무 현황': "Who's working",
   '근무 중': 'On now',
+  // 퇴근을 찍지 않은 채 날이 바뀐 기록. '근무 중'과 달리 지금 일하는 사람이 아닙니다.
+  '퇴근 미기록': 'No check-out',
   '종료': 'Done',
   '오늘 근무': 'Scheduled',
   '오늘 누가 나와 있는지 출근 순서대로 봅니다. 실제 출근 기록이 아니라 예정된 근무 기준입니다.':
@@ -64,6 +66,7 @@ const en: Record<string, string> = {
   // Status messages
   '불러오지 못했습니다.': 'Could not load.',
   '저장했습니다.': 'Saved.',
+  '바꾼 내용을 팀 워크스페이스에 기록했습니다.': 'Your change is recorded in the team workspace.',
   '저장하지 못했습니다.': 'Could not save.',
   '먼저 워크스페이스를 생성하세요. 샘플 데이터는 저장되지 않습니다.':
     'Create your workspace first. Sample data is not saved.',
@@ -124,6 +127,8 @@ const en: Record<string, string> = {
   '내 워크스페이스 생성': 'Create my workspace',
   '출근 알림 · 오늘 {start}, {area} 근무가 1시간 이내에 시작됩니다.':
     'Shift reminder · Your {area} shift today at {start} starts within 1 hour.',
+  '출근 기록 없음 · {start}, {area} 근무가 시작됐습니다. 출근을 찍어 주세요.':
+    'Not checked in · Your {area} shift started at {start}. Please check in.',
   '이번 주 근무': 'Shifts this week',
   개: 'shifts',
   '{n}명의 직원과 함께하는 한 주': 'A week with {n} staff',
@@ -307,6 +312,7 @@ const en: Record<string, string> = {
   '확인 대기 {n}': '{n} awaiting review',
   '아직 끝난 근무가 없습니다': 'No finished shifts yet',
   '근무 중 {n}': '{n} on shift',
+  '퇴근 미기록 {n}': '{n} missing check-out',
   '직원 목록': 'All employees',
   '이전 급여 기간': 'Previous pay period',
   '다음 급여 기간': 'Next pay period',
@@ -382,14 +388,26 @@ const en: Record<string, string> = {
 
   // Payroll tab
   '예상 급여': 'Estimated pay',
-  '내 예상 급여': 'My estimated pay',
-  '정규 {r}시간까지 시급 × 실근무, 초과분 {m}배 가산, 지각 차감, 승인된 대체 추가수당':
-    'Hourly rate × hours worked up to {r}h, {m}× premium above that, late minutes deducted, plus approved swap bonuses',
+  '정규 {r}시간까지 시급 × 실근무, 초과분 {m}배 가산, 체크인별 지각 차감, 승인된 대체 추가수당':
+    'Hourly rate × hours worked up to {r}h, {m}× premium above that, late minutes deducted per check-in, plus approved swap bonuses',
   'CSV 다운로드': 'Download CSV',
+  '급여 이메일로 보내기': 'Email payroll',
+  '받는 사람: {names}': 'Sends to {names}',
+  '예상 급여 {from} ~ {to}': 'Estimated pay {from} – {to}',
+  '{from} ~ {to} 기간의 예상 급여입니다.': 'Estimated pay for {from} – {to}.',
+  '급여 합계': 'Total',
+  '사람별 자세한 내역은 함께 보내는 CSV 파일에 있습니다.':
+    'The per-person breakdown is in the CSV file attached.',
+  '급여 CSV 를 내려받았습니다. 열린 메일 초안에 그 파일을 첨부해 보내세요.':
+    'The payroll CSV has been downloaded. Attach it to the email draft that just opened, then send.',
+  '{names} 는 등록된 이메일이 없어 받는 사람에서 빠졌습니다.':
+    '{names} has no email on file and was left out of the recipients.',
+  '급여를 보낼 주소가 없습니다. 직원 관리에서 {names} 의 이메일을 먼저 등록하세요.':
+    'No payroll recipients have an email yet. Add an email for {names} under Staff first.',
   시작일: 'Start date',
   종료일: 'End date',
-  '지급액은 단말에서 찍힌 출퇴근을 기준으로 계산합니다. 유급 휴게는 근무로 치고 무급 휴게만 뺍니다. 그 사람 그 날짜에 찍힌 기록이 없을 때만 예전에 가져온 기록을 씁니다. 초과근무는 하루 {d}시간 초과분과 한 주(일요일 시작) {w}시간 초과분 중 큰 쪽만 {m}배로 가산합니다. 지각은 예정 출근 시각을 넘긴 분만큼 시급으로 차감하며, 예정 근무가 없는 출근기록은 지각으로 보지 않습니다. 세금·유급휴가를 제외한 예상 금액이고, 시급 0인 직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급 대상이 아니며 실제 출근기록만 지급합니다.':
-    "Pay is worked out from the check-ins taken on the time clock. Paid breaks count as work; only unpaid breaks come off. Imported time clock records are used only when that person has no check-in on that date. Overtime pays {m}× on the greater of hours over {d} in a day or hours over {w} in a week (weeks start Sunday), never both. Lateness is deducted at the hourly rate for every minute past the scheduled start; attendance with no scheduled shift is never counted late. Estimates exclude taxes and paid leave, and pay needs checking for anyone whose hourly rate is 0. Only actual attendance is paid, not the original employee's scheduled hours.",
+  '지급액은 단말에서 찍힌 출퇴근을 기준으로 계산합니다. 유급 휴게는 근무로 치고 무급 휴게만 뺍니다. 그 사람 그 날짜에 찍힌 기록이 없을 때만 예전에 가져온 기록을 씁니다. 초과근무는 하루 {d}시간 초과분과 한 주(일요일 시작) {w}시간 초과분 중 큰 쪽만 {m}배로 가산합니다. 지각은 체크인 하나하나 따로 보아 예정 출근 시각을 넘긴 분만큼 그 체크인에서 번 금액까지만 차감하며, 예정 근무가 없는 출근기록은 지각으로 보지 않습니다. 세금·유급휴가를 제외한 예상 금액이고, 시급 0인 직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급 대상이 아니며 실제 출근기록만 지급합니다.':
+    "Pay is worked out from the check-ins taken on the time clock. Paid breaks count as work; only unpaid breaks come off. Imported time clock records are used only when that person has no check-in on that date. Overtime pays {m}× on the greater of hours over {d} in a day or hours over {w} in a week (weeks start Sunday), never both. Lateness is worked out per check-in: every minute past that check-in’s scheduled start is deducted at the hourly rate, never more than that check-in earned; attendance with no scheduled shift is never counted late. Estimates exclude taxes and paid leave, and pay needs checking for anyone whose hourly rate is 0. Only actual attendance is paid, not the original employee's scheduled hours.",
   '직원이 이의를 제기한 근무 {n}건이 이 금액에 들어 있습니다. ':
     'This total includes {n} shift(s) a staff member has disputed. ',
   '아직 아무도 확인하지 않은 근무 {n}건이 있습니다. ': '{n} shift(s) have not been reviewed yet. ',
@@ -421,8 +439,8 @@ const en: Record<string, string> = {
   금액: 'Amount',
   '{week} 시작 주 · 실근무 {worked}h · 하루 8시간 초과분 합 {daily}h · 주 40시간 초과분 {weekly}h → 1.5배 가산 {applied}h':
     'Week of {week} · {worked}h worked · {daily}h over 8h a day · {weekly}h over 40h a week → {applied}h paid at 1.5x',
-  '날짜별 금액은 시급 × 실근무입니다. 초과분에 붙는 0.5배 가산과 지각 차감은 주 단위로 아래에서 더하고 뺍니다.':
-    'Each day shows the hourly rate times hours worked. The extra 0.5x on overtime and the late deduction are applied per week, below.',
+  '날짜별 금액은 시급 × 실근무이고, 지각 차감은 그 체크인에서 번 금액까지만 그 줄에서 바로 뺍니다. 초과분에 붙는 0.5배 가산만 주 단위로 아래에서 더합니다.':
+    'Each day shows the hourly rate times hours worked, with that check-in’s late deduction taken off on the same row, never more than the row earned. Only the extra 0.5x on overtime is applied per week, below.',
   통화: 'Currency',
   예상급여_: 'estimated-pay_',
 
@@ -488,10 +506,6 @@ const en: Record<string, string> = {
     "When this is on, the employee signs in to the admin screens with their own password. They can see and change the schedule, payroll and staff records, which includes every employee's birth date, phone number and hourly rate.",
   '{name} 직원을 삭제할까요? 지난 근무·급여 기록은 그대로 남고 목록에서만 사라집니다.':
     'Remove {name}? Their past shifts and payroll records stay as they are; they only disappear from the lists.',
-  // 감추는 삭제와 달리 이쪽은 정말로 지웁니다. 되돌릴 수 없다는 말을 먼저 둡니다.
-  '{name} 직원을 완전히 삭제합니다. 지난 근무·출퇴근·급여·작업·메시지 기록이 함께 지워지고 되돌릴 수 없습니다. 계속하려면 이름을 그대로 입력하세요.':
-    'Delete {name} for good. Their shifts, check-ins, payroll, tasks and messages go with them, and this cannot be undone. Type their name exactly to continue.',
-  '이름이 맞지 않아 삭제하지 않았습니다.': 'That name did not match, so nothing was deleted.',
   '완전 삭제': 'Delete for good',
   '보관된 직원': 'Archived staff',
   '삭제해 목록에서 감춘 직원입니다. 지난 근무·급여 기록은 아직 남아 있습니다.':
@@ -509,15 +523,22 @@ const en: Record<string, string> = {
   '새 업무 이름': 'New job name',
   '예: Kitchen': 'e.g. Kitchen',
   '업무 추가': 'Add job',
+  '‘{name}’ 업무를 목록에 더했습니다.': '“{name}” has been added to the job list.',
   '이미 있는 업무입니다.': 'That job is already on the list.',
   '업무는 40개까지 만들 수 있습니다.': 'You can keep up to 40 jobs.',
   // 한 사람이 여러 업무를 겸할 수 있습니다 — Proshop 과 Workshop 을 함께 뛰는 멀티 플레이어.
   '업무 (겸직이면 여러 개를 고릅니다)': 'Roles (tick more than one for staff who cover both)',
-  '여러 업무를 겸하면 함께 고르세요. 먼저 고른 업무가 새 근무의 기본이 됩니다.':
-    'Tick every role this person covers. The first one is the default on their new shifts.',
+  '두 업무를 함께 뛰면 Hybrid 를 고르세요. 먼저 고른 업무가 새 근무의 기본이 됩니다.':
+    'Pick Hybrid for staff who cover both jobs. The first role picked is the default on their new shifts.',
   '{roles} 를 함께 맡습니다. 먼저 고른 {main} 이 새 근무의 기본 업무가 됩니다.':
     'Covers {roles}. {main} was picked first, so it is the default on their new shifts.',
+  '{roles} 를 함께 맡는 Hybrid 입니다. 먼저 고른 {main} 이 새 근무의 기본 업무가 됩니다.':
+    'Hybrid — covers {roles}. {main} was picked first, so it is the default on their new shifts.',
   '업무를 하나 이상 고르세요.': 'Pick at least one role.',
+  '초과 근무 편성 권한': 'Overtime scheduling',
+  '초과 근무': 'Overtime',
+  '끄면 이 직원이 짜는 근무는 하루 {d}시간, 한 주(일요일 시작) {w}시간까지만 들어갑니다. 켜면 그 선을 넘는 근무도 낼 수 있고, 넘긴 시간에는 급여에서 {m}배가 붙습니다. 관리자는 이 설정과 상관없이 넘겨 짤 수 있습니다.':
+    'With this off, shifts this person schedules stop at {d} hours a day and {w} hours a week (weeks start Sunday). With it on they can schedule past that line, and the hours over it are paid at {m}× . Administrators can always schedule past it.',
   '대체근무 신청': 'Request a swap',
   '대체근무 승인': 'Approve swap',
   '근무 상세': 'Shift details',
@@ -669,6 +690,10 @@ const en: Record<string, string> = {
   '받는 직원': 'Assign to',
   '직원을 선택하세요': 'Choose an employee',
   마감일: 'Due date',
+  '마감 시각': 'Due time',
+  '적지 않아도 됩니다': 'Optional',
+  '시각 비우기': 'Clear time',
+  '마감 시각은 10분 단위로 고르세요.': 'Pick a due time on a 10-minute mark.',
   '작업 제목': 'Task title',
   '예: 3번 홀 장비 점검': 'e.g. Check equipment at hole 3',
   '작업 안내': 'Instructions',
@@ -677,6 +702,7 @@ const en: Record<string, string> = {
   '{n}개의 진행 중 작업': '{n} open tasks',
   '전체 {n}건': '{n} total',
   '마감 {date}': 'Due {date}',
+  '마감 {date} {time}': 'Due {date} {time}',
   '· {time} 완료': '· Completed {time}',
   '완료 처리': 'Mark done',
   '보낸 작업이 없습니다': 'No tasks sent yet',
@@ -688,6 +714,9 @@ const en: Record<string, string> = {
   '출근 1시간 전 알림': 'Shift starts in 1 hour',
   '{date} {start} · {area} 근무가 1시간 이내에 시작됩니다.':
     '{date} {start} · Your {area} shift starts within 1 hour.',
+  '출근 기록이 아직 없습니다': 'You have not checked in yet',
+  '{start} · {area} 근무가 시작됐는데 출근이 찍히지 않았습니다. 출퇴근 화면에서 출근을 찍어 주세요.':
+    '{start} · Your {area} shift has started but no check-in was recorded. Please check in on the clock screen.',
   'Pelham Shift 테스트 알림': 'Pelham Shift test notification',
   '이 기기에서 푸시 알림을 받을 수 있습니다.': 'This device can receive push notifications.',
 
@@ -733,7 +762,7 @@ const en: Record<string, string> = {
     'No database connection is configured. Set the DATABASE_URL environment variable on Vercel or connect Supabase (POSTGRES_URL).',
   '필수 입력값을 확인하세요.': 'Check the required fields.',
   '날짜를 확인하세요.': 'Check the date.',
-  '근무시간은 30분 단위로 입력하세요.': 'Enter shift times in 30-minute steps.',
+  '근무시간은 10분 단위로 입력하세요.': 'Enter shift times in 10-minute steps.',
   '시간 형식을 확인하세요.': 'Check the time format.',
   '0 이상의 유효한 금액/시간을 입력하세요.': 'Enter a valid amount or time of 0 or more.',
   '관리자 권한이 필요합니다.': 'Manager permission is required.',
@@ -921,9 +950,16 @@ const en: Record<string, string> = {
   '예정된 근무가 없습니다': 'No scheduled shift',
   '일정이 없어도 찍을 수 있습니다.': 'You can still check in.',
   '출근·퇴근은 사진이 찍혀야 기록됩니다.': 'A photo is required to check in or out.',
+  '근무 종료 시간({time})입니다. 퇴근을 찍어주세요.':
+    'Your shift is over ({time}). Please check out.',
   '방금 찍은 사진': 'The photo just taken',
   '출근을 기록했습니다.': 'Checked in.',
   '퇴근을 기록했습니다.': 'Checked out.',
+  '조퇴 — 퇴근을 기록했습니다.': 'Checked out early — undertime.',
+  '예정 퇴근은 {t} 입니다. 지금 퇴근을 찍으면 {n}분 조퇴로 남습니다.':
+    'Your shift ends at {t}. Checking out now records {n} min of undertime.',
+  '이미 출근으로 찍혀 있습니다.': 'Already checked in.',
+  '이미 퇴근으로 찍혀 있습니다.': 'Already checked out.',
   '카메라를 켜는 중입니다…': 'Starting the camera…',
   '카메라를 켤 수 없습니다. 기기 설정에서 카메라 권한을 허용해 주세요.':
     'The camera is not available. Allow camera access in this device’s settings.',

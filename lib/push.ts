@@ -1,6 +1,6 @@
 import {env} from '@/lib/db';
 import {buildPushPayload} from '@block65/webcrypto-web-push';
-import {type State,TIME_ZONE,localDate,addDays,minutes} from './domain';
+import {type Shift,type State,dueShifts,missedShifts} from './domain';
 import {translate,isLang,SCREEN_LANG,type Vars} from './i18n';
 export type Note={title:string;body:string;tag?:string;vars?:Vars};
 type Keys={publicKey:string;privateKey:string;tickKey:string};
@@ -14,10 +14,16 @@ export async function subscribe(workspace:string,member:string,value:unknown,lan
 export async function unsubscribe(workspace:string,member:string,endpoint:unknown){await env.DB.prepare('DELETE FROM push_subscriptions WHERE endpoint = ? AND workspace = ? AND member = ?').bind(typeof endpoint==='string'?endpoint:'',workspace,member).run()}
 export async function notify(workspace:string,members:string[],note:Note,origin:string){const targets=new Set(members);const subs=(await env.DB.prepare('SELECT endpoint,member,p256dh,auth,lang FROM push_subscriptions WHERE workspace = ?').bind(workspace).all<Sub>()).results.filter(s=>targets.has(s.member));if(!subs.length)return 0;const keys=await pushKeys(workspace);const vapid={subject:origin.startsWith('https://')?origin:'mailto:notifications@pelham-shift.invalid',publicKey:keys.publicKey,privateKey:keys.privateKey};const url='/?team='+encodeURIComponent(workspace);// 알림도 화면과 같은 말로 갑니다. 기기마다 저장된 lang 은 언어 고르기가 돌아올 때를 위해 그대로 둡니다.
  const results=await Promise.allSettled(subs.map(async s=>{const lang=SCREEN_LANG;const data=JSON.stringify({title:translate(lang,note.title,note.vars),body:translate(lang,note.body,note.vars),tag:note.tag,url});const res=await fetch(s.endpoint,await buildPushPayload({data,options:{ttl:3600,urgency:'high'}},{endpoint:s.endpoint,expirationTime:null,keys:{p256dh:s.p256dh,auth:s.auth}},vapid));if(res.status===404||res.status===410)await env.DB.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(s.endpoint).run();return res.ok}));return results.filter(r=>r.status==='fulfilled'&&r.value).length}
-const clubMinutes=(now:Date)=>minutes(new Intl.DateTimeFormat('en-GB',{timeZone:TIME_ZONE,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(now));
-export function dueShifts(state:State,now=new Date()){if(!state.published)return [];const today=localDate(now),tomorrow=addDays(today,1),current=clubMinutes(now);return state.shifts.filter(s=>{if(s.date!==today&&s.date!==tomorrow)return false;const diff=(s.date===today?0:1440)+minutes(s.start)-current;return diff>0&&diff<=60})}
 // Each shift start is claimed in push_sent before sending, so concurrent polls and cron ticks never double-send.
 // A claim whose send reached no device is released, so the next poll retries (e.g. the employee enables push later).
-export async function remind(workspace:string,state:State,origin:string,now=new Date()){let sent=0;for(const s of dueShifts(state,now)){const id=`${workspace}:${s.id}:${s.employeeId}:${s.date}T${s.start}`;const claim=await env.DB.prepare('INSERT INTO push_sent (id,workspace,sent_at) VALUES (?,?,?) ON CONFLICT DO NOTHING').bind(id,workspace,now.toISOString()).run();if(claim.meta.changes!==1)continue;const n=await notify(workspace,[s.employeeId],{title:'출근 1시간 전 알림',body:'{date} {start} · {area} 근무가 1시간 이내에 시작됩니다.',vars:{date:s.date.slice(5).replace('-','/'),start:s.start,area:s.area},tag:'shift-'+s.id},origin).catch(()=>0);if(n)sent+=n;else await env.DB.prepare('DELETE FROM push_sent WHERE id = ?').bind(id).run()}if(sent)await env.DB.prepare('DELETE FROM push_sent WHERE workspace = ? AND sent_at < ?').bind(workspace,new Date(now.getTime()-7*86400000).toISOString()).run();return sent}
+// The claim id carries which of the two messages it is, so the missed-check-in notice is not mistaken for the reminder already sent.
+async function claimed(workspace:string,s:Shift,kind:string,note:Note,origin:string,now:Date){const id=`${workspace}:${s.id}:${s.employeeId}:${s.date}T${s.start}${kind}`;const claim=await env.DB.prepare('INSERT INTO push_sent (id,workspace,sent_at) VALUES (?,?,?) ON CONFLICT DO NOTHING').bind(id,workspace,now.toISOString()).run();if(claim.meta.changes!==1)return 0;const n=await notify(workspace,[s.employeeId],note,origin).catch(()=>0);if(!n)await env.DB.prepare('DELETE FROM push_sent WHERE id = ?').bind(id).run();return n}
+// 근무마다 최대 두 번입니다 — 시작 1시간 전에 한 번, 그러고도 출근이 찍히지 않으면 한 번 더.
+// 이미 출근을 찍은 사람은 두 창 모두에서 빠지므로 알림이 가지 않습니다.
+export async function remind(workspace:string,state:State,origin:string,now=new Date()){let sent=0;
+ const vars=(s:Shift)=>({date:s.date.slice(5).replace('-','/'),start:s.start,area:s.area});
+ for(const s of dueShifts(state,now)) sent+=await claimed(workspace,s,'',{title:'출근 1시간 전 알림',body:'{date} {start} · {area} 근무가 1시간 이내에 시작됩니다.',vars:vars(s),tag:'shift-'+s.id},origin,now);
+ for(const s of missedShifts(state,now)) sent+=await claimed(workspace,s,':missed',{title:'출근 기록이 아직 없습니다',body:'{start} · {area} 근무가 시작됐는데 출근이 찍히지 않았습니다. 출퇴근 화면에서 출근을 찍어 주세요.',vars:vars(s),tag:'missed-'+s.id},origin,now);
+ if(sent)await env.DB.prepare('DELETE FROM push_sent WHERE workspace = ? AND sent_at < ?').bind(workspace,new Date(now.getTime()-7*86400000).toISOString()).run();return sent}
 // 완전히 삭제한 직원에게는 알림이 갈 곳이 없습니다. 기기 등록을 함께 지웁니다.
 export async function forgetPush(workspace:string,member:string){await env.DB.prepare('DELETE FROM push_subscriptions WHERE workspace = ? AND member = ?').bind(workspace,member).run()}

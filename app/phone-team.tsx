@@ -76,6 +76,7 @@ export default function PhoneTeam({
           <small>
             {person.admin ? t('관리자') : t('직원')}
             {person.taskManager ? ' · ' + t('작업 지시') : ''}
+            {person.overtimeManager ? ' · ' + t('초과 근무') : ''}
             {person.archived ? ' · ' + t('보관됨') : ''}
           </small>
           <button className="pteam-message" onClick={() => onMessage(person)}>

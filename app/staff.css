@@ -663,6 +663,17 @@
   line-height: 1.6;
 }
 
+/* 알림은 막는 말이 아니라 알려 주는 말입니다. 빨간 경고와 달리 버튼은 그대로 눌립니다. */
+.stclock-note {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border-radius: 9px;
+  background: #fff5e2;
+  color: #8a5a17;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
 /* 출퇴근 화면은 폰 폭에 맞춰 그렸습니다. 넓은 화면에서는 가운데로 모읍니다. */
 @media (min-width: 901px) {
   .stclock { max-width: 520px; margin: 0 auto; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
@@ -683,6 +694,24 @@
   .stclock-body { padding-bottom: 76px; }
 }
 .stclock-free { color: #3aa76d; }
+
+/* 예정된 근무가 끝났는데 퇴근이 찍히지 않았을 때 뜨는 줄.
+   막는 말인 .stclock-error 와 달리 할 일을 짚어 주는 말이라 빨강 대신 호박색을 씁니다. */
+.stclock-due {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border: 1px solid #f0d08a;
+  border-radius: 9px;
+  background: #fff6e3;
+  color: #85600f;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+.stclock-due svg { flex-shrink: 0; }
 
 /* 직원 기록이 없는 계정에게 보여 주는 안내. 카메라를 켜지 않습니다. */
 .nostaff {

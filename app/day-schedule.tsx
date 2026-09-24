@@ -67,11 +67,11 @@ export default function DaySchedule({
   const { t, locale } = useLang();
   // 빈 칸 위에 마우스를 올리면 그 자리에 + 를 띄웁니다. 누르면 그 시각으로 근무가 열립니다.
   const [hover, setHover] = useState<{ id: string; at: number } | null>(null);
-  // 가로 위치를 30분 단위 시각으로 바꿉니다. 클릭과 + 표시가 같은 값을 씁니다.
+  // 가로 위치를 10분 단위 시각으로 바꿉니다. 클릭과 + 표시가 같은 값을 씁니다.
   const slotAt = (event: { clientX: number; currentTarget: Element }) => {
     const box = event.currentTarget.getBoundingClientRect();
     const raw = FROM + ((event.clientX - box.left) / box.width) * SPAN;
-    return Math.min(Math.max(Math.round(raw / 30) * 30, FROM), TO - 30);
+    return Math.min(Math.max(Math.round(raw / 10) * 10, FROM), TO - 30);
   };
   const asTime = (m: number) =>
     String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
@@ -211,7 +211,7 @@ export default function DaySchedule({
                     }
                     onMouseLeave={() => setHover(null)}
                     onClick={(event) => {
-                      // 빈 자리를 누르면 그 시각부터 근무를 새로 만듭니다. 30분 단위로 맞춥니다.
+                      // 빈 자리를 누르면 그 시각부터 근무를 새로 만듭니다. 10분 단위로 맞춥니다.
                       if (!canEdit) return;
                       onAddShift(e.id, date, asTime(slotAt(event)));
                     }}

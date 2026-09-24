@@ -1,10 +1,12 @@
-import {MAX_AREAS,MIN_WORKPLACE_RADIUS,MAX_WORKPLACE_RADIUS,type State,type Shift,type Attendance,type Punch,areaList,canSwap,leadDate,localDate,localTime,minutes,nameKey,overlap,duration,payPeriodStart,payPeriodEnd,periodOpen} from './domain';
+import {MAX_AREAS,MIN_WORKPLACE_RADIUS,MAX_WORKPLACE_RADIUS,OT_DAILY_HOURS,OT_WEEKLY_HOURS,type State,type Shift,type Attendance,type Punch,areaList,canSwap,leadDate,localDate,localTime,minutes,nameKey,overlap,overtimeOver,duration,payPeriodStart,payPeriodEnd,periodOpen} from './domain';
 export type Actor={id:string;admin:boolean};
 export type Command={type:string;payload:any};
 const fail=(message:string):never=>{throw new Error(message)};
 function text(value:unknown,max=200){if(typeof value!=='string'||!value.trim()||value.length>max)fail('필수 입력값을 확인하세요.');return (value as string).trim()}
 function date(value:string){if(!/^\d{4}-\d{2}-\d{2}$/.test(value)||new Date(value+'T12:00Z').toISOString().slice(0,10)!==value)fail('날짜를 확인하세요.');return value}
-function time(value:string,halfHour=false){if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(value)||(halfHour&&!['00','30'].includes(value.slice(3))))fail(halfHour?'근무시간은 30분 단위로 입력하세요.':'시간 형식을 확인하세요.');return value}
+function time(value:string,stepped=false){if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(value)||(stepped&&Number(value.slice(3))%10!==0))fail(stepped?'근무시간은 10분 단위로 입력하세요.':'시간 형식을 확인하세요.');return value}
+// 작업 지시의 마감 시각은 10분 단위로만 받습니다 — 화면 시계가 세워 주는 눈금과 같아야 합니다.
+function tenMinute(value:unknown){const v=typeof value==='string'?value:'';if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(v)||Number(v.slice(3))%10)fail('마감 시각은 10분 단위로 고르세요.');return v}
 function number(value:unknown,max=1000000){const n=Number(value);if(!Number.isFinite(n)||n<0||n>max)fail('0 이상의 유효한 금액/시간을 입력하세요.');return n}
 // 직군은 겸할 수 있습니다 — 화면은 고른 직군을 쉼표로 묶어 보냅니다.
 // 첫째 직군이 그 사람의 기본 업무가 되어, 근무와 출퇴근이 장소를 하나만 적을 때 쓰입니다.
@@ -25,10 +27,27 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
  // Payroll and staff records stay with the administrator.
  const taskManager=actor.admin||!!s.employees.find(e=>e.id===actor.id)?.taskManager;
  const scheduler=()=>{if(!taskManager)fail('작업 지시 권한이 필요합니다.')};
+ // 초과 근무 편성은 따로 엽니다. 근무표는 짜도 하루 8시간·주 40시간을 넘기는 근무는 이 권한을 받은 사람만 냅니다.
+ // 근무를 s 에 반영한 뒤에, 손대기 전 모습(before)과 견주어 부릅니다. 이미 넘어 있던 근무의 장소나 메모를
+ // 고치는 것까지 막으면 예전에 짜 둔 근무표를 손볼 수 없게 되므로, 이번 편성이 더 넘긴 자리만 막습니다.
+ // 막히면 그 자리에서 throw 되고, 손대던 s 는 복제본이라 그대로 버려집니다.
+ const overtimeManager=actor.admin||!!s.employees.find(e=>e.id===actor.id)?.overtimeManager;
+ const withinOvertime=(before:Shift[],employeeId:string,dates:string[])=>{
+  if(overtimeManager)return;
+  const was=overtimeOver(before,employeeId,dates);
+  for(const [key,hours] of overtimeOver(s.shifts,employeeId,dates)){
+   // 분 단위로 세다 보면 소수점 끝자리가 흔들립니다. 1분(0.017시간)보다 적게 늘어난 것은 늘어난 것으로 보지 않습니다.
+   if(hours<=(was.get(key)??0)+0.001)continue;
+   const name=employee(employeeId).name,extra=Math.round(hours*100)/100,day=key.slice(2);
+   fail(key.startsWith('w')
+    ?`${day} 주 ${name}: 주 ${OT_WEEKLY_HOURS}시간을 ${extra}시간 넘깁니다. 초과 근무 편성 권한이 필요합니다.`
+    :`${day} ${name}: 하루 ${OT_DAILY_HOURS}시간을 ${extra}시간 넘깁니다. 초과 근무 편성 권한이 필요합니다.`);
+  }
+ };
  const MANAGED=['taskCreate','taskRemove','areaAdd','shift','shiftUpdate','shiftRemove','publish','unpublish'];
  if(!actor.admin&&!['taskUpdate','message','read','timeOffRequest','timeOffDecision','availabilitySet','availabilityDecision','punchIn','punchOut','punchBreak','punchReview','punchApproveAll'].includes(command.type)&&!(MANAGED.includes(command.type)&&taskManager))fail('직원 계정은 전체 일정, 본인 근태 및 급여를 읽기 전용으로만 볼 수 있습니다.');
  switch(command.type){
- case 'employee': {admin();const prev=s.employees.find(x=>x.id===p.id);const roles=roleInput(p.roles,p.role);const e={id:p.id||id(),name:text(p.name,80),color:text(p.color,7),role:roles[0],roles,email:String(p.email||'').trim().toLowerCase(),birthDate:String(p.birthDate||'').trim(),phone:String(p.phone||'').trim(),punchId:String(p.punchId||'').trim(),rate:number(p.rate),taskManager:p.taskManager===true||p.taskManager==='1',admin:p.admin===true||p.admin==='1',archived:prev?.archived};if(!/^#[0-9a-f]{6}$/i.test(e.color))fail('직원 색상을 확인하세요.');if(e.phone&&!/^[0-9+()\-\s]{7,30}$/.test(e.phone))fail('연락처를 확인하세요. 숫자와 + - ( ) 만 입력할 수 있습니다.');if(!/^\d{4,8}$/.test(e.punchId||''))fail('직원 ID는 숫자 4~8자리로 입력하세요.');if(s.employees.some(x=>x.id!==e.id&&!x.archived&&x.punchId===e.punchId))fail('이미 쓰이고 있는 직원 ID 입니다.');if(e.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.email))fail('이메일을 확인하세요.');if(e.birthDate&&!/^\d{8}$/.test(e.birthDate))fail('생년월일 8자리를 입력하세요.');if(e.email&&s.employees.some(x=>x.id!==e.id&&!x.archived&&x.email===e.email))fail('이미 등록된 이메일입니다.');if(e.birthDate&&s.employees.some(x=>x.id!==e.id&&!x.archived&&x.birthDate===e.birthDate))fail('같은 생년월일이 이미 등록되어 있습니다.');s.employees=s.employees.filter(x=>x.id!==e.id).concat(e);break;}
+ case 'employee': {admin();const prev=s.employees.find(x=>x.id===p.id);const roles=roleInput(p.roles,p.role);const e={id:p.id||id(),name:text(p.name,80),color:text(p.color,7),role:roles[0],roles,email:String(p.email||'').trim().toLowerCase(),birthDate:String(p.birthDate||'').trim(),phone:String(p.phone||'').trim(),punchId:String(p.punchId||'').trim(),rate:number(p.rate),taskManager:p.taskManager===true||p.taskManager==='1',overtimeManager:p.overtimeManager===true||p.overtimeManager==='1',admin:p.admin===true||p.admin==='1',archived:prev?.archived};if(!/^#[0-9a-f]{6}$/i.test(e.color))fail('직원 색상을 확인하세요.');if(e.phone&&!/^[0-9+()\-\s]{7,30}$/.test(e.phone))fail('연락처를 확인하세요. 숫자와 + - ( ) 만 입력할 수 있습니다.');if(!/^\d{4,8}$/.test(e.punchId||''))fail('직원 ID는 숫자 4~8자리로 입력하세요.');if(s.employees.some(x=>x.id!==e.id&&!x.archived&&x.punchId===e.punchId))fail('이미 쓰이고 있는 직원 ID 입니다.');if(e.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.email))fail('이메일을 확인하세요.');if(e.birthDate&&!/^\d{8}$/.test(e.birthDate))fail('생년월일 8자리를 입력하세요.');if(e.email&&s.employees.some(x=>x.id!==e.id&&!x.archived&&x.email===e.email))fail('이미 등록된 이메일입니다.');if(e.birthDate&&s.employees.some(x=>x.id!==e.id&&!x.archived&&x.birthDate===e.birthDate))fail('같은 생년월일이 이미 등록되어 있습니다.');s.employees=s.employees.filter(x=>x.id!==e.id).concat(e);break;}
  // 삭제한 직원은 지난 근무·출근·급여 기록이 이름을 잃지 않도록 지우지 않고 감춥니다.
  // 아직 번호가 없는 직원에게 한 번에 번호를 내어 줍니다. 이미 쓰는 번호는 건너뜁니다.
  case 'employeeIds': {admin();const used=new Set(s.employees.map(e=>e.punchId).filter(Boolean));let next=1001;
@@ -50,11 +69,16 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
   s.punches=s.punches!.filter(x=>x.employeeId!==gone);for(const x of s.punches)if(x.editedBy===gone)delete x.editedBy;
   s.clockNames=s.clockNames!.filter(x=>x.employeeId!==gone);
   break;}
- case 'shift': {scheduler();employee(p.employeeId);const shift:Shift={id:id(),employeeId:p.employeeId,date:date(p.date),start:time(p.start,true),end:time(p.end,true),area:text(p.area,60),note:p.note?text(p.note,250):undefined,breakMinutes:p.breakMinutes?number(p.breakMinutes,720):undefined,draft:true};if(!duration(shift.start,shift.end))fail('출근과 퇴근 시간이 같습니다.');if((shift.breakMinutes??0)>=duration(shift.start,shift.end)*60)fail('휴게시간이 근무시간보다 깁니다.');if(s.shifts.some(x=>x.employeeId===shift.employeeId&&overlap(x,shift)))fail('해당 직원의 근무시간이 겹칩니다.');s.shifts.push(shift);s.published=false;break;}
+ case 'shift': {scheduler();employee(p.employeeId);const shift:Shift={id:id(),employeeId:p.employeeId,date:date(p.date),start:time(p.start,true),end:time(p.end,true),area:text(p.area,60),note:p.note?text(p.note,250):undefined,breakMinutes:p.breakMinutes?number(p.breakMinutes,720):undefined,draft:true};if(!duration(shift.start,shift.end))fail('출근과 퇴근 시간이 같습니다.');if((shift.breakMinutes??0)>=duration(shift.start,shift.end)*60)fail('휴게시간이 근무시간보다 깁니다.');if(s.shifts.some(x=>x.employeeId===shift.employeeId&&overlap(x,shift)))fail('해당 직원의 근무시간이 겹칩니다.');const before=[...s.shifts];s.shifts.push(shift);withinOvertime(before,shift.employeeId,[shift.date]);s.published=false;break;}
  case 'shiftUpdate': {scheduler();const ids=[...new Set(String(p.ids||'').split(',').filter(Boolean))];if(!ids.length)fail('수정할 근무를 선택하세요.');if(ids.length>1000)fail('한 번에 최대 1,000개 근무를 수정할 수 있습니다.');const single=ids.length===1;const start=p.start?time(p.start,true):'',end=p.end?time(p.end,true):'',area=p.area?text(p.area,60):'',day=single&&p.date?date(p.date):'',note=single&&p.note!==undefined?String(p.note).trim().slice(0,250):null,rest=single&&p.breakMinutes!==undefined?number(p.breakMinutes,720):null;if(!start&&!end&&!area&&!day&&note===null&&rest===null)fail('변경할 내용을 입력하세요.');const targets=ids.map(v=>s.shifts.find(x=>x.id===v)??fail('근무를 찾을 수 없습니다. 새로고침 후 다시 시도하세요.'));
+  // 고치기 전 모습. 아래에서 targets 를 제자리에서 손대므로, 견줄 값은 지금 떠 두어야 합니다.
+  const before=s.shifts.map(x=>({...x}));
   // Edit every target first, then check overlaps, so shifts moved together are compared at their new times and never against themselves.
   for(const x of targets){if(s.swaps.some(r=>r.shiftId===x.id&&(r.status==='requested'||r.status==='accepted')))fail(`${x.date}: 진행 중인 대체근무 요청이 있어 수정할 수 없습니다.`);if(start)x.start=start;if(end)x.end=end;if(area)x.area=area;if(day)x.date=day;if(note!==null)x.note=note||undefined;if(rest!==null)x.breakMinutes=rest||undefined;if((x.breakMinutes??0)>=duration(x.start,x.end)*60)fail('휴게시간이 근무시간보다 깁니다.');if(!duration(x.start,x.end))fail(`${x.date}: 출근과 퇴근 시간이 같습니다.`)}
   for(const x of targets)if(s.shifts.some(y=>y.id!==x.id&&y.employeeId===x.employeeId&&overlap(x,y)))fail(`${x.date} ${employee(x.employeeId).name}: 근무시간이 겹칩니다.`);
+  // 옮겨 간 날만 셉니다. 근무를 빼 온 날은 시간이 줄어들 뿐이라 볼 것이 없습니다.
+  const touched=new Map<string,string[]>();for(const x of targets)touched.set(x.employeeId,[...(touched.get(x.employeeId)??[]),x.date]);
+  for(const [who,dates] of touched)withinOvertime(before,who,dates);
   // 고친 근무도 다시 공개하기 전까지 Unpublished 딱지를 답니다.
   for(const x of targets)x.draft=true;
   s.published=false;break;}
@@ -79,7 +103,10 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
  case 'swap': {const shift=s.shifts.find(x=>x.id===p.shiftId)??fail('근무를 선택하세요.');if(!actor.admin&&shift.employeeId!==actor.id)fail('본인 근무만 대체 신청할 수 있습니다.');if(!canSwap(shift.date))fail('대체 신청은 근무일 7일 전까지 가능합니다.');employee(p.to);if(p.to===shift.employeeId)fail('다른 대체 직원을 선택하세요.');if(shift.originalId)fail('이미 대체 승인된 근무입니다.');if(s.swaps.some(x=>x.shiftId===shift.id&&x.status!=='rejected'))fail('이미 대체 요청이 있습니다.');if(s.shifts.some(x=>x.employeeId===p.to&&overlap(x,shift)))fail('대체 직원의 기존 근무시간과 겹칩니다.');s.swaps.push({id:id(),shiftId:shift.id,from:shift.employeeId,to:p.to,status:'requested',createdAt:now.toISOString(),bonus:0});break;}
  case 'swapDecision': {const r=s.swaps.find(x=>x.id===p.id)??fail('요청을 찾을 수 없습니다.');if(p.action==='accept'){if(actor.admin||actor.id!==r.to)fail('대체 직원 본인이 수락해야 합니다.');if(r.status!=='requested')fail('처리된 요청입니다.');r.status='accepted'}else if(p.action==='reject'){if(!actor.admin&&actor.id!==r.to&&actor.id!==r.from)fail('권한이 없습니다.');if(r.status==='approved')fail('승인된 대체는 취소할 수 없습니다.');r.status='rejected'}else if(p.action==='approve'){admin();if(r.status!=='accepted')fail('대체 직원의 수락이 먼저 필요합니다.');const shift=s.shifts.find(x=>x.id===r.shiftId)??fail('근무가 없습니다.');if(!canSwap(shift.date))fail('대체 승인도 근무일 7일 전까지 가능합니다.');if(shift.employeeId!==r.from)fail('원래 근무자가 변경되었습니다.');if(s.shifts.some(x=>x.id!==shift.id&&x.employeeId===r.to&&overlap(x,shift)))fail('대체 직원의 근무시간이 겹칩니다.');shift.originalId=r.from;shift.employeeId=r.to;r.bonus=number(p.bonus);r.status='approved'}else fail('잘못된 처리입니다.');break;}
  // 펀치는 서버 시각으로 남깁니다. 기기 시계를 고쳐도 찍히는 시각은 달라지지 않습니다.
- case 'punchIn': {const target=punchTarget(p.employeeId);if(s.punches!.some(x=>x.employeeId===target&&!x.out))fail('이미 출근으로 찍혀 있습니다. 먼저 퇴근을 찍으세요.');const who=employee(target);if(who.punchId&&!actor.admin&&String(p.punchId||'')!==who.punchId)fail('직원 ID가 맞지 않습니다.');const day=localDate(now),at=localTime(now);const near=s.shifts.filter(x=>x.employeeId===target&&x.date===day).sort((x,y)=>Math.abs(minutes(x.start)-minutes(at))-Math.abs(minutes(y.start)-minutes(at)))[0];s.punches!.push({id:id(),employeeId:target,date:day,in:at,area:near?.area||employee(target).role,...(p.photoAt?{photoAt:String(p.photoAt)}:{}),...(spotOf(p)?{spot:spotOf(p)}:{}),status:'pending'});break;}
+ case 'punchIn': {const target=punchTarget(p.employeeId);const day=localDate(now),at=localTime(now);
+  // 퇴근을 찍지 않은 채 날이 바뀌어도 새 날의 출근은 찍힙니다. 어제 기록이 오늘을 막지 않도록 오늘 찍은 출근만 봅니다.
+  // 닫히지 않은 어제 기록은 그대로 남아 '퇴근 미기록'으로 보이며, 급여는 퇴근까지 찍힌 것만 셉니다.
+  if(s.punches!.some(x=>x.employeeId===target&&!x.out&&x.date===day))fail('이미 출근으로 찍혀 있습니다. 먼저 퇴근을 찍으세요.');const who=employee(target);if(who.punchId&&!actor.admin&&String(p.punchId||'')!==who.punchId)fail('직원 ID가 맞지 않습니다.');const near=s.shifts.filter(x=>x.employeeId===target&&x.date===day).sort((x,y)=>Math.abs(minutes(x.start)-minutes(at))-Math.abs(minutes(y.start)-minutes(at)))[0];s.punches!.push({id:id(),employeeId:target,date:day,in:at,area:near?.area||employee(target).role,...(p.photoAt?{photoAt:String(p.photoAt)}:{}),...(spotOf(p)?{spot:spotOf(p)}:{}),status:'pending'});break;}
  case 'punchOut': {const target=punchTarget(p.employeeId);const open=[...s.punches!].reverse().find(x=>x.employeeId===target&&!x.out)??fail('출근으로 찍힌 기록이 없습니다.');const running=(open.breaks??[]).find(b=>!b.end);if(running)running.end=localTime(now);open.out=localTime(now);if(p.photoAt)open.outPhotoAt=String(p.photoAt);const out=spotOf(p);if(out)open.outSpot=out;open.status??='pending';break;}
  // 휴게 시작과 종료. 유급 휴게는 근무시간에 그대로 남고 무급 휴게만 빠집니다.
  case 'punchBreak': {const target=punchTarget(p.employeeId);const open=[...s.punches!].reverse().find(x=>x.employeeId===target&&!x.out)??fail('출근으로 찍힌 기록이 없습니다.');open.breaks??=[];const running=open.breaks.find(b=>!b.end);
@@ -109,12 +136,13 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
  case 'attendance': {admin();if(!Array.isArray(p.rows)||!p.rows.length||p.rows.length>3000)fail('1~3,000개 행을 가져올 수 있습니다.');for(const row of p.rows){employee(row.employeeId);const a:Attendance={id:id(),employeeId:row.employeeId,date:date(row.date),start:time(row.start),end:time(row.end),breakMinutes:number(row.breakMinutes,1440)};if(!duration(a.start,a.end)||a.breakMinutes>=duration(a.start,a.end)*60)fail('퇴근 시간과 휴게시간을 확인하세요.');const shift={...a,area:''};if(s.attendance.some(x=>x.employeeId===a.employeeId&&overlap({...x,area:''},shift)))fail(`${a.date} ${a.employeeId}: 중복 또는 겹치는 출근기록입니다.`);s.attendance.push(a)}break;}
  case 'message': {if(!actor.admin&&p.to!=='admin')fail('직원은 관리자에게만 메시지를 보낼 수 있습니다.');if(p.to!=='admin'&&p.to!=='all')employee(p.to);if(p.to==='all')admin();s.messages.push({id:id(),sender:actor.id,to:p.to,body:text(p.body,2000),createdAt:now.toISOString(),readBy:[actor.id],kind:'message'});break;}
  case 'rain': {admin();const end=time(p.end,true);const ids=p.targets===undefined?s.employees.map(e=>e.id):[...new Set(String(p.targets).split(',').filter(Boolean))];if(!ids.length)fail('공지를 받을 직원을 선택하세요.');const names=ids.map(v=>employee(v).name);const all=s.employees.every(e=>ids.includes(e.id));s.messages.push({id:id(),sender:actor.id,to:'all',...(all?{}:{recipients:ids}),body:`[우천 근무 종료] ${date(p.date)} ${end}에 ${all?'전 직원':names.join(', ')} 근무를 종료합니다. ${text(p.body,1000)}`,createdAt:now.toISOString(),readBy:[actor.id],kind:'rain'});break;}
- case 'read': {const m=s.messages.find(x=>x.id===p.id)??fail('메시지가 없습니다.');if((m.to==='all'?m.recipients&&!m.recipients.includes(actor.id):m.to!==actor.id)&&m.sender!==actor.id)fail('권한이 없습니다.');if(!m.readBy.includes(actor.id))m.readBy.push(actor.id);break;}
+ // 직원이 관리자에게 보낸 메시지는 to 가 'admin' 이라 관리자 본인 id 와 같지 않습니다. 관리자라면 받는 사람으로 봅니다.
+ case 'read': {const m=s.messages.find(x=>x.id===p.id)??fail('메시지가 없습니다.');const mine=m.to==='all'?!m.recipients||m.recipients.includes(actor.id):m.to==='admin'?actor.admin:m.to===actor.id;if(!mine&&m.sender!==actor.id)fail('권한이 없습니다.');if(!m.readBy.includes(actor.id))m.readBy.push(actor.id);break;}
  // 메시지 삭제는 관리자만 할 수 있습니다. 지우면 직원 화면에서도 함께 사라집니다.
  case 'messageRemove': {admin();const m=s.messages.find(x=>x.id===text(p.id,120))??fail('메시지가 없습니다.');s.messages=s.messages.filter(x=>x.id!==m.id);break;}
  // 업무(직무)는 늘리기만 합니다 — 근무·출퇴근 기록이 이름을 그대로 들고 있어, 지우면 지난 기록이 가리킬 곳을 잃습니다.
  case 'areaAdd': {if(!taskManager)fail('작업 지시 권한이 필요합니다.');const area=text(p.name,60);const list=areaList(s);if(list.some(a=>nameKey(a)===nameKey(area)))fail('이미 있는 업무입니다.');if(list.length>=MAX_AREAS)fail('업무는 40개까지 만들 수 있습니다.');s.areas=[...list,area];break;}
- case 'taskCreate': {if(!taskManager)fail('작업 지시 권한이 필요합니다.');const assignedTo=text(p.assignedTo,80);employee(assignedTo);s.tasks.push({id:id(),assignedTo,title:text(p.title,160),notes:typeof p.notes==='string'?p.notes.trim().slice(0,2000):'',date:date(p.date),status:'sent',createdAt:now.toISOString(),createdBy:actor.id});break;}
+ case 'taskCreate': {if(!taskManager)fail('작업 지시 권한이 필요합니다.');const assignedTo=text(p.assignedTo,80);employee(assignedTo);s.tasks.push({id:id(),assignedTo,title:text(p.title,160),notes:typeof p.notes==='string'?p.notes.trim().slice(0,2000):'',date:date(p.date),...(p.time?{time:tenMinute(p.time)}:{}),status:'sent',createdAt:now.toISOString(),createdBy:actor.id});break;}
  // 작업 지시는 낸 사람이 거두어 갑니다. 관리자는 누가 낸 것이든 지울 수 있고,
  // 지시한 사람이 적혀 있지 않은 옛 작업은 관리자만 지울 수 있습니다.
  case 'taskRemove': {const task=s.tasks.find(x=>x.id===text(p.id,120))??fail('작업을 찾을 수 없습니다.');if(!actor.admin&&task.createdBy!==actor.id)fail('본인이 지시한 작업만 삭제할 수 있습니다.');s.tasks=s.tasks.filter(x=>x.id!==task.id);break;}

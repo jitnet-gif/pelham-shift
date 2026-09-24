@@ -7,6 +7,7 @@ import {
   addDays,
   payPeriods,
   payPeriodStart,
+  missingOut,
   periodOpen,
   punchHours,
 } from '@/lib/domain';
@@ -200,6 +201,7 @@ export default function StaffTimesheets({
                 <b>
                   {clock(p.in)}
                   {p.out ? ` - ${clock(p.out)}` : ''}
+                  {missingOut(p, today) && ` - ${t('퇴근 미기록')}`}
                 </b>
                 <small>
                   <i style={{ background: employee?.color }} />

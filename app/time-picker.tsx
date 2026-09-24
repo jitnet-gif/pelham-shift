@@ -37,7 +37,7 @@ export default function TimePicker({
   const face = useRef<HTMLDivElement>(null);
 
   const pm = hour24 >= 12;
-  // 분은 허용된 간격 위에만 섭니다. 30분 단위면 00 과 30 만 고를 수 있습니다.
+  // 분은 허용된 간격 위에만 섭니다. 10분 단위면 00, 10, 20, 30, 40, 50 만 고를 수 있습니다.
   const step = Math.max(1, Math.min(30, minuteStep));
   const minutes = Array.from({ length: Math.ceil(60 / step) }, (_, i) => i * step);
   const hours = Array.from({ length: 12 }, (_, i) => (i === 0 ? 12 : i));

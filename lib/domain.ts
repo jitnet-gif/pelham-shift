@@ -2,13 +2,16 @@
 // 흔적까지 지우는 쪽은 employeePurge 입니다 — 그 사람의 근무·출퇴근·급여·작업·메시지가 함께 사라지고 되돌릴 수 없습니다.
 // roles: 그 사람이 맡은 직군 전부. Proshop 과 Workshop 을 함께 맡는 멀티 플레이어를 위해 둡니다.
 // role: 그중 첫째 직군. 근무와 출퇴근은 장소를 하나만 적기에, 비워 둔 자리를 이 값으로 채웁니다.
-export type Employee = {id:string;name:string;color:string;role:string;roles?:string[];rate:number;email:string;birthDate:string;phone?:string;punchId?:string;taskManager?:boolean;admin?:boolean;archived?:boolean};
+// overtimeManager: 하루 8시간·주 40시간을 넘는 근무를 짤 수 있는 사람. 근무 편성 권한과 따로 둡니다 —
+// 근무표를 짜는 것과 초과근무 수당이 붙는 근무를 내는 것은 다른 결정이기 때문입니다.
+export type Employee = {id:string;name:string;color:string;role:string;roles?:string[];rate:number;email:string;birthDate:string;phone?:string;punchId?:string;taskManager?:boolean;overtimeManager?:boolean;admin?:boolean;archived?:boolean};
 // draft: 새로 넣거나 고친 근무는 직원에게 공개하기 전까지 Unpublished 딱지를 답니다. publish 하면 지워집니다.
 export type Shift = {id:string;employeeId:string;date:string;start:string;end:string;area:string;note?:string;breakMinutes?:number;originalId?:string;draft?:boolean};
 export type Swap = {id:string;shiftId:string;from:string;to:string;status:'requested'|'accepted'|'approved'|'rejected';createdAt:string;bonus:number};
 export type Attendance = {id:string;employeeId:string;date:string;start:string;end:string;breakMinutes:number};
 export type Message = {id:string;sender:string;to:string;body:string;createdAt:string;readBy:string[];kind:string;recipients?:string[]};
-export type Task = {id:string;assignedTo:string;title:string;notes:string;date:string;status:'sent'|'seen'|'completed';createdAt:string;completedAt?:string;createdBy?:string};
+// time 은 마감 시각입니다. 적지 않고 보낼 수 있어 예전에 보낸 작업에는 없습니다.
+export type Task = {id:string;assignedTo:string;title:string;notes:string;date:string;time?:string;status:'sent'|'seen'|'completed';createdAt:string;completedAt?:string;createdBy?:string};
 export type Decision='pending'|'approved'|'declined';
 // Time off covers a date range; a partial day (allDay false) is a single date with start/end times.
 export type TimeOff = {id:string;employeeId:string;from:string;to:string;allDay:boolean;start?:string;end?:string;reason:string;status:Decision;createdAt:string;decidedAt?:string};
@@ -73,8 +76,34 @@ export const payPeriodEnd=(start:string)=>addDays(start,PAY_PERIOD_DAYS-1);
 export function payPeriods(today:string,count:number){const first=payPeriodStart(today);return Array.from({length:count},(_,i)=>{const from=addDays(first,-i*PAY_PERIOD_DAYS);return {from,to:payPeriodEnd(from)}})}
 // 지금 지나고 있는 기간만 직원이 확인할 수 있습니다. 지난 기간은 급여가 나가 닫힙니다.
 export const periodOpen=(from:string,today:string)=>from===payPeriodStart(today);
+// 퇴근을 찍지 않은 채 날이 바뀐 기록. 출근은 새 날짜로 다시 찍히고, 이 기록은 '근무 중'이 아니라 '퇴근 미기록'으로 보입니다.
+// 끝 시각이 없어 급여에는 들어가지 않습니다 — 없는 퇴근 시각을 지어내면 그대로 지급액이 됩니다.
+export const missingOut=(p:Punch,today:string)=>!p.out&&p.date<today;
 // 찍힌 출퇴근으로 실제 근무한 시간을 셉니다. 유급 휴게는 근무로 치고 무급 휴게만 뺍니다.
 export function punchHours(p:Punch){if(!p.out)return 0;const unpaid=(p.breaks??[]).reduce((sum,b)=>sum+(b.end&&!b.paid?duration(b.start,b.end):0),0);return Math.max(0,duration(p.in,p.out)-unpaid)}
+// 그 근무에 출근을 찍었는지. 펀치에는 근무 번호가 없어, 찍은 시각에 가장 가까운 근무의 것으로 봅니다 —
+// 출근을 찍을 때 장소를 어느 근무에서 가져올지 정하는 규칙과 같습니다(operations.ts 의 punchIn).
+// 그래서 오전 근무에 찍은 출근이 같은 날 오후 근무의 알림까지 함께 걷어 가지 않습니다.
+// 퇴근까지 찍은 기록도 '찍었다'로 셉니다 — 이미 다녀온 근무를 두고 출근을 채근할 일은 없습니다.
+export function punchedIn(state:State,shift:Shift){
+ const sameDay=state.shifts.filter(x=>x.employeeId===shift.employeeId&&x.date===shift.date);
+ const nearest=(p:Punch)=>[...sameDay].sort((x,y)=>Math.abs(minutes(x.start)-minutes(p.in))-Math.abs(minutes(y.start)-minutes(p.in)))[0];
+ // 근무표에 없는 근무로 물어 오면 기댈 기준이 없습니다. 그 날 찍힌 출근이 있으면 찍은 것으로 봅니다.
+ return (state.punches??[]).some(p=>p.employeeId===shift.employeeId&&p.date===shift.date&&(nearest(p)?.id??shift.id)===shift.id);
+}
+// 클럽 시각으로 본 지금의 분. 근무 시작까지 남은 시간을 셀 때 기준이 됩니다.
+export const clubMinutes=(now:Date)=>minutes(new Intl.DateTimeFormat('en-GB',{timeZone:TIME_ZONE,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(now));
+// 알림 창의 폭(분). 시작 60분 전부터 알리고, 시작하고도 60분 동안은 출근이 찍혔는지 지켜봅니다.
+// 넓게 잡은 이유: 바깥 cron 이 20분쯤 늦게 도착해도 창 안에 들어와야 하고, 보낸 기록이 두 번 보내는 것을 막아 줍니다.
+export const REMIND_WINDOW=60;
+// 지금부터 근무 시작까지 남은 분. 어제·오늘·내일에 걸친 근무를 함께 보므로 날짜 차이를 같이 셉니다.
+const untilStart=(s:Shift,today:string,current:number)=>(s.date===today?0:s.date>today?1440:-1440)+minutes(s.start)-current;
+// 알림이 걸릴 만한 근무만 걸러 냅니다. 공개하지 않은 근무표는 직원에게 아직 없는 일정이라 알리지 않습니다.
+function nearShifts(state:State,now:Date,keep:(left:number)=>boolean){if(!state.published)return [];const today=localDate(now),current=clubMinutes(now);const days=new Set([addDays(today,-1),today,addDays(today,1)]);return state.shifts.filter(s=>days.has(s.date)&&keep(untilStart(s,today,current)))}
+// 곧 시작하는 근무. 이미 출근을 찍은 사람에게는 알릴 것이 없어 빠집니다.
+export const dueShifts=(state:State,now=new Date())=>nearShifts(state,now,left=>left>0&&left<=REMIND_WINDOW).filter(s=>!punchedIn(state,s));
+// 출근을 깜빡한 근무. 시작 시각을 지났는데도 출근이 찍히지 않은 사이입니다.
+export const missedShifts=(state:State,now=new Date())=>nearShifts(state,now,left=>left<=0&&left>=-REMIND_WINDOW).filter(s=>!punchedIn(state,s));
 // What an approved time off or unavailability blocks on a shift's date, if anything. Managers are warned, not stopped.
 export function blockedBy(state:State,shift:Shift):'timeoff'|'unavailable'|null{const hits=(allDay:boolean,start?:string,end?:string)=>allDay||!start||!end||overlap(shift,{...shift,start,end});if((state.timeOff??[]).some(r=>r.status==='approved'&&r.employeeId===shift.employeeId&&shift.date>=r.from&&shift.date<=r.to&&hits(r.allDay,r.start,r.end)))return 'timeoff';if((state.availability??[]).some(r=>r.status==='approved'&&r.employeeId===shift.employeeId&&r.weekday===weekdayOf(shift.date)&&(!r.effectiveFrom||shift.date>=r.effectiveFrom)&&hits(r.allDay,r.start,r.end)))return 'unavailable';return null}
 // 급여 규칙 · 미국 연방(FLSA) 주 40시간 기준에 일 8시간 기준을 함께 적용합니다.
@@ -82,12 +111,46 @@ export function blockedBy(state:State,shift:Shift):'timeoff'|'unavailable'|null{
 export const OT_DAILY_HOURS=8;
 export const OT_WEEKLY_HOURS=40;
 export const OT_MULTIPLIER=1.5;
+// 짜 놓은 근무표가 이 선을 얼마나 넘었는지 자리마다 셉니다. 급여가 초과근무를 세는 눈금과 같은 선을 봅니다 —
+// 편성에서 다른 선을 쓰면 통과한 근무가 급여에서 가산되거나 그 반대가 됩니다.
+// 무급 휴게는 빼고 셉니다. dates 에 적은 날(과 그 날이 속한 주)만 보므로, 손대지 않은 주는 건드리지 않습니다.
+// 키는 하루면 'd:날짜', 주면 'w:그 주의 일요일'. 편성 전후를 같은 키로 견주어, 이미 넘어 있던 근무는 그대로 두고
+// 이번 편성이 더 넘긴 자리만 가려냅니다.
+export function overtimeOver(shifts:Shift[],employeeId:string,dates:string[]):Map<string,number>{
+ const mine=shifts.filter(x=>x.employeeId===employeeId);
+ const hours=(list:Shift[])=>list.reduce((n,x)=>n+duration(x.start,x.end,x.breakMinutes??0),0);
+ const over=new Map<string,number>();
+ for(const date of [...new Set(dates)].sort()){
+  const day=hours(mine.filter(x=>x.date===date))-OT_DAILY_HOURS;
+  if(day>0)over.set('d:'+date,day);
+ }
+ for(const week of [...new Set(dates.map(d=>weekStart(d)))].sort()){
+  const end=addDays(week,7);
+  const total=hours(mine.filter(x=>x.date>=week&&x.date<end))-OT_WEEKLY_HOURS;
+  if(total>0)over.set('w:'+week,total);
+ }
+ return over;
+}
 // 지각 유예 없음: 예정 출근 시각을 1분이라도 넘기면 지각입니다.
 export const LATE_GRACE_MINUTES=0;
 // 출근기록의 기준이 되는 예정 근무. 같은 날 겹치는 근무 중 예정 출근 시각이 가장 가까운 것을 봅니다.
 export function scheduledFor(state:State,a:Attendance){const worked={...a,area:''};return state.shifts.filter(x=>x.employeeId===a.employeeId&&x.date===a.date&&overlap(x,worked)).sort((x,y)=>Math.abs(minutes(x.start)-minutes(a.start))-Math.abs(minutes(y.start)-minutes(a.start)))[0]}
 // 지각 분. 예정 근무가 없으면 기준이 없으므로 null 을 돌려 '정시(0분)'와 구분합니다.
 export function lateBy(state:State,a:Attendance){const shift=scheduledFor(state,a);return shift?Math.max(0,minutes(a.start)-minutes(shift.start)-LATE_GRACE_MINUTES):null}
+// 조퇴 유예 없음: 예정 퇴근 시각보다 1분이라도 일찍 찍으면 조퇴입니다.
+export const EARLY_GRACE_MINUTES=0;
+// 예정 퇴근 시각까지 몇 분 남았는지. 예정 근무가 없으면 기준이 없으므로 null 을 돌려 '정시(0분)'와 구분합니다 —
+// 일정 없이 찍은 사람은 조퇴로 보지 않습니다.
+// 재는 자리는 찍힌 출근입니다. 시계 글자(HH:MM)만으로 지금과 종료 시각을 견주면
+// 22:00-02:00 근무는 밤새 조퇴로 보입니다. 출근에서부터 재면 자정을 넘기는 근무도 한 번에 맞습니다.
+export function earlyOut(shift:Shift|undefined,inAt:string,outAt:string){
+ if(!shift)return null;
+ // 하루 안에 끝나는 근무인데 예정 종료를 지나서 찍은 출근입니다. 남은 시간이 자정을 돌아
+ // 24시간 가까이 나오므로 기준이 되지 못합니다 - 한참 늦게 온 사람을 조퇴로 만들지 않습니다.
+ if(minutes(shift.end)>minutes(shift.start)&&minutes(inAt)>minutes(shift.end))return null;
+ const planned=duration(inAt,shift.end);
+ return planned>0?Math.max(0,Math.round((planned-duration(inAt,outAt))*60)-EARLY_GRACE_MINUTES):null;
+}
 // 조회 구간이 주(일요일 시작) 경계에 맞지 않으면 걸쳐 있는 주의 초과근무가 실제보다 적게 잡힙니다.
 export function wholeWeeks(from:string,to:string){return weekStart(from)===from&&weekStart(addDays(to,1))===addDays(to,1)}
 // 실근무시간을 정규·초과로 나눠 시급을 곱하고, 승인된 대체 추가수당을 더한 뒤 지각한 만큼 차감합니다.
@@ -113,12 +176,14 @@ export function payroll(state:State,employeeId:string,from:string,to:string){con
  // 날짜별로 합친 뒤 주(일요일 시작)별로 묶어 가산 시간을 구합니다.
  const byDay=new Map<string,number>();for(const a of records)byDay.set(a.date,(byDay.get(a.date)??0)+worked(a));const byWeek=new Map<string,number[]>();for(const [day,h] of byDay){const w=weekStart(day);byWeek.set(w,[...(byWeek.get(w)??[]),h])}
  const otHours=[...byWeek.values()].reduce((s,days)=>{const daily=days.reduce((n,h)=>n+Math.max(0,h-OT_DAILY_HOURS),0);const weekly=Math.max(0,days.reduce((n,h)=>n+h,0)-OT_WEEKLY_HOURS);return s+Math.max(daily,weekly)},0);const regularHours=hours-otHours;
- const lateMinutes=records.reduce((s,a)=>s+(lateBy(state,a)??0),0);const lateDays=new Set(records.filter(a=>(lateBy(state,a)??0)>0).map(a=>a.date)).size;
+ // 지각은 체크인 하나하나 따로 셉니다. 차감은 그 체크인에서 번 금액까지만이라, 한 번 늦은 날이 다른 날 번 돈까지 갉아먹지 않습니다.
+ const lates=records.map(a=>{const minutes=lateBy(state,a)??0;return {id:a.id,date:a.date,minutes,deduction:Math.min(worked(a)*e.rate,(minutes/60)*e.rate)}});
+ const lateMinutes=lates.reduce((s,r)=>s+r.minutes,0);const lateDays=new Set(lates.filter(r=>r.minutes>0).map(r=>r.date)).size;
  const bonus=state.swaps.filter(r=>r.status==='approved'&&r.to===employeeId).reduce((s,r)=>{const shift=state.shifts.find(x=>x.id===r.shiftId);return s+(shift&&shift.date>=from&&shift.date<=to&&records.some(a=>a.date===shift.date&&overlap(shift,{...shift,start:a.start,end:a.end}))?r.bonus:0)},0);
  const base=regularHours*e.rate,otPay=otHours*e.rate*OT_MULTIPLIER,earned=base+otPay+bonus,cents=(n:number)=>Math.round(n*100)/100;
- // 지각 차감은 그 구간에 번 금액까지만. 엑셀 열을 잘못 연결해도 지급액이 마이너스로 내려가지 않습니다.
- const lateDeduction=Math.min(earned,(lateMinutes/60)*e.rate);
- return {hours,regularHours,otHours,lateMinutes,lateDays,base:cents(base),otPay:cents(otPay),bonus,lateDeduction:cents(lateDeduction),total:cents(earned-lateDeduction),...punchReviewCounts(state,employeeId,from,to)}}
+ // 체크인마다 이미 그 체크인에서 번 금액으로 막아 두어, 엑셀 열을 잘못 연결해도 합계가 번 돈을 넘지 않습니다.
+ const lateDeduction=lates.reduce((s,r)=>s+r.deduction,0);
+ return {hours,regularHours,otHours,lateMinutes,lateDays,lates:lates.map(r=>({...r,deduction:cents(r.deduction)})),base:cents(base),otPay:cents(otPay),bonus,lateDeduction:cents(lateDeduction),total:cents(earned-lateDeduction),...punchReviewCounts(state,employeeId,from,to)}}
 // 근무지 이름. 직원 화면과 출퇴근 단말이 같은 이름을 씁니다.
 export const LOCATION='Pelham Hills Golf Club';
 // 날씨와 일출·일몰은 클럽이 서 있는 자리의 것입니다 — 출퇴근을 찍는 자리와 같은 좌표를 봅니다.
@@ -133,8 +198,12 @@ export function areaList(state:{areas?:string[]}):string[]{return state.areas?.l
 // 한 사람이 맡은 직군 목록. roles 를 아직 저장하지 않은 예전 직원은 role 한 줄만 맡은 것으로 봅니다.
 export type Roled = {role:string;roles?:string[]};
 export function roleList(e:Roled):string[]{return e.roles?.length?e.roles:(e.role?[e.role]:[])}
-// 화면에 적는 직군. 둘 다 맡은 사람은 'Proshop · Workshop' 처럼 나란히 보입니다.
-export const roleLabel=(e:Roled)=>roleList(e).join(' · ');
+// Proshop 과 Workshop 을 함께 맡는 사람을 부르는 이름. 따로 저장하는 값이 아니라 두 업무를 함께 든 사람에게 붙는 이름입니다.
+// 그래서 예전에 저장된 근무·출퇴근의 장소와 그대로 맞물리고, 업무로 거르는 화면에서도 두 쪽 모두에 남습니다.
+export const HYBRID_ROLE='Hybrid';
+export const isHybrid=(e:Roled)=>AREAS.every(a=>roleList(e).includes(a));
+// 화면에 적는 직군. 두 업무를 함께 맡으면 'Hybrid' 한 단어로 적고, 그 밖의 겸직은 ' · ' 로 나란히 적습니다.
+export const roleLabel=(e:Roled)=>{const roles=roleList(e);return isHybrid(e)?[HYBRID_ROLE,...roles.filter(r=>!(AREAS as readonly string[]).includes(r))].join(' · '):roles.join(' · ')};
 export const hasRole=(e:Roled,area:string)=>roleList(e).includes(area);
 // 한 직군만 맡은 사람과 구분해 표시할 때 씁니다.
 export const isMultiRole=(e:Roled)=>roleList(e).length>1;

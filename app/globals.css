@@ -39,3 +39,8 @@
 .timepick{cursor:pointer;caret-color:transparent}
 .timepick::placeholder{color:#9bada4}
 .timebox .timepick{border:0;padding:0;background:none;font-size:14px;color:#243e31;width:auto;min-height:auto;min-width:74px}
+
+/* 출근을 깜빡한 근무의 알림 띠. 같은 자리에 같은 모양으로 남으면 아까 본 띠와 구별되지 않아,
+   손대야 한다는 띠(statusbar)와 같은 호박색으로 갈아입습니다. */
+.demo-banner.missed{background:#fff5df;border-color:#ebdcb6;color:#8c5f30}
+.demo-banner.missed svg{color:#b07c34}
