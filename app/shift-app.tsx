@@ -797,8 +797,16 @@ export default function ShiftApp() {
   const pendingOff = timeOff.filter((r) => r.status === 'pending');
   const pendingAvail = availability.filter((r) => r.status === 'pending');
   // 내가 받은 메시지 중 아직 읽지 않은 것. 종 아이콘의 숫자와 앱 안 알림이 이 목록을 씁니다.
+  // 받는 사람 판단은 서버의 'read' 와 같게 둡니다. 다른 관리자가 직원에게 보낸 글처럼 내가 읽음 처리할 수 없는 글을 세면 숫자가 줄지 않습니다.
   const unread = data.messages.filter(
-    (m) => m.sender !== actor.id && !m.readBy.includes(actor.id),
+    (m) =>
+      m.sender !== actor.id &&
+      !m.readBy.includes(actor.id) &&
+      (m.to === 'all'
+        ? !m.recipients || m.recipients.includes(actor.id)
+        : m.to === 'admin'
+          ? actor.admin
+          : m.to === actor.id),
   );
   const unreadKey = unread.map((m) => m.id).join(',');
   // 저장 알림은 4초만 머뭅니다. 다음 저장이 들어오면 앞 타이머는 걷어 냅니다.
@@ -2112,7 +2120,7 @@ export default function ShiftApp() {
                 onShoutOut={() =>
                   open('message', { to: 'admin', body: t('오늘 고마웠던 동료: ') })
                 }
-                onOpen={(id) => void command('read', { id })}
+                onOpen={(ids) => void command('read', { ids })}
               />
             ) : (
             <div className="panel contentpanel">

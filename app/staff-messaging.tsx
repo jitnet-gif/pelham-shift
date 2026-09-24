@@ -23,14 +23,14 @@ export default function StaffMessaging({
   onTabChange: (tab: 'messages' | 'announcements') => void;
   onCompose: () => void;
   onShoutOut: () => void;
-  onOpen: (id: string) => void;
+  onOpen: (ids: string[]) => void;
 }) {
   const { t, locale } = useLang();
   const name = (id: string) => employees.find((e) => e.id === id)?.name || t('관리자');
   const color = (id: string) => employees.find((e) => e.id === id)?.color || '#5c9d61';
   const when = (iso: string) =>
     new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' }).format(new Date(iso));
-  const unread = (m: Message) => !m.readBy.includes(me);
+  const unread = (m: Message) => m.sender !== me && !m.readBy.includes(me);
   const announcements = messages
     .filter((m) => m.to === 'all')
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -41,7 +41,7 @@ export default function StaffMessaging({
       const rows = direct
         .filter((m) => (m.sender === me ? m.to : m.sender) === who)
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-      return { who, last: rows[0], unread: rows.filter(unread).length };
+      return { who, last: rows[0], unread: rows.filter(unread).map((m) => m.id) };
     })
     .filter((thread) => thread.last)
     .sort((a, b) => b.last.createdAt.localeCompare(a.last.createdAt));
@@ -83,9 +83,10 @@ export default function StaffMessaging({
           <h3 className="stmsg-section">{t('최근 대화')}</h3>
           {rows.map((thread) => (
             <button
-              className={'stmsg-row' + (thread.unread ? ' unread' : '')}
+              className={'stmsg-row' + (thread.unread.length ? ' unread' : '')}
               key={thread.who}
-              onClick={() => onOpen(thread.last.id)}
+              // 대화를 열면 마지막 한 줄만이 아니라 안 읽은 메시지를 모두 읽음으로 올려야 알림 숫자가 맞습니다.
+              onClick={() => thread.unread.length && onOpen(thread.unread)}
             >
               <span className="stmsg-face" style={{ background: color(thread.who) }}>
                 <UserRound size={19} />
@@ -110,7 +111,7 @@ export default function StaffMessaging({
             <button
               className={'stmsg-row' + (unread(m) ? ' unread' : '')}
               key={m.id}
-              onClick={() => onOpen(m.id)}
+              onClick={() => unread(m) && onOpen([m.id])}
             >
               <span className={'stmsg-face' + (m.kind === 'rain' ? ' notice' : '')}>
                 <UserRound size={19} />
