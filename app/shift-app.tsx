@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type CSSProperties } from 'react';
 import {
   CalendarDays,
   Clock3,
@@ -56,7 +56,9 @@ import {
   SelectTrigger,
   SelectValue,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
 } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { enUS } from 'date-fns/locale';
@@ -94,7 +96,10 @@ import {
   roleList,
   roleLabel,
   roleTint,
+  roleGroup,
+  groupByRole,
   ROLE_GROUP_COLORS,
+  type RoleGroup,
   hasRole,
   AREAS,
   HYBRID_ROLE,
@@ -164,9 +169,35 @@ function Pick({
   label: string;
   value: string;
   onChange: (s: string) => void;
-  options: { value: string; label: string }[];
+  options: { value: string; label: string; group?: RoleGroup | null }[];
 }) {
   const { t } = useLang();
+  // 직원을 고르는 목록은 Proshop · Workshop · Hybrid 로 묶고 그 색을 배경에 깝니다.
+  // '모든 직원' 처럼 구분이 없는 항목(group 이 undefined)은 묶음 위에 그대로 섭니다.
+  const loose = options.filter((o) => o.group === undefined);
+  const grouped = groupByRole(
+    options.filter((o) => o.group !== undefined),
+    (o) => o.group,
+  );
+  const item = (o: (typeof options)[number]) => {
+    const tint = o.group ? ROLE_GROUP_COLORS[o.group] : undefined;
+    return (
+      <SelectItem
+        key={o.value}
+        value={o.value}
+        data-role-group={o.group || undefined}
+        style={
+          tint
+            ? ({ '--role-fg': tint, '--role-bg': tint + '14', '--role-bg-strong': tint + '2e' } as CSSProperties)
+            : undefined
+        }
+      >
+        {o.label}
+      </SelectItem>
+    );
+  };
+  const picked = options.find((o) => o.value === value)?.group;
+  const pickedTint = picked ? ROLE_GROUP_COLORS[picked] : undefined;
   return (
     <label className="field">
       {label}
@@ -175,14 +206,27 @@ function Pick({
         onValueChange={(v) => onChange(String(v))}
         items={options}
       >
-        <SelectTrigger>
+        <SelectTrigger
+          style={
+            pickedTint
+              ? { background: pickedTint + '14', borderColor: pickedTint + '66', color: pickedTint }
+              : undefined
+          }
+        >
           <SelectValue placeholder={t('선택하세요')} />
         </SelectTrigger>
         <SelectContent>
-          {options.map((o) => (
-            <SelectItem key={o.value} value={o.value}>
-              {o.label}
-            </SelectItem>
+          {loose.map(item)}
+          {grouped.map((g) => (
+            <SelectGroup key={g.group ?? 'other'}>
+              <SelectLabel
+                className="role-group-label"
+                style={{ color: g.group ? ROLE_GROUP_COLORS[g.group] : undefined }}
+              >
+                {g.group ?? t('기타')}
+              </SelectLabel>
+              {g.items.map(item)}
+            </SelectGroup>
           ))}
         </SelectContent>
       </Select>
@@ -564,6 +608,7 @@ export default function ShiftApp() {
   const options = staff.map((e) => ({
     value: e.id,
     label: e.name + ' · ' + e.id,
+    group: roleGroup(e),
   }));
   // 대체 신청은 근무일 7일 전까지만 받습니다. 가까운 날짜만 남아 있으면 고를 근무가 하나도 없습니다.
   // 근무 길이를 대화상자에서 바로 보여 줍니다. 7shifts 의 (4 hrs) 표시와 같은 자리입니다.

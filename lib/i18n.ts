@@ -535,6 +535,8 @@ const en: Record<string, string> = {
   '{roles} 를 함께 맡는 Hybrid 입니다. 먼저 고른 {main} 이 새 근무의 기본 업무가 됩니다.':
     'Hybrid — covers {roles}. {main} was picked first, so it is the default on their new shifts.',
   '업무를 하나 이상 고르세요.': 'Pick at least one role.',
+  // 직원 드롭다운에서 Proshop · Workshop · Hybrid 어디에도 들지 않는 사람들의 묶음.
+  '기타': 'Other',
   '초과 근무 편성 권한': 'Overtime scheduling',
   '초과 근무': 'Overtime',
   '끄면 이 직원이 짜는 근무는 하루 {d}시간, 한 주(일요일 시작) {w}시간까지만 들어갑니다. 켜면 그 선을 넘는 근무도 낼 수 있고, 넘긴 시간에는 급여에서 {m}배가 붙습니다. 관리자는 이 설정과 상관없이 넘겨 짤 수 있습니다.':

@@ -44,3 +44,7 @@
    손대야 한다는 띠(statusbar)와 같은 호박색으로 갈아입습니다. */
 .demo-banner.missed{background:#fff5df;border-color:#ebdcb6;color:#8c5f30}
 .demo-banner.missed svg{color:#b07c34}
+/* 직원 드롭다운 — Proshop · Workshop · Hybrid 묶음의 색을 항목 배경에 깝니다. 고른 칸과 올린 칸은 조금 더 짙게 칠합니다. */
+[data-slot=select-item][data-role-group]{background:var(--role-bg);color:var(--role-fg);margin-top:2px}
+[data-slot=select-item][data-role-group][data-highlighted],[data-slot=select-item][data-role-group][data-selected]{background:var(--role-bg-strong);color:var(--role-fg)}
+[data-slot=select-label].role-group-label{font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;padding-top:8px}
