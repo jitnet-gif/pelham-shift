@@ -54,7 +54,10 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
  case 'shiftUpdate': {scheduler();const ids=[...new Set(String(p.ids||'').split(',').filter(Boolean))];if(!ids.length)fail('수정할 근무를 선택하세요.');if(ids.length>1000)fail('한 번에 최대 1,000개 근무를 수정할 수 있습니다.');const single=ids.length===1;const start=p.start?time(p.start,true):'',end=p.end?time(p.end,true):'',area=p.area?text(p.area,60):'',day=single&&p.date?date(p.date):'',note=single&&p.note!==undefined?String(p.note).trim().slice(0,250):null,rest=single&&p.breakMinutes!==undefined?number(p.breakMinutes,720):null;if(!start&&!end&&!area&&!day&&note===null&&rest===null)fail('변경할 내용을 입력하세요.');const targets=ids.map(v=>s.shifts.find(x=>x.id===v)??fail('근무를 찾을 수 없습니다. 새로고침 후 다시 시도하세요.'));
   // Edit every target first, then check overlaps, so shifts moved together are compared at their new times and never against themselves.
   for(const x of targets){if(s.swaps.some(r=>r.shiftId===x.id&&(r.status==='requested'||r.status==='accepted')))fail(`${x.date}: 진행 중인 대체근무 요청이 있어 수정할 수 없습니다.`);if(start)x.start=start;if(end)x.end=end;if(area)x.area=area;if(day)x.date=day;if(note!==null)x.note=note||undefined;if(rest!==null)x.breakMinutes=rest||undefined;if((x.breakMinutes??0)>=duration(x.start,x.end)*60)fail('휴게시간이 근무시간보다 깁니다.');if(!duration(x.start,x.end))fail(`${x.date}: 출근과 퇴근 시간이 같습니다.`)}
-  for(const x of targets)if(s.shifts.some(y=>y.id!==x.id&&y.employeeId===x.employeeId&&overlap(x,y)))fail(`${x.date} ${employee(x.employeeId).name}: 근무시간이 겹칩니다.`);s.published=false;break;}
+  for(const x of targets)if(s.shifts.some(y=>y.id!==x.id&&y.employeeId===x.employeeId&&overlap(x,y)))fail(`${x.date} ${employee(x.employeeId).name}: 근무시간이 겹칩니다.`);
+  // 고친 근무도 다시 공개하기 전까지 Unpublished 딱지를 답니다.
+  for(const x of targets)x.draft=true;
+  s.published=false;break;}
  // 근무 삭제는 근무를 편성하는 사람의 몫입니다. 진행 중인 대체근무 요청이 있으면 먼저 정리해야 지울 수 있고,
  // 지운 근무에 딸린 대체 기록은 빈 줄로 남지 않도록 함께 치웁니다.
  // 지우기는 공개 상태를 건드리지 않습니다 — 근무 하나를 지우려다 온 팀의 스케줄이 가려지면 안 되기 때문입니다.
@@ -70,7 +73,7 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
  // 공개하면 모든 근무의 Unpublished 딱지를 뗍니다.
  case 'publish':scheduler();s.published=true;for(const x of s.shifts)delete x.draft;break;
  // 게시 해제는 끄기일 뿐 지우기가 아닙니다. 근무표도 기록도 그대로 남고 직원 화면에서만 사라집니다.
- // 딱지는 '지난 공개 뒤에 새로 넣은 근무'라는 뜻이므로 여기서는 건드리지 않습니다.
+ // 딱지는 '지난 공개 뒤에 새로 넣거나 고친 근무'라는 뜻이므로 여기서는 건드리지 않습니다.
  case 'unpublish':scheduler();s.published=false;break;
  case 'currency':admin();if(!['CAD'].includes(p.currency))fail('통화를 선택하세요.');s.currency=p.currency;break;
  case 'swap': {const shift=s.shifts.find(x=>x.id===p.shiftId)??fail('근무를 선택하세요.');if(!actor.admin&&shift.employeeId!==actor.id)fail('본인 근무만 대체 신청할 수 있습니다.');if(!canSwap(shift.date))fail('대체 신청은 근무일 7일 전까지 가능합니다.');employee(p.to);if(p.to===shift.employeeId)fail('다른 대체 직원을 선택하세요.');if(shift.originalId)fail('이미 대체 승인된 근무입니다.');if(s.swaps.some(x=>x.shiftId===shift.id&&x.status!=='rejected'))fail('이미 대체 요청이 있습니다.');if(s.shifts.some(x=>x.employeeId===p.to&&overlap(x,shift)))fail('대체 직원의 기존 근무시간과 겹칩니다.');s.swaps.push({id:id(),shiftId:shift.id,from:shift.employeeId,to:p.to,status:'requested',createdAt:now.toISOString(),bonus:0});break;}

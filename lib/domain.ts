@@ -3,7 +3,7 @@
 // roles: 그 사람이 맡은 직군 전부. Proshop 과 Workshop 을 함께 맡는 멀티 플레이어를 위해 둡니다.
 // role: 그중 첫째 직군. 근무와 출퇴근은 장소를 하나만 적기에, 비워 둔 자리를 이 값으로 채웁니다.
 export type Employee = {id:string;name:string;color:string;role:string;roles?:string[];rate:number;email:string;birthDate:string;phone?:string;punchId?:string;taskManager?:boolean;admin?:boolean;archived?:boolean};
-// draft: 새로 넣은 근무는 직원에게 공개하기 전까지 Unpublished 딱지를 답니다. publish 하면 지워집니다.
+// draft: 새로 넣거나 고친 근무는 직원에게 공개하기 전까지 Unpublished 딱지를 답니다. publish 하면 지워집니다.
 export type Shift = {id:string;employeeId:string;date:string;start:string;end:string;area:string;note?:string;breakMinutes?:number;originalId?:string;draft?:boolean};
 export type Swap = {id:string;shiftId:string;from:string;to:string;status:'requested'|'accepted'|'approved'|'rejected';createdAt:string;bonus:number};
 export type Attendance = {id:string;employeeId:string;date:string;start:string;end:string;breakMinutes:number};
