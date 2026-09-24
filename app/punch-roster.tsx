@@ -10,6 +10,7 @@ import {
   missingOut,
   punchHours,
   roleLabel,
+  roleTint,
 } from '@/lib/domain';
 import { useLang } from './use-lang';
 
@@ -72,7 +73,7 @@ export function PunchRoster({
             <span className="punchroster-body">
               <span className="punchroster-name">
                 <i style={{ background: e.color }} />
-                <b>{e.name}</b>
+                <b style={{ color: roleTint(e) }}>{e.name}</b>
                 {e.archived && <small className="punchroster-gone">{t('퇴사')}</small>}
               </span>
               <span className="punchroster-meta">

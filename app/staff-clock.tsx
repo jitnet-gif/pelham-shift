@@ -6,7 +6,7 @@ import { AlarmClock, Camera, Check, Coffee, Hourglass, LogOut } from 'lucide-rea
 import type { Employee, Punch, Shift, Workplace } from '@/lib/domain';
 import { say } from './say';
 import { FIX_MAX_AGE_MS, type GpsState } from './gps-guard';
-import { TIME_ZONE, distanceMeters, duration, earlyOut, minutes } from '@/lib/domain';
+import { TIME_ZONE, distanceMeters, roleTint, duration, earlyOut, minutes } from '@/lib/domain';
 import { useLang } from './use-lang';
 
 // 직원이 자기 폰으로 출퇴근을 찍는 화면입니다.
@@ -423,7 +423,7 @@ export default function StaffClock({
           {employee?.name.slice(0, 1)}
         </span>
         <span className="stclock-name">
-          <b>{employee?.name}</b>
+          <b style={{ color: roleTint(employee) }}>{employee?.name}</b>
           <em className={working ? (onBreakNow ? 'onbreak' : 'in') : 'out'}>
             {working ? (onBreakNow ? t('휴게 중') : t('출근 중')) : t('출근 전')}
           </em>

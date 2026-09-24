@@ -13,7 +13,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import type { Availability, Employee, Shift, TimeOff } from '@/lib/domain';
-import { TIME_ZONE, addDays, weekdayOf } from '@/lib/domain';
+import { TIME_ZONE, addDays, roleTint, weekdayOf } from '@/lib/domain';
 import { useLang } from './use-lang';
 import WeatherPanel from './weather-panel';
 
@@ -216,7 +216,7 @@ export default function PhoneSchedule({
                   <CalendarX size={16} />
                 </span>
                 <span className="psched-main">
-                  <b>{of(r.employeeId)?.name}</b>
+                  <b style={{ color: roleTint(of(r.employeeId)) }}>{of(r.employeeId)?.name}</b>
                   <span className="psched-time">{spanOf(r)}</span>
                   <small className="psched-role">
                     {r.status === 'pending' ? t('휴무 신청') : t('휴무')}
@@ -235,7 +235,7 @@ export default function PhoneSchedule({
                   <CalendarClock size={16} />
                 </span>
                 <span className="psched-main">
-                  <b>{of(r.employeeId)?.name}</b>
+                  <b style={{ color: roleTint(of(r.employeeId)) }}>{of(r.employeeId)?.name}</b>
                   <span className="psched-time">{spanOf(r)}</span>
                   <small className="psched-role">
                     {r.status === 'pending' ? t('불가 신청') : t('근무 불가')}
@@ -258,7 +258,7 @@ export default function PhoneSchedule({
                   </span>
                   <span className="psched-main">
                     <b>
-                      {e?.name}
+                      <span style={{ color: roleTint(e) }}>{e?.name}</span>
                       {s.draft && <em className="psched-flag">Unpublished</em>}
                     </b>
                     <span className="psched-time">

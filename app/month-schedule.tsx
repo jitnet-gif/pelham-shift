@@ -1,4 +1,4 @@
-import { addDays, localDate, type Employee, type Shift } from '@/lib/domain';
+import { addDays, localDate, roleTint, type Employee, type Shift } from '@/lib/domain';
 import { useLang } from './use-lang';
 
 type Props = {
@@ -98,7 +98,7 @@ export default function MonthSchedule({
                         title={shift.draft ? 'Unpublished' : undefined}
                       >
                         <i style={{ background: employee.color }} />
-                        <b>{employee.name}</b>
+                        <b style={{ color: roleTint(employee) }}>{employee.name}</b>
                         <small>{shift.start}–{shift.end}</small>
                       </button>
                     );

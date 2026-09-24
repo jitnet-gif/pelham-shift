@@ -1,7 +1,7 @@
 'use client';
 import { LogIn, LogOut } from 'lucide-react';
 import type { Employee, Punch, Shift } from '@/lib/domain';
-import { TIME_ZONE } from '@/lib/domain';
+import { TIME_ZONE, roleTint } from '@/lib/domain';
 import { useLang } from './use-lang';
 
 const minutes = (v: string) => Number(v.slice(0, 2)) * 60 + Number(v.slice(3, 5));
@@ -122,7 +122,7 @@ export default function WhosWorking({
               return (
                 <div className="working-row" key={s.id}>
                   <span className="working-name">
-                    <b>{person.name}</b>
+                    <b style={{ color: roleTint(person) }}>{person.name}</b>
                     <small>
                       {punch
                         ? punch.out

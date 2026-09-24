@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight, EyeOff, Plus, Search, Send } from 'lucide-react';
 import type { Employee, Shift } from '@/lib/domain';
-import { TIME_ZONE } from '@/lib/domain';
+import { TIME_ZONE, roleTint } from '@/lib/domain';
 import { useLang } from './use-lang';
 
 // 하루를 오전 5시부터 보여줍니다. 7shifts 의 Day 보기와 같은 구간입니다.
@@ -186,7 +186,7 @@ export default function DaySchedule({
                   <div className="dv-staff">
                     <i style={{ background: e.color }} />
                     <span>
-                      <b>{e.name}</b>
+                      <b style={{ color: roleTint(e) }}>{e.name}</b>
                       <small>
                         {hoursOf(e.id).toFixed(2)} {t('시간')}
                         {showCost && <> · {money(hoursOf(e.id) * rateOf(e.id))}</>}

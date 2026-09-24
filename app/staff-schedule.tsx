@@ -2,7 +2,7 @@
 import { useEffect, useRef } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { Employee, Shift } from '@/lib/domain';
-import { TIME_ZONE, addDays, weekdayOf } from '@/lib/domain';
+import { TIME_ZONE, addDays, roleTint, weekdayOf } from '@/lib/domain';
 import { useLang } from './use-lang';
 
 // 직원이 보는 스케줄. 한 주를 날짜 줄로 펼쳐, 근무가 없는 날도 한 줄씩 남겨 둡니다.
@@ -179,7 +179,12 @@ export default function StaffSchedule({
                           <span className="stsched-where">{location}</span>
                           <small className="stsched-role">
                             <i style={{ background: e?.color }} />
-                            {scope === 'all' && e?.name ? `${e.name} · ` : ''}
+                            {scope === 'all' && e?.name && (
+                              <>
+                                <span style={{ color: roleTint(e) }}>{e.name}</span>
+                                {' · '}
+                              </>
+                            )}
                             {s.area}
                             {e?.role && e.role !== s.area ? ` | ${e.role}` : ''}
                           </small>

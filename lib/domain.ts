@@ -207,6 +207,13 @@ export const roleLabel=(e:Roled)=>{const roles=roleList(e);return isHybrid(e)?[H
 export const hasRole=(e:Roled,area:string)=>roleList(e).includes(area);
 // 한 직군만 맡은 사람과 구분해 표시할 때 씁니다.
 export const isMultiRole=(e:Roled)=>roleList(e).length>1;
+// 직원 구분 — Proshop, Workshop, 둘 다 맡는 Hybrid. 이름을 이 구분의 색으로 적어 한눈에 가려 봅니다.
+// 두 업무 밖의 직군만 맡은 사람은 구분이 없어 평소 글자색 그대로 둡니다.
+export type RoleGroup='Proshop'|'Workshop'|'Hybrid';
+export const ROLE_GROUP_COLORS:Record<RoleGroup,string>={Proshop:'#1f63b5',Workshop:'#b35f0b',Hybrid:'#8a3db6'};
+export function roleGroup(e:Roled):RoleGroup|null{if(isHybrid(e))return 'Hybrid';const roles=roleList(e);return (AREAS as readonly RoleGroup[]).find(a=>roles.includes(a))??null}
+// 이름 글자에 입힐 색. 구분이 없거나 직원을 찾지 못하면 undefined 라 원래 색을 따릅니다.
+export const roleTint=(e?:Roled|null)=>{const g=e&&roleGroup(e);return g?ROLE_GROUP_COLORS[g]:undefined};
 export function seed():State{const names=['Josh','Grace','Claudio','Francis','James','Karen','Dylan','Dustin','Sam'];const colors=['#5579cf','#c48537','#20a69a','#9864c3','#e17b57','#5c9d61','#d26395','#628597','#a89643'];const employees=names.map((name,i)=>({id:'E'+String(i+1).padStart(3,'0'),name,color:colors[i],role:AREAS[i%AREAS.length],rate:0,email:'',birthDate:'',phone:'',punchId:String(1001+i)}));const week=weekStart(localDate(new Date()));const shifts:Shift[]=[];for(let d=0;d<7;d++) employees.forEach((e,i)=>{if((i+d)%4!==1) shifts.push({id:`s${d}-${i}`,employeeId:e.id,date:addDays(week,d),start:i%3===0?'10:00':i%3===1?'06:00':'12:00',end:i%3===0?'18:00':i%3===1?'14:00':'20:00',area:e.role})});
  // 지난 두 급여 기간과 이번 기간의 출퇴근 기록. 지난 기간은 이미 확인이 끝나 닫혀 있습니다.
  const today=localDate(new Date());const start=addDays(payPeriodStart(today),-2*PAY_PERIOD_DAYS);const punches:Punch[]=[];

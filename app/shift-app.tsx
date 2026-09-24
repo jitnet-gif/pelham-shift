@@ -93,6 +93,8 @@ import {
   areaList,
   roleList,
   roleLabel,
+  roleTint,
+  ROLE_GROUP_COLORS,
   hasRole,
   AREAS,
   HYBRID_ROLE,
@@ -533,7 +535,7 @@ export default function ShiftApp() {
     e ? (
       <span className="person">
         <i style={{ background: e.color }} />
-        {e.name}
+        <span style={{ color: roleTint(e) }}>{e.name}</span>
       </span>
     ) : (
       <span>{t('관리자')}</span>
@@ -1076,7 +1078,7 @@ export default function ShiftApp() {
                 checked={picked.includes(role)}
                 onCheckedChange={(on) => toggle(role, on === true)}
               />
-              {role}
+              <span style={{ color: ROLE_GROUP_COLORS[role as keyof typeof ROLE_GROUP_COLORS] }}>{role}</span>
             </label>
           ))}
           {bothListed && (
@@ -1085,7 +1087,7 @@ export default function ShiftApp() {
                 checked={hybrid}
                 onCheckedChange={(on) => toggleHybrid(on === true)}
               />
-              {HYBRID_ROLE}
+              <span style={{ color: ROLE_GROUP_COLORS.Hybrid }}>{HYBRID_ROLE}</span>
             </label>
           )}
         </div>
@@ -4233,6 +4235,7 @@ export default function ShiftApp() {
                                         <span>
                                           <button
                                             className="roster-name"
+                                            style={{ color: roleTint(e) }}
                                             onClick={() =>
                                               setFilter(filter === e.id ? 'all' : e.id)
                                             }
