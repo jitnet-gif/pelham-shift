@@ -222,6 +222,13 @@
 }
 
 /* 관리자 출근 기록: 이름 목록과, 고른 사람의 2주 기간 머리말. */
+.punchroster-group h4 {
+  margin: 14px 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #5d6a65;
+}
+.punchroster-group h4 small { margin-left: 4px; font-weight: 500; color: #8b9691; }
 .punchroster {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));

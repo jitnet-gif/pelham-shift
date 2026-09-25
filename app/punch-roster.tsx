@@ -3,12 +3,15 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Employee, Punch } from '@/lib/domain';
 import {
   PAY_PERIOD_DAYS,
+  ROLE_GROUP_COLORS,
   addDays,
+  groupByRole,
   payPeriodEnd,
   payPeriodStart,
   periodOpen,
   missingOut,
   punchHours,
+  roleGroup,
   roleLabel,
   roleTint,
 } from '@/lib/domain';
@@ -47,64 +50,75 @@ export function PunchRoster({
   onPick: (employeeId: string) => void;
 }) {
   const { t, locale } = useLang();
+  // 직원 드롭다운과 같이 Proshop · Workshop · Hybrid · 기타 로 묶고, 묶음 안은 이름순으로 세웁니다.
+  const groups = groupByRole(
+    [...employees].sort((a, b) => a.name.localeCompare(b.name, locale)),
+    roleGroup,
+  );
   const open = payPeriodStart(today);
   const openEnd = payPeriodEnd(open);
   const day = (date: string) =>
-    new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(
-      new Date(date + 'T12:00:00Z'),
-    );
+    new Intl.DateTimeFormat(locale, {
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    }).format(new Date(date + 'T12:00:00Z'));
 
-  if (!employees.length)
-    return <p className="punchroster-empty">{t('등록된 직원이 없습니다.')}</p>;
+  if (!employees.length) return <p className="punchroster-empty">{t('등록된 직원이 없습니다.')}</p>;
 
-  return (
-    <div className="punchroster">
-      {employees.map((e) => {
-        const mine = punches.filter((p) => p.employeeId === e.id);
-        const now = mine.filter((p) => p.date >= open && p.date <= openEnd);
-        const seen = tally(now, today);
-        // 가장 최근에 찍은 날. 이번 기간에 아무것도 없는 사람도 언제까지 일했는지 보입니다.
-        const last = mine.reduce((v, p) => (p.date > v ? p.date : v), '');
-        const pending = waiting(now);
-        return (
-          <button className="punchroster-card" key={e.id} onClick={() => onPick(e.id)}>
-            {/* 이름은 윗칸에만 서고, 맡은 자리와 건수·표지는 아랫칸으로 내려보냅니다.
+  return groups.map((g) => (
+    <section className="punchroster-group" key={g.group ?? 'other'}>
+      <h4 style={{ color: g.group ? ROLE_GROUP_COLORS[g.group] : undefined }}>
+        {g.group ?? t('기타')} <small>{g.items.length}</small>
+      </h4>
+      <div className="punchroster">
+        {g.items.map((e) => {
+          const mine = punches.filter((p) => p.employeeId === e.id);
+          const now = mine.filter((p) => p.date >= open && p.date <= openEnd);
+          const seen = tally(now, today);
+          // 가장 최근에 찍은 날. 이번 기간에 아무것도 없는 사람도 언제까지 일했는지 보입니다.
+          const last = mine.reduce((v, p) => (p.date > v ? p.date : v), '');
+          const pending = waiting(now);
+          return (
+            <button className="punchroster-card" key={e.id} onClick={() => onPick(e.id)}>
+              {/* 이름은 윗칸에만 서고, 맡은 자리와 건수·표지는 아랫칸으로 내려보냅니다.
                 한 줄에 모두 세우면 이름이 밀려 사라지고 글자끼리 겹쳐 읽혔습니다. */}
-            <span className="punchroster-body">
-              <span className="punchroster-name">
-                <i style={{ background: e.color }} />
-                <b style={{ color: roleTint(e) }}>{e.name}</b>
-                {e.archived && <small className="punchroster-gone">{t('퇴사')}</small>}
-              </span>
-              <span className="punchroster-meta">
-                {roleLabel(e) && <small className="punchroster-role">{roleLabel(e)}</small>}
-                <span className="punchroster-stat">
-                  {seen.count
-                    ? t('이번 기간 {n}건 · {h}시간', {
-                        n: seen.count,
-                        h: seen.hours.toFixed(2),
-                      })
-                    : seen.live || seen.noOut
-                      ? t('아직 끝난 근무가 없습니다')
-                      : last
-                        ? t('마지막 기록 {date}', { date: day(last) })
-                        : t('찍힌 기록 없음')}
+              <span className="punchroster-body">
+                <span className="punchroster-name">
+                  <i style={{ background: e.color }} />
+                  <b style={{ color: roleTint(e) }}>{e.name}</b>
+                  {e.archived && <small className="punchroster-gone">{t('퇴사')}</small>}
                 </span>
-                {seen.live > 0 && <em className="punchroster-live">{t('근무 중')}</em>}
-                {seen.noOut > 0 && (
-                  <em className="punchroster-flag">{t('퇴근 미기록 {n}', { n: seen.noOut })}</em>
-                )}
-                {pending > 0 && (
-                  <em className="punchroster-flag">{t('확인 대기 {n}', { n: pending })}</em>
-                )}
+                <span className="punchroster-meta">
+                  {roleLabel(e) && <small className="punchroster-role">{roleLabel(e)}</small>}
+                  <span className="punchroster-stat">
+                    {seen.count
+                      ? t('이번 기간 {n}건 · {h}시간', {
+                          n: seen.count,
+                          h: seen.hours.toFixed(2),
+                        })
+                      : seen.live || seen.noOut
+                        ? t('아직 끝난 근무가 없습니다')
+                        : last
+                          ? t('마지막 기록 {date}', { date: day(last) })
+                          : t('찍힌 기록 없음')}
+                  </span>
+                  {seen.live > 0 && <em className="punchroster-live">{t('근무 중')}</em>}
+                  {seen.noOut > 0 && (
+                    <em className="punchroster-flag">{t('퇴근 미기록 {n}', { n: seen.noOut })}</em>
+                  )}
+                  {pending > 0 && (
+                    <em className="punchroster-flag">{t('확인 대기 {n}', { n: pending })}</em>
+                  )}
+                </span>
               </span>
-            </span>
-            <ChevronRight size={18} aria-hidden="true" />
-          </button>
-        );
-      })}
-    </div>
-  );
+              <ChevronRight size={18} aria-hidden="true" />
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  ));
 }
 
 // 고른 사람의 2주 기간 머리말. 앞뒤로 옮기고, 이 기간에 몇 건 몇 시간인지 함께 셉니다.
