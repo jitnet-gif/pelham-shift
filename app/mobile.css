@@ -1,6 +1,11 @@
 /* Responsive working surface: tablet and touch phones */
 @media (max-width: 1024px) {
   .shell { min-width: 0; overflow-x: hidden; }
+  /* 두 주 스케줄처럼 넓은 표가 페이지 밖으로 삐져나오면, 폰 브라우저는 화면 폭을 그만큼 넓게 잡습니다.
+     그러면 화면 전체를 쓰는 시트(근무 상세 등)도 함께 넓어져 오른쪽 버튼이 화면 밖으로 밀려납니다.
+     clip 은 스크롤 칸을 만들지 않아 안쪽 sticky 는 그대로 동작합니다. */
+  .app-shell { min-width: 0; overflow-x: clip; }
+  html, body { overflow-x: clip; }
   .topbar { gap: 22px; padding-inline: 24px; }
   .navrow { padding-inline: 24px; overflow-x: auto; scrollbar-width: none; }
   .navrow::-webkit-scrollbar { display: none; }

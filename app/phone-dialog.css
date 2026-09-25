@@ -13,7 +13,8 @@
     translate: 0 0 !important;
     transform: none !important;
     width: 100% !important;
-    max-width: none !important;
+    /* 뒤 페이지가 넓어져도 시트는 기기 화면 폭을 넘지 않습니다. */
+    max-width: 100dvw !important;
     height: 100dvh;
     max-height: none !important;
     border-radius: 0 !important;
@@ -96,7 +97,7 @@
   }
 
   /* 근무 상세: 시간을 먼저 읽히게 키웁니다. */
-  .shift-dialog .shiftdetail { padding: 2px 0 0; }
+  .shift-dialog .shiftdetail { padding: 2px 0 0; min-width: 0; overflow-wrap: anywhere; }
   .shift-dialog .shiftdetail h3 {
     margin: 14px 0 2px;
     font-size: 15px;
