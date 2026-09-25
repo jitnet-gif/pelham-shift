@@ -1,4 +1,5 @@
 'use client';
+import { useState } from 'react';
 import { PartyPopper, SquarePen, UserRound } from 'lucide-react';
 import type { Employee, Message } from '@/lib/domain';
 import { useLang } from './use-lang';
@@ -21,11 +22,12 @@ export default function StaffMessaging({
   employees: Employee[];
   teammates: number;
   onTabChange: (tab: 'messages' | 'announcements') => void;
-  onCompose: () => void;
+  onCompose: (to?: string) => void;
   onShoutOut: () => void;
   onOpen: (ids: string[]) => void;
 }) {
   const { t, locale } = useLang();
+  const [shown, setShown] = useState<string | null>(null);
   const name = (id: string) => employees.find((e) => e.id === id)?.name || t('관리자');
   const color = (id: string) => employees.find((e) => e.id === id)?.color || '#5c9d61';
   const when = (iso: string) =>
@@ -41,7 +43,7 @@ export default function StaffMessaging({
       const rows = direct
         .filter((m) => (m.sender === me ? m.to : m.sender) === who)
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-      return { who, last: rows[0], unread: rows.filter(unread).map((m) => m.id) };
+      return { who, rows, last: rows[0], unread: rows.filter(unread).map((m) => m.id) };
     })
     .filter((thread) => thread.last)
     .sort((a, b) => b.last.createdAt.localeCompare(a.last.createdAt));
@@ -51,7 +53,7 @@ export default function StaffMessaging({
     <section className="stmsg">
       <header className="stmsg-top">
         <h2>{t('title::메시지')}</h2>
-        <button className="stmsg-compose" aria-label={t('새 메시지')} onClick={onCompose}>
+        <button className="stmsg-compose" aria-label={t('새 메시지')} onClick={() => onCompose()}>
           <SquarePen size={21} />
         </button>
       </header>
@@ -82,24 +84,52 @@ export default function StaffMessaging({
           </button>
           <h3 className="stmsg-section">{t('최근 대화')}</h3>
           {rows.map((thread) => (
-            <button
-              className={'stmsg-row' + (thread.unread.length ? ' unread' : '')}
-              key={thread.who}
-              // 대화를 열면 마지막 한 줄만이 아니라 안 읽은 메시지를 모두 읽음으로 올려야 알림 숫자가 맞습니다.
-              onClick={() => thread.unread.length && onOpen(thread.unread)}
-            >
-              <span className="stmsg-face" style={{ background: color(thread.who) }}>
-                <UserRound size={19} />
-              </span>
-              <span className="stmsg-main">
-                <b>{thread.who === 'admin' ? t('관리자') : name(thread.who)}</b>
-                <small>
-                  {thread.last.sender === me ? t('나: ') : ''}
-                  {thread.last.body}
-                </small>
-              </span>
-              <time dateTime={thread.last.createdAt}>{when(thread.last.createdAt)}</time>
-            </button>
+            <div className="stmsg-item" key={thread.who}>
+              <button
+                className={
+                  'stmsg-row' +
+                  (thread.unread.length ? ' unread' : '') +
+                  (shown === thread.who ? ' open' : '')
+                }
+                aria-expanded={shown === thread.who}
+                // 누르면 그 사람과 주고받은 글 전체가 펼쳐집니다.
+                // 대화를 열면 마지막 한 줄만이 아니라 안 읽은 메시지를 모두 읽음으로 올려야 알림 숫자가 맞습니다.
+                onClick={() => {
+                  setShown(shown === thread.who ? null : thread.who);
+                  if (thread.unread.length) onOpen(thread.unread);
+                }}
+              >
+                <span className="stmsg-face" style={{ background: color(thread.who) }}>
+                  <UserRound size={19} />
+                </span>
+                <span className="stmsg-main">
+                  <b>{thread.who === 'admin' ? t('관리자') : name(thread.who)}</b>
+                  {shown !== thread.who && (
+                    <small>
+                      {thread.last.sender === me ? t('나: ') : ''}
+                      {thread.last.body}
+                    </small>
+                  )}
+                </span>
+                <time dateTime={thread.last.createdAt}>{when(thread.last.createdAt)}</time>
+              </button>
+              {shown === thread.who && (
+                <div className="stmsg-thread">
+                  {thread.rows
+                    .slice()
+                    .reverse()
+                    .map((m) => (
+                      <p key={m.id} className={'stmsg-bubble' + (m.sender === me ? ' mine' : '')}>
+                        {m.body}
+                        <time dateTime={m.createdAt}>{when(m.createdAt)}</time>
+                      </p>
+                    ))}
+                  <button className="stmsg-reply" onClick={() => onCompose(thread.who)}>
+                    {t('답장')}
+                  </button>
+                </div>
+              )}
+            </div>
           ))}
           {!rows.length && <p className="stmsg-empty">{t('주고받은 메시지가 없습니다.')}</p>}
         </>
@@ -109,9 +139,16 @@ export default function StaffMessaging({
           <h3 className="stmsg-section">{t('전체 공지')}</h3>
           {announcements.map((m) => (
             <button
-              className={'stmsg-row' + (unread(m) ? ' unread' : '')}
+              className={
+                'stmsg-row' + (unread(m) ? ' unread' : '') + (shown === m.id ? ' open' : '')
+              }
               key={m.id}
-              onClick={() => unread(m) && onOpen([m.id])}
+              aria-expanded={shown === m.id}
+              // 누르면 공지 전문이 펼쳐지고, 다시 누르면 접힙니다.
+              onClick={() => {
+                setShown(shown === m.id ? null : m.id);
+                if (unread(m)) onOpen([m.id]);
+              }}
             >
               <span className={'stmsg-face' + (m.kind === 'rain' ? ' notice' : '')}>
                 <UserRound size={19} />

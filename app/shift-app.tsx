@@ -2198,7 +2198,7 @@ export default function ShiftApp() {
                   ).size
                 }
                 onTabChange={setMsgTab}
-                onCompose={() => open('message', { to: 'admin', body: '' })}
+                onCompose={(to = 'admin') => open('message', { to, body: '' })}
                 onShoutOut={() =>
                   open('message', { to: 'admin', body: t('오늘 고마웠던 동료: ') })
                 }
@@ -3237,7 +3237,10 @@ export default function ShiftApp() {
                   options={
                     actor.admin
                       ? [{ value: 'all', label: t('전 직원') }, ...options]
-                      : [{ value: 'admin', label: t('관리자') }]
+                      : [
+                          { value: 'admin', label: t('관리자') },
+                          ...options.filter((o) => o.value !== actor.id),
+                        ]
                   }
                 />
                 <label className="field">

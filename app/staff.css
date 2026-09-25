@@ -363,6 +363,7 @@
   text-align: left;
 }
 .stmsg-row:first-of-type { border-top: 0; }
+.stmsg-item + .stmsg-item { border-top: 1px solid var(--line); }
 .stmsg-face {
   display: grid;
   place-items: center;
@@ -383,9 +384,39 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.stmsg-row.open .stmsg-main small {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #2b2f36;
+  line-height: 1.45;
+}
 .stmsg-row.unread .stmsg-main b { font-weight: 700; }
 .stmsg-row.unread .stmsg-main small { color: #454b54; }
 .stmsg-row time { align-self: flex-start; font-size: 13px; color: var(--sub); white-space: nowrap; }
+.stmsg-thread { display: flex; flex-direction: column; gap: 8px; padding: 0 16px 14px 71px; }
+.stmsg-bubble {
+  align-self: flex-start;
+  max-width: 85%;
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: 14px;
+  background: #eef0f3;
+  font-size: 15px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.stmsg-bubble.mine { align-self: flex-end; background: #dcebdd; }
+.stmsg-bubble time { display: block; margin-top: 3px; font-size: 12px; color: var(--sub); }
+.stmsg-reply {
+  align-self: flex-end;
+  padding: 8px 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: none;
+  color: var(--ink);
+  font-size: 14px;
+}
 .stmsg-empty { margin: 16px; font-size: 15px; color: var(--sub); }
 
 /* ── 더보기 ─────────────────────────────────────────────── */
