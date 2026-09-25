@@ -43,6 +43,7 @@ import {
   Clock,
   X,
   CheckCircle2,
+  Megaphone,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
@@ -1194,6 +1195,98 @@ export default function ShiftApp() {
       </fieldset>
     );
   };
+  // 메시지 받는 사람. 전체·구분(그룹)·한 사람씩 골라 한 번에 보냅니다.
+  // 직원은 관리자와 동료에게, 관리자는 직원에게 보냅니다. 공지는 관리자만 올리고 관리자 칸은 빠집니다.
+  const msgNotice = actor.admin && form.notice === '1';
+  const msgPeople = staff.filter((e) => e.id !== actor.id);
+  const msgPool = [...(actor.admin ? [] : ['admin']), ...msgPeople.map((e) => e.id)];
+  const msgTargets = (form.to || '').split(',').filter((v) => msgPool.includes(v));
+  const msgSet = (ids: string[]) => put('to', msgPool.filter((v) => ids.includes(v)).join(','));
+  const msgToggle = (ids: string[], on: boolean) =>
+    msgSet(on ? [...msgTargets, ...ids] : msgTargets.filter((v) => !ids.includes(v)));
+  const msgGroups = groupByRole(msgPeople, (e) => roleGroup(e));
+  const msgAll = msgPool.length > 0 && msgPool.every((v) => msgTargets.includes(v));
+  const messagePick = () => (
+    <fieldset className="recipients msgpick">
+      <legend>
+        {t('받는 사람 ({n}/{total}명)', { n: msgTargets.length, total: msgPool.length })}
+      </legend>
+      {actor.admin && (
+        <label className="recipient all">
+          <Checkbox
+            checked={msgNotice}
+            onCheckedChange={(on) => put('notice', on === true ? '1' : '')}
+          />
+          {t('공지로 올리기 (공지 탭에 한 건으로 올라갑니다)')}
+        </label>
+      )}
+      <div className="msgpick-groups">
+        <label className="recipient all">
+          <Checkbox checked={msgAll} onCheckedChange={(on) => msgSet(on === true ? msgPool : [])} />
+          {t('전체')}
+        </label>
+        {!actor.admin && (
+          <label className="recipient">
+            <Checkbox
+              checked={msgTargets.includes('admin')}
+              onCheckedChange={(on) => msgToggle(['admin'], on === true)}
+            />
+            {t('관리자')}
+          </label>
+        )}
+        {msgGroups.map((g) => {
+          const ids = g.items.map((e) => e.id);
+          return (
+            <label className="recipient" key={g.group ?? 'other'}>
+              <Checkbox
+                checked={ids.every((v) => msgTargets.includes(v))}
+                onCheckedChange={(on) => msgToggle(ids, on === true)}
+              />
+              <span style={{ color: g.group ? ROLE_GROUP_COLORS[g.group] : undefined }}>
+                {g.group ?? t('기타')} <small>{ids.length}</small>
+              </span>
+            </label>
+          );
+        })}
+      </div>
+      <div className="recipientlist">
+        {msgGroups.flatMap((g) =>
+          g.items.map((e) => (
+            <label className="recipient" key={e.id}>
+              <Checkbox
+                checked={msgTargets.includes(e.id)}
+                onCheckedChange={(on) => msgToggle([e.id], on === true)}
+              />
+              {box(e)}
+            </label>
+          )),
+        )}
+      </div>
+    </fieldset>
+  );
+  // 여럿에게 한 번에 보낸 메시지는 한 사람씩 따로 저장되지만, 목록에서는 한 장으로 묶어 보여 줍니다.
+  // 묶음 안에 내가 받은 한 통이 있으면 그 통으로 확인 단추가 움직입니다.
+  const mineTo = (x: Message) => (x.to === 'admin' ? actor.admin : x.to === actor.id);
+  const seen = (x: Message) =>
+    x.to === 'admin' ? x.readBy.some((id) => emp(id)?.admin) : x.readBy.includes(x.to);
+  const sendBatches = (list: Message[]) => {
+    const out: Message[][] = [];
+    for (const x of list.slice().reverse()) {
+      const head = out.at(-1)?.[0];
+      if (
+        head &&
+        x.kind === 'message' &&
+        head.kind === 'message' &&
+        x.to !== 'all' &&
+        head.to !== 'all' &&
+        x.sender === head.sender &&
+        x.createdAt === head.createdAt
+      )
+        out.at(-1)!.push(x);
+      else out.push([x]);
+    }
+    return out.map((batch) => ({ m: batch.find(mineTo) ?? batch[0], batch }));
+  };
   const rainTargets = (form.targets || '').split(',').filter(Boolean);
   const rainAll =
     staff.length > 0 && staff.every((e) => rainTargets.includes(e.id));
@@ -2198,7 +2291,7 @@ export default function ShiftApp() {
                   ).size
                 }
                 onTabChange={setMsgTab}
-                onCompose={(to = 'admin') => open('message', { to, body: '' })}
+                onCompose={(to = 'admin', body = '') => open('message', { to, body })}
                 onShoutOut={() =>
                   open('message', { to: 'admin', body: t('오늘 고마웠던 동료: ') })
                 }
@@ -2219,7 +2312,8 @@ export default function ShiftApp() {
                   className="button primary"
                   onClick={() =>
                     open('message', {
-                      to: actor.admin ? 'all' : 'admin',
+                      to: actor.admin ? staff.map((e) => e.id).join(',') : 'admin',
+                      notice: actor.admin ? '1' : '',
                       body: '',
                     })
                   }
@@ -2227,10 +2321,7 @@ export default function ShiftApp() {
                   <Plus size={16} /> {t('메시지 작성')}
                 </button>
               </div>
-              {data.messages
-                .slice()
-                .reverse()
-                .map((m) => (
+              {sendBatches(data.messages).map(({ m, batch }) => (
                   <article
                     className={
                       'message ' + (m.kind === 'rain' ? 'weather' : '')
@@ -2240,12 +2331,16 @@ export default function ShiftApp() {
                     <div className="messagehead">
                       {m.kind === 'rain' ? (
                         <CloudRain size={21} />
+                      ) : m.kind === 'notice' ? (
+                        <Megaphone size={21} />
                       ) : (
                         box(emp(m.sender))
                       )}
                       <span>
                         →{' '}
-                        {m.recipients
+                        {batch.length > 1
+                          ? batch.map((x) => name(x.to)).join(', ')
+                          : m.recipients
                           ? m.recipients.map(name).join(', ')
                           : m.to === 'all'
                             ? t('전 직원')
@@ -2276,6 +2371,17 @@ export default function ShiftApp() {
                                   !m.readBy.includes(e.id),
                               )
                               .map((e) => e.name)
+                              .join(', '),
+                          })}
+                        </span>
+                      ) : batch.length > 1 && m.sender === actor.id ? (
+                        <span>
+                          {t('확인 {read} / {total}명 · {names} 미확인', {
+                            read: batch.filter(seen).length,
+                            total: batch.length,
+                            names: batch
+                              .filter((x) => !seen(x))
+                              .map((x) => name(x.to))
                               .join(', '),
                           })}
                         </span>
@@ -2316,7 +2422,7 @@ export default function ShiftApp() {
                           className="button"
                           onClick={() => {
                             if (confirm(t('이 메시지를 삭제할까요? 직원 화면에서도 사라집니다.')))
-                              void command('messageRemove', { id: m.id });
+                              void command('messageRemove', { ids: batch.map((x) => x.id) });
                           }}
                         >
                           <X size={14} /> {t('삭제')}
@@ -2895,7 +3001,12 @@ export default function ShiftApp() {
               } else if (modal === 'punchEdit') {
                 const back = form.employeeId;
                 void command('punchEdit', form).then((ok) => ok && setPayDetail(back));
-              } else void command(modal, form);
+              } else if (modal === 'message')
+                void command(msgNotice ? 'notice' : 'message', {
+                  to: msgTargets.join(','),
+                  body: form.body,
+                });
+              else void command(modal, form);
             }}
           >
             {modal === 'rain' && (
@@ -3230,19 +3341,8 @@ export default function ShiftApp() {
             )}
             {modal === 'message' && (
               <>
-                <Pick
-                  label={t('받는 사람')}
-                  value={form.to || ''}
-                  onChange={(v) => put('to', v)}
-                  options={
-                    actor.admin
-                      ? [{ value: 'all', label: t('전 직원') }, ...options]
-                      : [
-                          { value: 'admin', label: t('관리자') },
-                          ...options.filter((o) => o.value !== actor.id),
-                        ]
-                  }
-                />
+                {/* 받는 사람 목록에는 이름만 보이고, 직원 아이디는 감춥니다. */}
+                {messagePick()}
                 <label className="field">
                   {t('field::메시지')}
                   <textarea
@@ -3338,6 +3438,7 @@ export default function ShiftApp() {
                 disabled={
                   busy ||
                   (modal === 'rain' && !rainTargets.length) ||
+                  (modal === 'message' && !msgTargets.length) ||
                   (modal === 'swap' && !swappable.length) ||
                   (modal === 'detail' &&
                     (!data.shifts.some((s) => s.id === form.id) || swapBusy(form.id)))
@@ -3352,7 +3453,11 @@ export default function ShiftApp() {
                       ? rainAll
                         ? t('전 직원에게 공지 저장')
                         : t('선택한 {n}명에게 공지 저장', { n: rainTargets.length })
-                      : t('저장')}
+                      : modal === 'message'
+                        ? msgNotice
+                          ? t('{n}명에게 공지 올리기', { n: msgTargets.length })
+                          : t('{n}명에게 보내기', { n: msgTargets.length })
+                        : t('저장')}
               </button>
               </div>
             )}

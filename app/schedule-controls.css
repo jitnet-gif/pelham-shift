@@ -1,3 +1,5 @@
 .filterbar .all-schedule{align-self:flex-end;margin-bottom:0;color:#087e6d;border-color:#b9d8cd}.filterbar .all-schedule:hover{background:#eaf5f0}@media(max-width:700px){.filterbar .all-schedule{width:100%;min-height:39px;align-self:auto}}
 .shiftpick .recipientlist{grid-template-columns:1fr;max-height:260px;overflow-y:auto}.shiftpick .recipient{flex-wrap:wrap;row-gap:4px}.shiftpick .recipient small{color:#83958a}.shiftpick .recipient.locked{opacity:.55;cursor:not-allowed}.detailactions{display:flex;gap:10px;margin-top:12px}.detailactions .button{flex:1}
 .taskbadge{margin-left:8px;padding:3px 8px;white-space:nowrap}
+/* 메시지 받는 사람: 전체·구분은 한 줄에 칩처럼, 직원 목록은 길어지면 안에서 스크롤합니다. */
+.msgpick .msgpick-groups{display:flex;flex-wrap:wrap;column-gap:18px;border-bottom:1px solid #e8eeeb;margin-bottom:4px}.msgpick .msgpick-groups .recipient.all{border-bottom:0;margin-bottom:0;padding-bottom:6px}.msgpick .recipient small{color:#83958a;font-weight:400}.msgpick .recipientlist{max-height:240px;overflow-y:auto}

@@ -22,7 +22,7 @@ export default function StaffMessaging({
   employees: Employee[];
   teammates: number;
   onTabChange: (tab: 'messages' | 'announcements') => void;
-  onCompose: (to?: string) => void;
+  onCompose: (to?: string, body?: string) => void;
   onShoutOut: () => void;
   onOpen: (ids: string[]) => void;
 }) {
@@ -138,27 +138,41 @@ export default function StaffMessaging({
         <>
           <h3 className="stmsg-section">{t('전체 공지')}</h3>
           {announcements.map((m) => (
-            <button
-              className={
-                'stmsg-row' + (unread(m) ? ' unread' : '') + (shown === m.id ? ' open' : '')
-              }
-              key={m.id}
-              aria-expanded={shown === m.id}
-              // 누르면 공지 전문이 펼쳐지고, 다시 누르면 접힙니다.
-              onClick={() => {
-                setShown(shown === m.id ? null : m.id);
-                if (unread(m)) onOpen([m.id]);
-              }}
-            >
-              <span className={'stmsg-face' + (m.kind === 'rain' ? ' notice' : '')}>
-                <UserRound size={19} />
-              </span>
-              <span className="stmsg-main">
-                <b>{name(m.sender)}</b>
-                <small>{m.body}</small>
-              </span>
-              <time dateTime={m.createdAt}>{when(m.createdAt)}</time>
-            </button>
+            <div className="stmsg-item" key={m.id}>
+              <button
+                className={
+                  'stmsg-row' + (unread(m) ? ' unread' : '') + (shown === m.id ? ' open' : '')
+                }
+                aria-expanded={shown === m.id}
+                // 누르면 공지 전문이 펼쳐지고, 다시 누르면 접힙니다.
+                onClick={() => {
+                  setShown(shown === m.id ? null : m.id);
+                  if (unread(m)) onOpen([m.id]);
+                }}
+              >
+                <span className={'stmsg-face' + (m.kind === 'rain' ? ' notice' : '')}>
+                  <UserRound size={19} />
+                </span>
+                <span className="stmsg-main">
+                  <b>{name(m.sender)}</b>
+                  <small>{m.body}</small>
+                </span>
+                <time dateTime={m.createdAt}>{when(m.createdAt)}</time>
+              </button>
+              {/* 공지는 관리자만 올리므로, 공지에 대한 답장은 관리자와의 대화로 갑니다. */}
+              {shown === m.id && (
+                <div className="stmsg-thread">
+                  <button
+                    className="stmsg-reply"
+                    onClick={() =>
+                      onCompose('admin', t('공지 답장: {title}', { title: m.body.slice(0, 60) }) + '\n')
+                    }
+                  >
+                    {t('답장')}
+                  </button>
+                </div>
+              )}
+            </div>
           ))}
           {!announcements.length && <p className="stmsg-empty">{t('공지가 없습니다.')}</p>}
         </>
