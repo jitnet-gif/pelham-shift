@@ -99,9 +99,19 @@
 /* 한 주 날짜 줄 */
 .stsched-strip {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: 22px repeat(7, 1fr) 22px;
   gap: 2px;
-  padding: 8px 8px 12px;
+  padding: 8px 4px 12px;
+  touch-action: pan-y;
+}
+/* 요일 줄 양옆의 앞뒤 주 화살표 */
+.stsched-arrow {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #9aa0a8;
 }
 .stsched-chip {
   display: flex;

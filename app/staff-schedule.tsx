@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Employee, Shift } from '@/lib/domain';
 import { TIME_ZONE, addDays, roleTint, weekdayOf } from '@/lib/domain';
 import { useLang } from './use-lang';
@@ -53,6 +53,12 @@ export default function StaffSchedule({
   useEffect(() => {
     rowsRef.current[selected]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [selected]);
+  // 앞뒤 주로 넘깁니다. 고른 요일은 그대로 두어, 금요일을 보던 사람은 다음 주 금요일을 봅니다.
+  const swipeRef = useRef<{ x: number; y: number } | null>(null);
+  const shiftWeek = (step: 1 | -1) => {
+    onWeekChange(addDays(week, 7 * step));
+    onDayChange(addDays(selected, 7 * step));
+  };
   const today = new Intl.DateTimeFormat('en-CA', {
     timeZone: TIME_ZONE,
     year: 'numeric',
@@ -125,7 +131,28 @@ export default function StaffSchedule({
           </button>
         ))}
       </div>
-      <div className="stsched-strip">
+      <div
+        className="stsched-strip"
+        onTouchStart={(e) => {
+          swipeRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        }}
+        onTouchEnd={(e) => {
+          const from = swipeRef.current;
+          swipeRef.current = null;
+          if (!from) return;
+          const dx = e.changedTouches[0].clientX - from.x;
+          const dy = e.changedTouches[0].clientY - from.y;
+          // 가로로 충분히 밀었을 때만 주를 넘깁니다. 세로 스크롤이나 톡 누르기는 그냥 둡니다.
+          if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) shiftWeek(dx < 0 ? 1 : -1);
+        }}
+      >
+        <button
+          className="stsched-arrow"
+          aria-label={t('이전 주')}
+          onClick={() => shiftWeek(-1)}
+        >
+          <ChevronLeft size={20} />
+        </button>
         {weekDates.map((date, i) => (
           <button
             key={date}
@@ -144,6 +171,13 @@ export default function StaffSchedule({
             <i className={onDate(date).length ? 'on' : ''} />
           </button>
         ))}
+        <button
+          className="stsched-arrow"
+          aria-label={t('다음 주')}
+          onClick={() => shiftWeek(1)}
+        >
+          <ChevronRight size={20} />
+        </button>
       </div>
       <div className="stsched-list">
         {weekDates.map((date) => {
