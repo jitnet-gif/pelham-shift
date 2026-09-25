@@ -16,7 +16,7 @@ export const weekdays = (lang: Lang) =>
 const en: Record<string, string> = {
   // App shell and navigation
   'Pelham Shift · 근무 관리': 'Pelham Shift · Staff scheduling',
-  '근무 스케줄': 'Schedule',
+  '근무 스케줄': 'Team shifts',
   '근무 현황': "Who's working",
   '근무 중': 'On now',
   // 퇴근을 찍지 않은 채 날이 바뀐 기록. '근무 중'과 달리 지금 일하는 사람이 아닙니다.
@@ -684,7 +684,7 @@ const en: Record<string, string> = {
   확인: 'Mark as seen',
   '새 작업': 'New',
   '로그인하고 열기': 'Sign in to open',
-  스케줄: 'Schedule',
+  스케줄: 'Team shifts',
   '작업 지시 관리': 'Task assignments',
   '내 작업 수신함': 'My task inbox',
   새로고침: 'Refresh',

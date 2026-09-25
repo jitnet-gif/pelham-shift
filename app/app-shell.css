@@ -176,7 +176,7 @@
   .sched-filters-gap{display:none}
   .sched-filters .button{flex:1 1 calc(50% - 5px)}
   .sched-actions{gap:8px}
-  .sched-actions .button.publish,
+  .sched-actions .button.publish{flex:1}
   .roster{grid-template-columns:150px repeat(14,minmax(96px,1fr));min-width:1494px}
   .roster-staff{padding:8px 10px;gap:8px}
   .roster-avatar{width:28px;height:28px;font-size:12px}
