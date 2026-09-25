@@ -628,8 +628,11 @@ export default function ShiftApp() {
       <small className="notecount">{250 - (form.note || '').length}</small>
     </label>
   );
+  // 근무 추가·수정은 24시간 시계로 고르고 적습니다.
+  const twentyFour = modal === 'shift' || modal === 'shiftUpdate';
   const clockText = (v: string) => {
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(v)) return '';
+    if (twentyFour) return v;
     const h = Number(v.slice(0, 2));
     return `${h % 12 || 12}:${v.slice(3, 5)} ${h < 12 ? 'AM' : 'PM'}`;
   };
@@ -2672,6 +2675,7 @@ export default function ShiftApp() {
           value={form[clockField.key] || ''}
           label={clockField.label}
           minuteStep={clockField.step}
+          twentyFour={twentyFour}
           onCancel={() => setClockField(null)}
           onPick={(value) => {
             put(clockField.key, value);

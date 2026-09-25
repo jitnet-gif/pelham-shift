@@ -15,18 +15,23 @@ const parse = (value: string) => {
 // 12시간 표시로 바꾼 값. 자정과 정오는 12로 읽습니다.
 const to12 = (hour24: number) => hour24 % 12 || 12;
 const NUMBER_RADIUS = 38;
+// 24시간 시계의 안쪽 고리. 00 과 13–23 이 여기 섭니다.
+const INNER_RADIUS = 25;
 
 // 창은 열릴 때 새로 붙습니다 — 그래서 지금 값에서 시작하는 데 따로 손볼 것이 없습니다.
 export default function TimePicker({
   value,
   label,
   minuteStep = 1,
+  twentyFour = false,
   onCancel,
   onPick,
 }: {
   value: string;
   label: string;
   minuteStep?: number;
+  // 켜면 AM/PM 없이 00–23 시로 고릅니다.
+  twentyFour?: boolean;
   onCancel: () => void;
   onPick: (value: string) => void;
 }) {
@@ -41,9 +46,19 @@ export default function TimePicker({
   const step = Math.max(1, Math.min(30, minuteStep));
   const minutes = Array.from({ length: Math.ceil(60 / step) }, (_, i) => i * step);
   const hours = Array.from({ length: 12 }, (_, i) => (i === 0 ? 12 : i));
-  const marks = stage === 'hour' ? hours : minutes;
+  // 눈금마다 값·글자·반지름을 둡니다. 24시간이면 바깥은 1–12, 안쪽은 00·13–23 입니다.
+  const marks =
+    stage === 'minute'
+      ? minutes.map((n) => ({ n, text: pad(n), r: NUMBER_RADIUS }))
+      : twentyFour
+        ? [
+            ...hours.map((n) => ({ n, text: String(n), r: NUMBER_RADIUS })),
+            ...hours.map((n) => ({ n: (n + 12) % 24, text: pad((n + 12) % 24), r: INNER_RADIUS })),
+          ]
+        : hours.map((n) => ({ n, text: String(n), r: NUMBER_RADIUS }));
   const angleOf = (n: number) => (stage === 'hour' ? ((n % 12) / 12) * 360 : (n / 60) * 360);
-  const active = stage === 'hour' ? to12(hour24) : minute;
+  const active = stage === 'hour' ? (twentyFour ? hour24 : to12(hour24)) : minute;
+  const inner = twentyFour && stage === 'hour' && (hour24 === 0 || hour24 > 12);
   const setHour12 = (h: number) => setHour24((h % 12) + (pm ? 12 : 0));
   const setMeridiem = (next: boolean) => setHour24((h) => (h % 12) + (next ? 12 : 0));
 
@@ -56,7 +71,12 @@ export default function TimePicker({
         180) /
         Math.PI +
       360;
-    if (stage === 'hour') setHour12(Math.round(angle / 30) % 12 || 12);
+    const h12 = Math.round(angle / 30) % 12 || 12;
+    if (stage === 'hour' && twentyFour) {
+      // 가운데에서 두 고리 사이보다 가까우면 안쪽 고리(00·13–23)로 읽습니다.
+      const dist = Math.hypot(event.clientX - (box.left + box.width / 2), event.clientY - (box.top + box.height / 2));
+      setHour24(dist < (box.width * (NUMBER_RADIUS + INNER_RADIUS)) / 200 ? (h12 + 12) % 24 : h12);
+    } else if (stage === 'hour') setHour12(h12);
     else {
       const raw = (Math.round((angle % 360) / (step * 6)) * step) % 60;
       setMinute(raw);
@@ -73,7 +93,7 @@ export default function TimePicker({
             className={'clockpick-unit' + (stage === 'hour' ? ' on' : '')}
             onClick={() => setStage('hour')}
           >
-            {pad(to12(hour24))}
+            {pad(twentyFour ? hour24 : to12(hour24))}
           </button>
           <em>:</em>
           <button
@@ -82,6 +102,7 @@ export default function TimePicker({
           >
             {pad(minute)}
           </button>
+          {!twentyFour && (
           <span className="clockpick-half">
             <button
               className={pm ? '' : 'on'}
@@ -94,6 +115,7 @@ export default function TimePicker({
               PM
             </button>
           </span>
+          )}
         </div>
         <div
           className="clockpick-face"
@@ -110,26 +132,33 @@ export default function TimePicker({
             if (stage === 'hour') setStage('minute');
           }}
         >
-          <i className="clockpick-hand" style={{ transform: `rotate(${angleOf(active)}deg)` }}>
+          <i
+            className="clockpick-hand"
+            style={{
+              transform: `rotate(${angleOf(active)}deg)`,
+              ...(inner && { top: `${50 - INNER_RADIUS}%`, height: `${INNER_RADIUS}%` }),
+            }}
+          >
             <b />
           </i>
           <span className="clockpick-pin" />
-          {marks.map((n) => (
+          {marks.map(({ n, text, r }) => (
             <button
               key={n}
-              className={'clockpick-mark' + (n === active ? ' on' : '')}
+              className={'clockpick-mark' + (r === INNER_RADIUS ? ' inner' : '') + (n === active ? ' on' : '')}
               style={{
-                left: `calc(50% + ${Math.sin((angleOf(n) * Math.PI) / 180) * NUMBER_RADIUS}% )`,
-                top: `calc(50% - ${Math.cos((angleOf(n) * Math.PI) / 180) * NUMBER_RADIUS}% )`,
+                left: `calc(50% + ${Math.sin((angleOf(n) * Math.PI) / 180) * r}% )`,
+                top: `calc(50% - ${Math.cos((angleOf(n) * Math.PI) / 180) * r}% )`,
               }}
               onClick={() => {
                 if (stage === 'hour') {
-                  setHour12(n);
+                  if (twentyFour) setHour24(n);
+                  else setHour12(n);
                   setStage('minute');
                 } else setMinute(n);
               }}
             >
-              {stage === 'hour' ? n : pad(n)}
+              {text}
             </button>
           ))}
         </div>
