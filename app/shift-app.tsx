@@ -1206,6 +1206,7 @@ export default function ShiftApp() {
     msgSet(on ? [...msgTargets, ...ids] : msgTargets.filter((v) => !ids.includes(v)));
   const msgGroups = groupByRole(msgPeople, (e) => roleGroup(e));
   const msgAll = msgPool.length > 0 && msgPool.every((v) => msgTargets.includes(v));
+  // 관리자만 씁니다. 직원은 받는 사람 한 명을 드롭다운에서 고릅니다.
   const messagePick = () => (
     <fieldset className="recipients msgpick">
       <legend>
@@ -3003,7 +3004,7 @@ export default function ShiftApp() {
                 void command('punchEdit', form).then((ok) => ok && setPayDetail(back));
               } else if (modal === 'message')
                 void command(msgNotice ? 'notice' : 'message', {
-                  to: msgTargets.join(','),
+                  to: actor.admin ? msgTargets.join(',') : msgTargets[0],
                   body: form.body,
                 });
               else void command(modal, form);
@@ -3341,8 +3342,20 @@ export default function ShiftApp() {
             )}
             {modal === 'message' && (
               <>
-                {/* 받는 사람 목록에는 이름만 보이고, 직원 아이디는 감춥니다. */}
-                {messagePick()}
+                {/* 여럿·그룹을 골라 보내기는 관리자만 합니다. 직원은 한 사람에게만 보내고, 목록에는 이름만 보입니다. */}
+                {actor.admin ? (
+                  messagePick()
+                ) : (
+                  <Pick
+                    label={t('받는 사람')}
+                    value={msgTargets[0] || ''}
+                    onChange={(v) => put('to', v)}
+                    options={[
+                      { value: 'admin', label: t('관리자') },
+                      ...msgPeople.map((e) => ({ value: e.id, label: e.name, group: roleGroup(e) })),
+                    ]}
+                  />
+                )}
                 <label className="field">
                   {t('field::메시지')}
                   <textarea
@@ -3456,7 +3469,9 @@ export default function ShiftApp() {
                       : modal === 'message'
                         ? msgNotice
                           ? t('{n}명에게 공지 올리기', { n: msgTargets.length })
-                          : t('{n}명에게 보내기', { n: msgTargets.length })
+                          : actor.admin
+                            ? t('{n}명에게 보내기', { n: msgTargets.length })
+                            : t('보내기')
                         : t('저장')}
               </button>
               </div>

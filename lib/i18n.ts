@@ -478,6 +478,8 @@ const en: Record<string, string> = {
   '받는 사람 ({n}/{total}명)': 'To ({n}/{total})',
   '공지로 올리기 (공지 탭에 한 건으로 올라갑니다)': 'Post as announcement (shows once in the Announcements tab)',
   '{n}명에게 보내기': 'Send to {n}',
+  보내기: 'Send',
+  '여러 명에게 보내기는 관리자만 할 수 있습니다.': 'Only the manager can send to several people at once.',
   '{n}명에게 공지 올리기': 'Post announcement to {n}',
   '공지 답장: {title}': 'Re announcement: {title}',
   '받는 사람을 선택하세요.': 'Choose at least one recipient.',
