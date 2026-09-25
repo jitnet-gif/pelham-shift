@@ -6,6 +6,7 @@ import {AREAS,HYBRID_ROLE,ROLE_GROUP_COLORS,TIME_ZONE,areaList,groupByRole,roleG
 import {notice} from '@/lib/notice';
 import {useLang} from '../use-lang';
 import TimePicker from '../time-picker';
+import {useBack} from '../use-back';
 type Actor={id:string;admin:boolean};
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:TIME_ZONE,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 // 마감 시각은 10분 단위로만 섭니다 — 서버도 같은 눈금으로 받습니다.
@@ -20,6 +21,8 @@ export default function TaskInbox(){
  const query=()=>window.location.search;
  // /tasks is also rendered on the server, where window does not exist; the team query is filled in after mount.
  const [root,setRoot]=useState('/');
+ // 뒤로 가기는 열린 시계를 먼저 닫고, 그다음은 앱을 닫지 않고 왼쪽 위 '스케줄' 링크처럼 스케줄로 돌아갑니다.
+ useBack(()=>{if(clock)return setClock(false);window.location.assign(root)});
  const receive=(data:any)=>{if(data.state){setState({...data.state,tasks:data.state.tasks??[]});setVersion(data.version);setSetup(false)}else setSetup(true);if(data.actor)setActor(data.actor)};
  async function refresh(){setSaved('');try{const r=await fetch('/api/workspace'+query());const data=await r.json();if(!r.ok)throw Error(data.error||'작업을 불러오지 못했습니다.');receive(data);setError('')}catch(e){setError(notice(e,'작업을 불러오지 못했습니다.'))}}
  useEffect(()=>{setRoot('/'+query());void refresh()},[]);

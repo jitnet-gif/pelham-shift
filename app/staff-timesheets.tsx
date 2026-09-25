@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useBackClose } from './use-back';
 import { ChevronDown, ChevronRight, Info } from 'lucide-react';
 import type { Employee, Punch } from '@/lib/domain';
 import {
@@ -47,6 +48,8 @@ export default function StaffTimesheets({
 }) {
   const { t, locale } = useLang();
   const [open, setOpen] = useState('');
+  // 펼친 급여 기간은 뒤로 가기로 접습니다.
+  useBackClose(!!open, () => setOpen(''));
   const mine = punches.filter((p) => p.employeeId === me);
   const short = (date: string) =>
     new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(

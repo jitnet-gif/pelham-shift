@@ -13,6 +13,8 @@ const ADMINS = [
   { id: 'admin', name: process.env.ADMIN_NAME || 'hwang sunjae', punchId: ADMIN_PASSWORD },
 ];
 const adminFor = (actor: string) => ADMINS.find((entry) => entry.id === actor) || null;
+// 직원 목록 밖에 있는 관리자 계정. 관리자에게 가는 알림이 이 계정의 기기에도 닿게 합니다.
+export const rosterAdminIds = () => ADMINS.map((entry) => entry.id);
 // 직원은 본인 직원 ID 로 로그인합니다. 아래 값은 아직 직원 ID 가 없는 사람만 쓰는 옛 기본값입니다.
 const DEFAULT_PASSWORD = '1111';
 const SESSION_DAYS = 30;
@@ -256,4 +258,9 @@ export async function forgetMember(workspace: string, actor: string) {
   await env.DB.prepare('DELETE FROM password_credentials WHERE workspace = ? AND actor = ?')
     .bind(workspace, actor)
     .run();
+  // 마지막 자리도 지웁니다. 위치 표를 아직 만들지 않았으면 지울 것도 없으니 넘어갑니다 — 그래서 맨 뒤에 둡니다.
+  await env.DB.prepare('DELETE FROM staff_locations WHERE workspace = ? AND actor = ?')
+    .bind(workspace, actor)
+    .run()
+    .catch(() => 0);
 }

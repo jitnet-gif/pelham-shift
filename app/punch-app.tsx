@@ -9,6 +9,7 @@ import { notice } from '@/lib/notice';
 import { useLang } from './use-lang';
 import GpsGuard, { useGps } from './gps-guard';
 import StaffClock from './staff-clock';
+import { useBack } from './use-back';
 import BirthLogin from './birth-login';
 import LoginQr from './login-qr';
 
@@ -37,6 +38,8 @@ export default function PunchApp() {
   const [push, setPush] = useState(false);
   // 출퇴근은 근무지 안에서만 찍히므로, 앱을 여는 동안 위치를 계속 지켜봅니다.
   const gps = useGps();
+  // 출퇴근 앱은 시계 한 장뿐이라 되돌아갈 화면이 없습니다. 뒤로 가기는 앱을 닫지 않고 그대로 머뭅니다.
+  useBack(() => {});
   const query = () => (typeof window === 'undefined' ? '' : window.location.search);
 
   const ingest = (r: Payload) => {

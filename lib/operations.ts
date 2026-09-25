@@ -1,4 +1,4 @@
-import {MAX_AREAS,MIN_WORKPLACE_RADIUS,MAX_WORKPLACE_RADIUS,OT_DAILY_HOURS,OT_WEEKLY_HOURS,type State,type Shift,type Attendance,type Punch,areaList,canSwap,leadDate,localDate,localTime,minutes,nameKey,overlap,overtimeOver,duration,payPeriodStart,payPeriodEnd,periodOpen} from './domain';
+import {MAX_AREAS,MIN_WORKPLACE_RADIUS,MAX_WORKPLACE_RADIUS,OT_WEEKLY_HOURS,type State,type Shift,type Attendance,type Punch,areaList,canSwap,leadDate,localDate,localTime,minutes,nameKey,overlap,overtimeOver,duration,payPeriodStart,payPeriodEnd,periodOpen} from './domain';
 export type Actor={id:string;admin:boolean};
 export type Command={type:string;payload:any};
 const fail=(message:string):never=>{throw new Error(message)};
@@ -27,7 +27,7 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
  // Payroll and staff records stay with the administrator.
  const taskManager=actor.admin||!!s.employees.find(e=>e.id===actor.id)?.taskManager;
  const scheduler=()=>{if(!taskManager)fail('작업 지시 권한이 필요합니다.')};
- // 초과 근무 편성은 따로 엽니다. 근무표는 짜도 하루 8시간·주 40시간을 넘기는 근무는 이 권한을 받은 사람만 냅니다.
+ // 초과 근무 편성은 따로 엽니다. 근무표는 짜도 한 주 44시간을 넘기는 근무는 이 권한을 받은 사람만 냅니다.
  // 근무를 s 에 반영한 뒤에, 손대기 전 모습(before)과 견주어 부릅니다. 이미 넘어 있던 근무의 장소나 메모를
  // 고치는 것까지 막으면 예전에 짜 둔 근무표를 손볼 수 없게 되므로, 이번 편성이 더 넘긴 자리만 막습니다.
  // 막히면 그 자리에서 throw 되고, 손대던 s 는 복제본이라 그대로 버려집니다.
@@ -39,9 +39,7 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
    // 분 단위로 세다 보면 소수점 끝자리가 흔들립니다. 1분(0.017시간)보다 적게 늘어난 것은 늘어난 것으로 보지 않습니다.
    if(hours<=(was.get(key)??0)+0.001)continue;
    const name=employee(employeeId).name,extra=Math.round(hours*100)/100,day=key.slice(2);
-   fail(key.startsWith('w')
-    ?`${day} 주 ${name}: 주 ${OT_WEEKLY_HOURS}시간을 ${extra}시간 넘깁니다. 초과 근무 편성 권한이 필요합니다.`
-    :`${day} ${name}: 하루 ${OT_DAILY_HOURS}시간을 ${extra}시간 넘깁니다. 초과 근무 편성 권한이 필요합니다.`);
+   fail(`${day} 주 ${name}: 주 ${OT_WEEKLY_HOURS}시간을 ${extra}시간 넘깁니다. 초과 근무 편성 권한이 필요합니다.`);
   }
  };
  const MANAGED=['taskCreate','taskRemove','areaAdd','shift','shiftUpdate','shiftRemove','publish','unpublish'];
@@ -100,8 +98,8 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
  // 딱지는 '지난 공개 뒤에 새로 넣거나 고친 근무'라는 뜻이므로 여기서는 건드리지 않습니다.
  case 'unpublish':scheduler();s.published=false;break;
  case 'currency':admin();if(!['CAD'].includes(p.currency))fail('통화를 선택하세요.');s.currency=p.currency;break;
- case 'swap': {const shift=s.shifts.find(x=>x.id===p.shiftId)??fail('근무를 선택하세요.');if(!actor.admin&&shift.employeeId!==actor.id)fail('본인 근무만 대체 신청할 수 있습니다.');if(!canSwap(shift.date))fail('대체 신청은 근무일 7일 전까지 가능합니다.');employee(p.to);if(p.to===shift.employeeId)fail('다른 대체 직원을 선택하세요.');if(shift.originalId)fail('이미 대체 승인된 근무입니다.');if(s.swaps.some(x=>x.shiftId===shift.id&&x.status!=='rejected'))fail('이미 대체 요청이 있습니다.');if(s.shifts.some(x=>x.employeeId===p.to&&overlap(x,shift)))fail('대체 직원의 기존 근무시간과 겹칩니다.');s.swaps.push({id:id(),shiftId:shift.id,from:shift.employeeId,to:p.to,status:'requested',createdAt:now.toISOString(),bonus:0});break;}
- case 'swapDecision': {const r=s.swaps.find(x=>x.id===p.id)??fail('요청을 찾을 수 없습니다.');if(p.action==='accept'){if(actor.admin||actor.id!==r.to)fail('대체 직원 본인이 수락해야 합니다.');if(r.status!=='requested')fail('처리된 요청입니다.');r.status='accepted'}else if(p.action==='reject'){if(!actor.admin&&actor.id!==r.to&&actor.id!==r.from)fail('권한이 없습니다.');if(r.status==='approved')fail('승인된 대체는 취소할 수 없습니다.');r.status='rejected'}else if(p.action==='approve'){admin();if(r.status!=='accepted')fail('대체 직원의 수락이 먼저 필요합니다.');const shift=s.shifts.find(x=>x.id===r.shiftId)??fail('근무가 없습니다.');if(!canSwap(shift.date))fail('대체 승인도 근무일 7일 전까지 가능합니다.');if(shift.employeeId!==r.from)fail('원래 근무자가 변경되었습니다.');if(s.shifts.some(x=>x.id!==shift.id&&x.employeeId===r.to&&overlap(x,shift)))fail('대체 직원의 근무시간이 겹칩니다.');shift.originalId=r.from;shift.employeeId=r.to;r.bonus=number(p.bonus);r.status='approved'}else fail('잘못된 처리입니다.');break;}
+ case 'swap': {const shift=s.shifts.find(x=>x.id===p.shiftId)??fail('근무를 선택하세요.');if(!actor.admin&&shift.employeeId!==actor.id)fail('본인 근무만 대체 신청할 수 있습니다.');if(!canSwap(shift.date))fail('대체 신청은 근무일 7일 전까지 가능합니다.');employee(p.to);if(p.to===shift.employeeId)fail('다른 대체 직원을 선택하세요.');if(shift.originalId)fail('이미 대체 승인된 근무입니다.');if(s.swaps.some(x=>x.shiftId===shift.id&&x.status!=='rejected'))fail('이미 대체 요청이 있습니다.');if(s.shifts.some(x=>x.employeeId===p.to&&overlap(x,shift)))fail('대체 직원의 기존 근무시간과 겹칩니다.');s.swaps.push({id:id(),shiftId:shift.id,from:shift.employeeId,to:p.to,status:'requested',createdAt:now.toISOString()});break;}
+ case 'swapDecision': {const r=s.swaps.find(x=>x.id===p.id)??fail('요청을 찾을 수 없습니다.');if(p.action==='accept'){if(actor.admin||actor.id!==r.to)fail('대체 직원 본인이 수락해야 합니다.');if(r.status!=='requested')fail('처리된 요청입니다.');r.status='accepted'}else if(p.action==='reject'){if(!actor.admin&&actor.id!==r.to&&actor.id!==r.from)fail('권한이 없습니다.');if(r.status==='approved')fail('승인된 대체는 취소할 수 없습니다.');r.status='rejected'}else if(p.action==='approve'){admin();if(r.status!=='accepted')fail('대체 직원의 수락이 먼저 필요합니다.');const shift=s.shifts.find(x=>x.id===r.shiftId)??fail('근무가 없습니다.');if(!canSwap(shift.date))fail('대체 승인도 근무일 7일 전까지 가능합니다.');if(shift.employeeId!==r.from)fail('원래 근무자가 변경되었습니다.');if(s.shifts.some(x=>x.id!==shift.id&&x.employeeId===r.to&&overlap(x,shift)))fail('대체 직원의 근무시간이 겹칩니다.');shift.originalId=r.from;shift.employeeId=r.to;r.status='approved'}else fail('잘못된 처리입니다.');break;}
  // 펀치는 서버 시각으로 남깁니다. 기기 시계를 고쳐도 찍히는 시각은 달라지지 않습니다.
  case 'punchIn': {const target=punchTarget(p.employeeId);const day=localDate(now),at=localTime(now);
   // 퇴근을 찍지 않은 채 날이 바뀌어도 새 날의 출근은 찍힙니다. 어제 기록이 오늘을 막지 않도록 오늘 찍은 출근만 봅니다.
@@ -129,6 +127,14 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
   const mine=s.punches!.filter(x=>x.employeeId===who&&x.date>=from&&x.date<=to&&x.out&&x.status!=='approved');
   if(!mine.length)fail('확인할 근무가 없습니다.');
   for(const punch of mine){punch.status='approved';punch.disputeNote=undefined;punch.reviewedAt=now.toISOString()}break;}
+ // 관리자가 한 날짜의 출근과 퇴근을 손으로 넣습니다. 찍지 못한 날을 메우는 자리라 퇴근까지 함께 받습니다.
+ // 퇴근이 출근보다 이르면 다음 날 퇴근입니다. 같은 사람의 기록과 시간이 겹치면 받지 않습니다.
+ case 'punchAdd': {admin();const who=employee(p.employeeId).id;const day=date(p.date);if(day>localDate(now))fail('아직 오지 않은 날짜에는 출퇴근을 넣을 수 없습니다.');
+  const at=time(p.in),out=time(p.out);if(at===out)fail('출근과 퇴근 시각이 같습니다.');
+  const span=(d:string,start:string,end:string)=>({date:d,start,end} as Shift);
+  if(s.punches!.some(x=>x.employeeId===who&&overlap(span(x.date,x.in,x.out??x.in),span(day,at,out))))fail('이 시간에 이미 찍힌 출퇴근이 있습니다.');
+  const near=s.shifts.filter(x=>x.employeeId===who&&x.date===day).sort((x,y)=>Math.abs(minutes(x.start)-minutes(at))-Math.abs(minutes(y.start)-minutes(at)))[0];
+  s.punches!.push({id:id(),employeeId:who,date:day,in:at,out,area:near?.area||employee(who).role,status:'pending',editedBy:actor.id});break;}
  // 출근기계 이름과 직원을 한 번 승인해 두면 다음 타임카드부터 자동으로 이어집니다. 비슷한 이름은 후보로만 제안하고, 확정은 관리자가 합니다.
  case 'clockName': {admin();const who=employee(p.employeeId).id;const key=nameKey(text(p.name,80));if(!key)fail('출근기계에 찍힌 이름을 확인하세요.');const rest=s.clockNames!.filter(x=>x.name!==key);if(rest.length>=500)fail('이름 연결은 500개까지 저장할 수 있습니다.');s.clockNames=[...rest,{name:key,raw:text(p.name,80),employeeId:who}];break;}
  // 잘못 승인한 연결은 지워야 다시 후보로 올라옵니다.

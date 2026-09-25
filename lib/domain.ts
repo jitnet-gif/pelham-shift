@@ -2,12 +2,12 @@
 // 흔적까지 지우는 쪽은 employeePurge 입니다 — 그 사람의 근무·출퇴근·급여·작업·메시지가 함께 사라지고 되돌릴 수 없습니다.
 // roles: 그 사람이 맡은 직군 전부. Proshop 과 Workshop 을 함께 맡는 멀티 플레이어를 위해 둡니다.
 // role: 그중 첫째 직군. 근무와 출퇴근은 장소를 하나만 적기에, 비워 둔 자리를 이 값으로 채웁니다.
-// overtimeManager: 하루 8시간·주 40시간을 넘는 근무를 짤 수 있는 사람. 근무 편성 권한과 따로 둡니다 —
+// overtimeManager: 한 주 44시간을 넘는 근무를 짤 수 있는 사람. 근무 편성 권한과 따로 둡니다 —
 // 근무표를 짜는 것과 초과근무 수당이 붙는 근무를 내는 것은 다른 결정이기 때문입니다.
 export type Employee = {id:string;name:string;color:string;role:string;roles?:string[];rate:number;email:string;birthDate:string;phone?:string;punchId?:string;taskManager?:boolean;overtimeManager?:boolean;admin?:boolean;archived?:boolean};
 // draft: 새로 넣거나 고친 근무는 직원에게 공개하기 전까지 Unpublished 딱지를 답니다. publish 하면 지워집니다.
 export type Shift = {id:string;employeeId:string;date:string;start:string;end:string;area:string;note?:string;breakMinutes?:number;originalId?:string;draft?:boolean};
-export type Swap = {id:string;shiftId:string;from:string;to:string;status:'requested'|'accepted'|'approved'|'rejected';createdAt:string;bonus:number};
+export type Swap = {id:string;shiftId:string;from:string;to:string;status:'requested'|'accepted'|'approved'|'rejected';createdAt:string;bonus?:number};
 export type Attendance = {id:string;employeeId:string;date:string;start:string;end:string;breakMinutes:number};
 export type Message = {id:string;sender:string;to:string;body:string;createdAt:string;readBy:string[];kind:string;recipients?:string[]};
 // time 은 마감 시각입니다. 적지 않고 보낼 수 있어 예전에 보낸 작업에는 없습니다.
@@ -106,30 +106,35 @@ export const dueShifts=(state:State,now=new Date())=>nearShifts(state,now,left=>
 export const missedShifts=(state:State,now=new Date())=>nearShifts(state,now,left=>left<=0&&left>=-REMIND_WINDOW).filter(s=>!punchedIn(state,s));
 // What an approved time off or unavailability blocks on a shift's date, if anything. Managers are warned, not stopped.
 export function blockedBy(state:State,shift:Shift):'timeoff'|'unavailable'|null{const hits=(allDay:boolean,start?:string,end?:string)=>allDay||!start||!end||overlap(shift,{...shift,start,end});if((state.timeOff??[]).some(r=>r.status==='approved'&&r.employeeId===shift.employeeId&&shift.date>=r.from&&shift.date<=r.to&&hits(r.allDay,r.start,r.end)))return 'timeoff';if((state.availability??[]).some(r=>r.status==='approved'&&r.employeeId===shift.employeeId&&r.weekday===weekdayOf(shift.date)&&(!r.effectiveFrom||shift.date>=r.effectiveFrom)&&hits(r.allDay,r.start,r.end)))return 'unavailable';return null}
-// 급여 규칙 · 미국 연방(FLSA) 주 40시간 기준에 일 8시간 기준을 함께 적용합니다.
-// 한 주 안에서 "일 8시간 초과분의 합"과 "주 40시간 초과분" 중 큰 쪽만 1.5배로 가산해 중복 가산을 막습니다.
-export const OT_DAILY_HOURS=8;
-export const OT_WEEKLY_HOURS=40;
+// 급여 규칙 · 온타리오 고용기준법(ESA)을 따라 한 주(일요일 시작) 44시간을 넘긴 시간만 1.5배로 가산합니다.
+// 하루 기준은 없습니다 — 하루 10시간을 일해도 그 주 합이 44시간 안이면 가산하지 않습니다.
+export const OT_WEEKLY_HOURS=44;
 export const OT_MULTIPLIER=1.5;
 // 짜 놓은 근무표가 이 선을 얼마나 넘었는지 자리마다 셉니다. 급여가 초과근무를 세는 눈금과 같은 선을 봅니다 —
 // 편성에서 다른 선을 쓰면 통과한 근무가 급여에서 가산되거나 그 반대가 됩니다.
-// 무급 휴게는 빼고 셉니다. dates 에 적은 날(과 그 날이 속한 주)만 보므로, 손대지 않은 주는 건드리지 않습니다.
-// 키는 하루면 'd:날짜', 주면 'w:그 주의 일요일'. 편성 전후를 같은 키로 견주어, 이미 넘어 있던 근무는 그대로 두고
+// 무급 휴게는 빼고 셉니다. dates 에 적은 날이 속한 주만 보므로, 손대지 않은 주는 건드리지 않습니다.
+// 키는 'w:그 주의 일요일'. 편성 전후를 같은 키로 견주어, 이미 넘어 있던 근무는 그대로 두고
 // 이번 편성이 더 넘긴 자리만 가려냅니다.
 export function overtimeOver(shifts:Shift[],employeeId:string,dates:string[]):Map<string,number>{
  const mine=shifts.filter(x=>x.employeeId===employeeId);
  const hours=(list:Shift[])=>list.reduce((n,x)=>n+duration(x.start,x.end,x.breakMinutes??0),0);
  const over=new Map<string,number>();
- for(const date of [...new Set(dates)].sort()){
-  const day=hours(mine.filter(x=>x.date===date))-OT_DAILY_HOURS;
-  if(day>0)over.set('d:'+date,day);
- }
  for(const week of [...new Set(dates.map(d=>weekStart(d)))].sort()){
   const end=addDays(week,7);
   const total=hours(mine.filter(x=>x.date>=week&&x.date<end))-OT_WEEKLY_HOURS;
   if(total>0)over.set('w:'+week,total);
  }
  return over;
+}
+// 이번 주(일요일 시작) 실제로 일한 시간이 44시간을 넘은 사람. 관리자에게 알리는 데 씁니다.
+// 급여와 같은 눈금(paidRecords·payableHours)으로 재고, 아직 퇴근을 찍지 않은 근무는 지금까지를 더합니다 —
+// 근무 중에 선을 넘는 순간 알 수 있게 하려는 것입니다. 퇴근을 잊고 며칠 열려 있는 기록은 어제·오늘 것만 셉니다.
+export function overtimeWorked(state:State,now=new Date()){
+ const today=localDate(now),week=weekStart(today),current=localTime(now);
+ const open=(state.punches??[]).filter(p=>!p.out&&p.date>=week&&p.date>=addDays(today,-1)).map(p=>({id:p.id,employeeId:p.employeeId,date:p.date,start:p.in,end:current,breakMinutes:(p.breaks??[]).reduce((n,b)=>n+(!b.paid&&b.end?Math.round(duration(b.start,b.end)*60):0),0)}));
+ const worked=new Map<string,number>();
+ for(const a of [...paidRecords(state).filter(a=>a.date>=week&&a.date<=today),...open])worked.set(a.employeeId,(worked.get(a.employeeId)??0)+payableHours(state,a));
+ return state.employees.filter(e=>!e.archived&&(worked.get(e.id)??0)>OT_WEEKLY_HOURS).map(e=>({employee:e,week,hours:worked.get(e.id)!}));
 }
 // 지각 유예 없음: 예정 출근 시각을 1분이라도 넘기면 지각입니다.
 export const LATE_GRACE_MINUTES=0;
@@ -151,9 +156,13 @@ export function earlyOut(shift:Shift|undefined,inAt:string,outAt:string){
  const planned=duration(inAt,shift.end);
  return planned>0?Math.max(0,Math.round((planned-duration(inAt,outAt))*60)-EARLY_GRACE_MINUTES):null;
 }
+// 조퇴 분. 지각과 같은 예정 근무(scheduledFor)를 기준으로 삼습니다 —
+// 한 기록을 두 눈금이 서로 다른 근무로 재면, 지각은 있는데 조퇴는 '예정 없음'인 줄이 나옵니다.
+export function earlyBy(state:State,a:Attendance){return earlyOut(scheduledFor(state,a),a.start,a.end)}
 // 조회 구간이 주(일요일 시작) 경계에 맞지 않으면 걸쳐 있는 주의 초과근무가 실제보다 적게 잡힙니다.
 export function wholeWeeks(from:string,to:string){return weekStart(from)===from&&weekStart(addDays(to,1))===addDays(to,1)}
-// 실근무시간을 정규·초과로 나눠 시급을 곱하고, 승인된 대체 추가수당을 더한 뒤 지각한 만큼 차감합니다.
+// 실근무시간을 정규·초과로 나눠 시급을 곱한 뒤 지각·조퇴한 만큼 차감합니다. 대체 근무에 붙는 추가수당은 없습니다 —
+// 예전 대체 요청에 남아 있는 bonus 값도 급여에 더하지 않습니다.
 // 급여가 보는 근무 기록. 단말에서 찍힌 출퇴근(punches)이 기준입니다.
 // 그 사람 그 날짜에 찍힌 기록이 하나도 없을 때만, 예전에 엑셀로 가져온 기록을 씁니다.
 // 같은 날을 두 번 세지 않으려는 규칙입니다 — 둘 다 세면 하루치가 두 번 지급됩니다.
@@ -172,18 +181,31 @@ export function punchReviewCounts(state:State,employeeId:string,from:string,to:s
  return {unconfirmed:mine.filter(p=>p.status!=='approved'&&p.status!=='disputed').length,
   disputed:mine.filter(p=>p.status==='disputed').length};
 }
-export function payroll(state:State,employeeId:string,from:string,to:string){const e=state.employees.find(e=>e.id===employeeId)!;const records=paidRecords(state).filter(a=>a.employeeId===employeeId&&a.date>=from&&a.date<=to);const worked=(a:Attendance)=>duration(a.start,a.end,a.breakMinutes);const hours=records.reduce((s,a)=>s+worked(a),0);
+// 급여에 넣는 시간은 예정 근무 시작부터입니다. 일찍 와서 찍어도 예정 시작 전 시간은 지급하지 않습니다.
+// 예정 시작보다 12시간 넘게 앞선 출근은 일찍 온 것이 아니라 자정을 넘긴 근무에 늦게 온 것이라 그대로 둡니다
+// (22:00 근무에 00:30 출근). 예정 근무가 없는 날의 기록은 기준이 없어 찍힌 그대로 셉니다.
+export const EARLY_PAY_WINDOW_MINUTES=720;
+export function paidStart(state:State,a:Attendance){const shift=scheduledFor(state,a);if(!shift)return a.start;const ahead=minutes(shift.start)-minutes(a.start);return ahead>0&&ahead<=EARLY_PAY_WINDOW_MINUTES?shift.start:a.start}
+export const payableHours=(state:State,a:Attendance)=>duration(paidStart(state,a),a.end,a.breakMinutes);
+export function payroll(state:State,employeeId:string,from:string,to:string){const e=state.employees.find(e=>e.id===employeeId)!;const records=paidRecords(state).filter(a=>a.employeeId===employeeId&&a.date>=from&&a.date<=to);const worked=(a:Attendance)=>payableHours(state,a);const hours=records.reduce((s,a)=>s+worked(a),0);
  // 날짜별로 합친 뒤 주(일요일 시작)별로 묶어 가산 시간을 구합니다.
  const byDay=new Map<string,number>();for(const a of records)byDay.set(a.date,(byDay.get(a.date)??0)+worked(a));const byWeek=new Map<string,number[]>();for(const [day,h] of byDay){const w=weekStart(day);byWeek.set(w,[...(byWeek.get(w)??[]),h])}
- const otHours=[...byWeek.values()].reduce((s,days)=>{const daily=days.reduce((n,h)=>n+Math.max(0,h-OT_DAILY_HOURS),0);const weekly=Math.max(0,days.reduce((n,h)=>n+h,0)-OT_WEEKLY_HOURS);return s+Math.max(daily,weekly)},0);const regularHours=hours-otHours;
- // 지각은 체크인 하나하나 따로 셉니다. 차감은 그 체크인에서 번 금액까지만이라, 한 번 늦은 날이 다른 날 번 돈까지 갉아먹지 않습니다.
- const lates=records.map(a=>{const minutes=lateBy(state,a)??0;return {id:a.id,date:a.date,minutes,deduction:Math.min(worked(a)*e.rate,(minutes/60)*e.rate)}});
+ const otHours=[...byWeek.values()].reduce((s,days)=>s+Math.max(0,days.reduce((n,h)=>n+h,0)-OT_WEEKLY_HOURS),0);const regularHours=hours-otHours;
+ // 지각과 조퇴는 체크인 하나하나 따로 셉니다. 둘은 겹치지 않습니다 — 지각은 예정 출근부터 찍은 출근까지,
+ // 조퇴는 찍은 퇴근부터 예정 퇴근까지라, 합치면 예정 근무 중 일하지 않은 시간 그대로입니다. 한 시간을 두 번 물리지 않습니다.
+ // 차감은 둘을 합쳐 그 체크인에서 번 금액까지만입니다. 한 번 빠진 날이 다른 날 번 돈까지 갉아먹지 않습니다.
+ // 한도에 걸리면 지각을 먼저 물리고 남은 만큼만 조퇴에서 뺍니다 — 합계는 어느 쪽을 먼저 물려도 같고,
+ // 두 칸에 나눠 적는 자리만 갈립니다.
+ const lates=records.map(a=>{const cap=worked(a)*e.rate;
+  const minutes=lateBy(state,a)??0,early=earlyBy(state,a)??0;
+  const deduction=Math.min(cap,(minutes/60)*e.rate);
+  return {id:a.id,date:a.date,minutes,deduction,early,earlyDeduction:Math.min(cap-deduction,(early/60)*e.rate)}});
  const lateMinutes=lates.reduce((s,r)=>s+r.minutes,0);const lateDays=new Set(lates.filter(r=>r.minutes>0).map(r=>r.date)).size;
- const bonus=state.swaps.filter(r=>r.status==='approved'&&r.to===employeeId).reduce((s,r)=>{const shift=state.shifts.find(x=>x.id===r.shiftId);return s+(shift&&shift.date>=from&&shift.date<=to&&records.some(a=>a.date===shift.date&&overlap(shift,{...shift,start:a.start,end:a.end}))?r.bonus:0)},0);
- const base=regularHours*e.rate,otPay=otHours*e.rate*OT_MULTIPLIER,earned=base+otPay+bonus,cents=(n:number)=>Math.round(n*100)/100;
+ const earlyMinutes=lates.reduce((s,r)=>s+r.early,0);const earlyDays=new Set(lates.filter(r=>r.early>0).map(r=>r.date)).size;
+ const base=regularHours*e.rate,otPay=otHours*e.rate*OT_MULTIPLIER,earned=base+otPay,cents=(n:number)=>Math.round(n*100)/100;
  // 체크인마다 이미 그 체크인에서 번 금액으로 막아 두어, 엑셀 열을 잘못 연결해도 합계가 번 돈을 넘지 않습니다.
- const lateDeduction=lates.reduce((s,r)=>s+r.deduction,0);
- return {hours,regularHours,otHours,lateMinutes,lateDays,lates:lates.map(r=>({...r,deduction:cents(r.deduction)})),base:cents(base),otPay:cents(otPay),bonus,lateDeduction:cents(lateDeduction),total:cents(earned-lateDeduction),...punchReviewCounts(state,employeeId,from,to)}}
+ const lateDeduction=lates.reduce((s,r)=>s+r.deduction,0),earlyDeduction=lates.reduce((s,r)=>s+r.earlyDeduction,0);
+ return {hours,regularHours,otHours,lateMinutes,lateDays,earlyMinutes,earlyDays,lates:lates.map(r=>({...r,deduction:cents(r.deduction),earlyDeduction:cents(r.earlyDeduction)})),base:cents(base),otPay:cents(otPay),lateDeduction:cents(lateDeduction),earlyDeduction:cents(earlyDeduction),total:cents(earned-lateDeduction-earlyDeduction),...punchReviewCounts(state,employeeId,from,to)}}
 // 근무지 이름. 직원 화면과 출퇴근 단말이 같은 이름을 씁니다.
 export const LOCATION='Pelham Hills Golf Club';
 // 날씨와 일출·일몰은 클럽이 서 있는 자리의 것입니다 — 출퇴근을 찍는 자리와 같은 좌표를 봅니다.

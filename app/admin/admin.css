@@ -1,0 +1,175 @@
+/* 관리자 위치 지도. 넓은 화면은 지도 옆에 목록, 좁은 화면은 지도 아래 목록입니다. */
+.staffmap {
+  max-width: 1550px;
+  margin: 0 auto;
+  padding: 28px 40px 24px;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.staffmap-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+}
+.staffmap-head p {
+  font-size: 14px;
+  color: #74817e;
+  margin: 0;
+}
+.staffmap-actions {
+  display: flex;
+  gap: 10px;
+}
+.staffmap-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 16px;
+  background: #fff0e7;
+  color: #965936;
+  border-radius: 7px;
+  font-size: 14px;
+}
+.staffmap-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 16px;
+  min-height: 520px;
+}
+.staffmap-map {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  min-height: 520px;
+  z-index: 0;
+}
+.staffmap-list {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 16px 8px;
+  overflow-y: auto;
+  max-height: calc(100dvh - 190px);
+}
+.staffmap-list h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 10px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.staffmap-list h2 span {
+  font-size: 12px;
+  font-weight: 400;
+  color: #83928a;
+}
+.staffmap-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.staffmap-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 11px 0;
+  border-bottom: 1px solid #e8eeeb;
+}
+.staffmap-list li:last-child {
+  border-bottom: 0;
+}
+.staffmap-list li.is-stale {
+  opacity: 0.6;
+}
+.staffmap-person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+}
+.staffmap-person:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.staffmap-person i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.staffmap-person span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.staffmap-person b {
+  font-size: 14px;
+  font-weight: 600;
+}
+.staffmap-person small {
+  font-size: 12px;
+  color: #83928a;
+}
+.staffmap-seen {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding-left: 22px;
+  font-size: 12px;
+  color: #087e6d;
+}
+span.staffmap-seen {
+  color: #8b9691;
+}
+.staffmap-seen em {
+  font-style: normal;
+  color: #8b9691;
+}
+.staffmap-empty {
+  font-size: 14px;
+  color: #8b9691;
+  padding: 18px 0;
+  margin: 0;
+}
+/* 지도 위 이름표. Leaflet 기본 말풍선보다 작게, 직원이 몰려 있어도 서로 덜 가리게. */
+.leaflet-tooltip.staffmap-tag {
+  padding: 2px 7px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+.leaflet-tooltip.staffmap-tag.is-stale {
+  color: #7a8984;
+}
+@media (max-width: 900px) {
+  .staffmap {
+    padding: 18px 16px;
+  }
+  .staffmap-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .staffmap-body {
+    grid-template-columns: 1fr;
+  }
+  .staffmap-map {
+    min-height: 60vh;
+  }
+  .staffmap-list {
+    max-height: none;
+  }
+}

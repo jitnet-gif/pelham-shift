@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MapPin, RefreshCw } from 'lucide-react';
 import { useLang } from './use-lang';
+import { distanceMeters } from '@/lib/domain';
 
 // at: 이 자리를 받은 시각. 오래된 자리로는 출퇴근을 찍지 못하게 하려고 함께 들고 다닙니다.
 export type Spot = { lat: number; lng: number; accuracy: number; at: number };
@@ -99,7 +100,63 @@ export function useGps() {
     document.addEventListener('visibilitychange', again);
     return () => document.removeEventListener('visibilitychange', again);
   }, [start]);
+  useBeacon(spot);
   return { spot, state, retry: start };
+}
+
+// 관리자 지도(/admin)에 지금 자리를 알립니다. 받을지 말지는 서버가 정합니다 —
+// 출근을 찍어 둔 동안에만 저장하고, 그 밖에는 { tracking: false } 로 돌려보냅니다.
+// 웹앱이라 앱이 화면에 떠 있는 동안에만 보냅니다. 화면을 끄면 마지막 자리가 남습니다.
+const BEACON_EVERY_MS = 60000;
+// 움직였으면 1분을 기다리지 않고 보냅니다. 다만 건물 안에서는 가만히 있어도 자리가 수십 m 씩 튀므로,
+// 오차보다 크게 움직였을 때만, 그리고 적어도 이만큼은 띄워서 보냅니다 — 몇 초마다 서버를 두드리지 않게.
+const BEACON_MOVED_M = 30;
+const BEACON_MIN_GAP_MS = 20000;
+const BEACON_TICK_MS = 15000;
+// 출근 전·퇴근 뒤·로그인 전에는 이만큼 쉬었다가 다시 물어봅니다. 너무 길면 출근 직후 지도에 늦게 뜹니다.
+const BEACON_IDLE_MS = 120000;
+function useBeacon(spot: Spot | null) {
+  const last = useRef<{ lat: number; lng: number; at: number } | null>(null);
+  const quietUntil = useRef(0);
+  const latest = useRef(spot);
+  const send = useCallback(() => {
+    const spot = latest.current;
+    if (!spot || document.visibilityState !== 'visible') return;
+    const now = Date.now();
+    if (now < quietUntil.current) return;
+    const was = last.current;
+    if (was) {
+      const gap = now - was.at;
+      const moved = distanceMeters(was, spot) >= Math.max(BEACON_MOVED_M, spot.accuracy);
+      if (gap < BEACON_MIN_GAP_MS || (gap < BEACON_EVERY_MS && !moved)) return;
+    }
+    last.current = { lat: spot.lat, lng: spot.lng, at: now };
+    void fetch('/api/location', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat: spot.lat, lng: spot.lng, accuracy: spot.accuracy }),
+      keepalive: true,
+    })
+      .then(async (res) => {
+        // 로그인 전이거나 받지 않는 때입니다. 쉬었다가 다시 물어봅니다 — 로그인 화면에서도 이 훅이 돌기 때문입니다.
+        const body = (await res.json().catch(() => null)) as { tracking?: boolean } | null;
+        if (res.status === 401 || res.status === 403 || body?.tracking === false) {
+          quietUntil.current = Date.now() + BEACON_IDLE_MS;
+          last.current = null;
+        }
+      })
+      .catch(() => 0);
+  }, []);
+  useEffect(() => {
+    latest.current = spot;
+    send();
+  }, [spot, send]);
+  // 가만히 서 있으면 기기가 새 자리를 주지 않습니다. 그래도 '아직 여기 있다'는 것은 알려야 하므로 자주 들여다보고,
+  // 보내는 간격은 위의 1분이 정합니다.
+  useEffect(() => {
+    const tick = setInterval(send, BEACON_TICK_MS);
+    return () => clearInterval(tick);
+  }, [send]);
 }
 
 // 위치가 꺼져 있는 동안 앱을 덮는 화면. 관리자는 덮지 않습니다 —

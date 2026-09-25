@@ -163,7 +163,7 @@ order by s.workspace, s.area, name;
 
 -- ───────────────────────────────────────────────────────────────────────────
 -- 4. 직원별 주간 예정 시간 · 주는 일요일에 시작합니다
---    40시간을 넘는 주가 보이면 초과근무가 예정되어 있다는 뜻입니다.
+--    44시간을 넘는 주가 보이면 초과근무가 예정되어 있다는 뜻입니다.
 -- ───────────────────────────────────────────────────────────────────────────
 with params as (
   select (now() at time zone 'America/Toronto')::date - 28 as from_day,   -- 조회 시작
@@ -206,7 +206,7 @@ select workspace,
        count(*)                               as shifts,
        round(sum(hours), 2)                   as hours,
        case when sum(hours) is null then null
-            else round(greatest(0, sum(hours) - 40), 2) end as over_40
+            else round(greatest(0, sum(hours) - 44), 2) end as over_44
 from (
   select s.workspace,
          s.day - extract(dow from s.day)::int as week_start,   -- 일요일
@@ -690,14 +690,14 @@ order by workspace, issue, date;
 
 -- ───────────────────────────────────────────────────────────────────────────
 -- 12. 대체 근무(swaps) 현황 · 누가 누구 근무를 넘겨받았는지
---     approved 인 건만 추가수당(bonus)이 급여에 더해집니다.
+--     대체 근무에는 추가수당이 없습니다. 급여는 실제 출근기록만큼입니다.
 -- ───────────────────────────────────────────────────────────────────────────
 with swap as (
   select w.id as workspace, r.*
   from public.workspaces w,
        jsonb_to_recordset(coalesce(w.state::jsonb -> 'swaps', '[]'::jsonb))
          as r(id text, "shiftId" text, "from" text, "to" text, status text,
-              "createdAt" text, bonus numeric)
+              "createdAt" text)
 ),
 shift as (
   select w.id as workspace, s ->> 'id' as id,
@@ -719,7 +719,6 @@ select r.workspace,
        coalesce(a.name, r."from")       as handed_over_by,
        coalesce(b.name, r."to")         as taken_by,
        coalesce(c.name, s."employeeId") as assigned_now,   -- 근무에 실제로 박혀 있는 사람
-       r.bonus,
        left(r."createdAt", 10)          as requested_on
 from swap r
 left join shift s on s.workspace = r.workspace and s.id = r."shiftId"

@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useRef, type CSSProperties } from 'react';
+import { useBack, closeTop } from './use-back';
 import {
   CalendarDays,
   Clock3,
@@ -78,10 +79,11 @@ import {
   duration,
   payroll,
   paidRecords,
+  payableHours,
+  earlyBy,
   lateBy,
   scheduledFor,
   wholeWeeks,
-  OT_DAILY_HOURS,
   OT_WEEKLY_HOURS,
   OT_MULTIPLIER,
   canSwap,
@@ -339,29 +341,10 @@ export default function ShiftApp() {
   // 뒤로 가기는 앱을 닫지 않고 한 단계씩 되돌립니다.
   // 열려 있는 것부터 닫고, 그다음 지나온 화면을 되짚고, 마지막은 홈(스케줄)에 머뭅니다.
   const back = useRef({
-    // 직원이 폰으로 보면 홈은 출퇴근 화면입니다. 관리자·데스크톱은 스케줄입니다.
-    home: 'schedule',
     tab: 'schedule',
-    modal: '',
-    navOpen: false,
-    payDetail: '',
-    // 근무표 안에서 보고 있는 급여 기간. 뒤로 가기는 기간 목록으로 먼저 돌아갑니다.
-    sheet: '',
-    clock: false,
-    // 팀에서 보고 있는 한 사람. 뒤로 가기는 이름 목록으로 먼저 돌아갑니다.
-    teamPick: '',
     // 지나온 화면. 뒤로 가기로 옮긴 걸음은 다시 쌓지 않습니다.
     trail: [] as string[],
     popping: false,
-  });
-  useEffect(() => {
-    back.current.home = staffPhone ? 'home' : 'schedule';
-    back.current.modal = modal;
-    back.current.navOpen = navOpen;
-    back.current.payDetail = payDetail;
-    back.current.sheet = sheet;
-    back.current.teamPick = teamPick;
-    back.current.clock = !!clockField;
   });
   useEffect(() => {
     const state = back.current;
@@ -370,55 +353,36 @@ export default function ShiftApp() {
     else state.trail.push(state.tab);
     state.tab = tab;
   }, [tab]);
-  useEffect(() => {
+  useBack(() => {
     const state = back.current;
-    // 되돌아갈 자리를 항상 하나 채워 둡니다. 이게 없으면 뒤로 가기가 앱을 닫습니다.
-    const refill = () => window.history.pushState({ pelham: true }, '');
-    refill();
-    const step = () => {
-      if (state.navOpen) return setNavOpen(false);
-      if (state.payDetail) return setPayDetail('');
-      if (state.clock) return setClockField(null);
-      if (state.modal) return setModal('');
-      // 근무표 화면에 있을 때만 한 걸음으로 칩니다. 다른 화면에서는 보이지 않는 값을 소비해 헛걸음이 됩니다.
-      if (state.tab === 'timesheets' && state.sheet) return setSheet('');
-      // 팀 화면에 있을 때만 한 걸음으로 칩니다. 다른 화면에서는 헛걸음이 됩니다.
-      if (state.tab === 'team' && state.teamPick) return setTeamPick('');
-      const previous = state.trail.pop();
-      if (previous && previous !== state.tab) {
-        state.popping = true;
-        return setTab(previous);
-      }
-      if (state.tab !== state.home) {
-        state.popping = true;
-        return setTab(state.home);
-      }
-      // 홈에서는 더 되돌릴 곳이 없습니다. 자리만 다시 채우고 그대로 머뭅니다.
-    };
-    const onPop = () => {
-      refill();
-      step();
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Backspace') return;
-      // 글자를 지우는 중이면 건드리지 않습니다.
-      const target = event.target as HTMLElement | null;
-      if (
-        target &&
-        (target.isContentEditable ||
-          ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
-      )
-        return;
-      event.preventDefault();
-      step();
-    };
-    window.addEventListener('popstate', onPop);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('popstate', onPop);
-      window.removeEventListener('keydown', onKey);
-    };
-  }, []);
+    // 직원이 폰으로 보면 홈은 출퇴근 화면입니다. 관리자·데스크톱은 스케줄입니다.
+    const home = staffPhone ? 'home' : 'schedule';
+    // 새 메시지 창은 모든 화면 위에 떠 있어 가장 먼저 닫습니다.
+    if (inapp) return setInapp(null);
+    if (navOpen) return setNavOpen(false);
+    if (payDetail) return setPayDetail('');
+    if (clockField) return setClockField(null);
+    // 대화상자 안에서 펼친 달력·시간대 목록은 대화상자보다 먼저 접습니다.
+    if (birthOpen) return setBirthOpen(false);
+    if (presets) return setPresets(false);
+    if (modal) return setModal('');
+    // 아래 화면이 열어 둔 창(날씨, 급여 기간 펼침 등)을 닫습니다.
+    if (closeTop()) return;
+    // 근무표 화면에 있을 때만 한 걸음으로 칩니다. 다른 화면에서는 보이지 않는 값을 소비해 헛걸음이 됩니다.
+    if (tab === 'timesheets' && sheet) return setSheet('');
+    // 팀 화면에 있을 때만 한 걸음으로 칩니다. 다른 화면에서는 헛걸음이 됩니다.
+    if (tab === 'team' && teamPick) return setTeamPick('');
+    const previous = state.trail.pop();
+    if (previous && previous !== tab) {
+      state.popping = true;
+      return setTab(previous);
+    }
+    if (tab !== home) {
+      state.popping = true;
+      return setTab(home);
+    }
+    // 홈에서는 더 되돌릴 곳이 없습니다. 자리만 다시 채우고 그대로 머뭅니다.
+  });
   const put = (key: string, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
   const query = () =>
@@ -473,6 +437,20 @@ export default function ShiftApp() {
     }
     if (!actor.admin && !employeeNav.has(tab)) setTab('schedule');
   }, [actor.admin, canSchedule, tab]);
+  // 알림을 눌러 들어온 주소(?open=attendance&who=직원&from=급여 기간 시작)는 그 직원의 출근 기록을 곧장 엽니다.
+  // 관리자로 확인된 뒤에 한 번만 열고, 주소에서 지워 새로고침이 같은 화면으로 끌고 가지 않게 합니다.
+  useEffect(() => {
+    // 로그인 확인 전에는 actor 가 자리표시 관리자라, 그 값으로 열면 진짜 관리자에게는 목록이 보입니다.
+    if (auth !== 'in' || !actor.admin) return;
+    const url = new URL(window.location.href);
+    const who = url.searchParams.get('who') || '';
+    if (url.searchParams.get('open') !== 'attendance' || !data.employees.some((e) => e.id === who)) return;
+    const from = url.searchParams.get('from') || '';
+    setTab('attendance');
+    setAtt({ actor: actor.id, who, from: /^\d{4}-\d{2}-\d{2}$/.test(from) ? payPeriodStart(from) : '' });
+    for (const key of ['open', 'who', 'from']) url.searchParams.delete(key);
+    window.history.replaceState(window.history.state, '', url);
+  }, [auth, actor.admin, actor.id]);
   // 게시 해제는 직원 화면에서 근무표가 통째로 사라지므로 한 번 묻습니다. 기록은 지워지지 않습니다.
   const unpublish = () => {
     if (
@@ -600,10 +578,18 @@ export default function ShiftApp() {
       void command('employeeRemove', { id: e.id });
     }
   };
-  // 지우는 삭제. 누르는 그 자리에서 지난 근무·출퇴근·급여·작업·메시지 기록까지 함께 사라지고 되돌릴 수 없습니다.
+  // 지우는 삭제. 지난 근무·출퇴근·급여·작업·메시지 기록까지 함께 사라지고 되돌릴 수 없어 한 번 묻습니다.
   const purgeEmployee = (e: Employee) => {
-    setTeamPick('');
-    void command('employeePurge', { id: e.id });
+    if (
+      confirm(
+        t('{name} 직원을 완전히 삭제할까요? 지난 근무·출퇴근·급여·작업·메시지 기록까지 모두 지워지고 되돌릴 수 없습니다.', {
+          name: e.name,
+        }),
+      )
+    ) {
+      setTeamPick('');
+      void command('employeePurge', { id: e.id });
+    }
   };
   const options = staff.map((e) => ({
     value: e.id,
@@ -629,7 +615,7 @@ export default function ShiftApp() {
     </label>
   );
   // 근무 추가·수정은 24시간 시계로 고르고 적습니다.
-  const twentyFour = modal === 'shift' || modal === 'shiftUpdate';
+  const twentyFour = modal === 'shift' || modal === 'shiftUpdate' || modal === 'punchAdd';
   const clockText = (v: string) => {
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(v)) return '';
     if (twentyFour) return v;
@@ -936,9 +922,13 @@ export default function ShiftApp() {
   // 급여 상세. 고른 구간의 출근기록을 날짜순으로 펼치고, 그 옆에 예정 근무·지각·그날 금액을 같이 둡니다.
   // 상세도 합계와 같은 기록을 봐야 합니다. 둘이 다른 데이터를 쓰면 숫자가 어긋납니다.
   const payDays = (employeeId: string) => {
-    // 지각 차감도 합계가 쓴 값을 그대로 가져옵니다. 화면에서 다시 계산하면 열을 더한 값이 아래 합계와 어긋납니다.
+    // 지각·조퇴 차감도 합계가 쓴 값을 그대로 가져옵니다. 화면에서 다시 계산하면 열을 더한 값이 아래 합계와 어긋납니다.
+    // 둘은 한 체크인에서 번 금액이라는 한도를 나눠 쓰므로 반드시 같은 계산에서 함께 받아 와야 합니다.
     const deductions = new Map(
-      payroll(data, employeeId, from, to).lates.map((r) => [r.id, r.deduction]),
+      payroll(data, employeeId, from, to).lates.map((r) => [
+        r.id,
+        { late: r.deduction, early: r.earlyDeduction },
+      ]),
     );
     return paidRecords(data)
       .filter((a) => a.employeeId === employeeId && a.date >= from && a.date <= to)
@@ -947,12 +937,14 @@ export default function ShiftApp() {
       .map((a) => ({
         a,
         shift: scheduledFor(data, a),
-        worked: duration(a.start, a.end, a.breakMinutes),
+        worked: payableHours(data, a),
         late: lateBy(data, a),
-        lateDeduction: deductions.get(a.id) ?? 0,
+        early: earlyBy(data, a),
+        lateDeduction: deductions.get(a.id)?.late ?? 0,
+        earlyDeduction: deductions.get(a.id)?.early ?? 0,
       }));
   };
-  // 초과근무가 어떤 근거로 잡혔는지. 하루 8시간 초과분의 합과 주 40시간 초과분 중 큰 쪽만 가산합니다.
+  // 초과근무가 어떤 근거로 잡혔는지. 한 주 44시간을 넘긴 시간만 가산합니다.
   const payWeeks = (employeeId: string) => {
     const byDay = new Map<string, number>();
     for (const r of payDays(employeeId))
@@ -963,10 +955,8 @@ export default function ShiftApp() {
     return [...weeks.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([week, days]) => {
-        const daily = days.reduce((n, h) => n + Math.max(0, h - OT_DAILY_HOURS), 0);
         const worked = days.reduce((n, h) => n + h, 0);
-        const weekly = Math.max(0, worked - OT_WEEKLY_HOURS);
-        return { week, worked, daily, weekly, applied: Math.max(daily, weekly) };
+        return { week, worked, applied: Math.max(0, worked - OT_WEEKLY_HOURS) };
       });
   };
   const totals = data.employees.map((e) => ({
@@ -1258,13 +1248,16 @@ export default function ShiftApp() {
         '지각(분)',
         '지각일수',
         '지각 차감',
-        '대체 추가수당',
+        '조퇴(분)',
+        '조퇴일수',
+        '조퇴 차감',
         '예상 급여',
         '통화',
         '시작일',
         '종료일',
       ].map((h) => t(h)),
-      ...totals.map((r) => [
+      // 근무도 금액도 없는 사람은 0 만 늘어선 줄이 되어 뺍니다. 메일 본문과 같은 기준입니다.
+      ...totals.filter((r) => r.hours > 0 || r.total !== 0).map((r) => [
         r.e.id,
         r.e.name,
         r.hours.toFixed(2),
@@ -1277,7 +1270,9 @@ export default function ShiftApp() {
         r.lateDays,
         // 화면과 같은 부호로 내보내 시트에서 열을 합산해도 결과가 맞습니다.
         -r.lateDeduction || 0,
-        r.bonus,
+        r.earlyMinutes,
+        r.earlyDays,
+        -r.earlyDeduction || 0,
         r.total,
         data.currency,
         from,
@@ -1312,7 +1307,7 @@ export default function ShiftApp() {
       );
       return;
     }
-    // 본문은 CSV 와 같은 totals 를 봅니다. 화면 필터로 걸러진 값을 쓰면 줄의 합과 합계가 어긋납니다.
+    // 본문은 CSV 와 같은 totals 를 같은 기준으로 거릅니다. 화면 필터로 걸러진 값을 쓰면 줄의 합과 합계가 어긋납니다.
     const rows = totals.filter((r) => r.hours > 0 || r.total !== 0);
     const sum = money(rows.reduce((n, r) => n + r.total, 0));
     const head = t('{from} ~ {to} 기간의 예상 급여입니다.', { from, to });
@@ -1554,9 +1549,11 @@ export default function ShiftApp() {
                                   <button
                                     className="button"
                                     disabled={busy}
-                                    onClick={() =>
-                                      command('timeOffDecision', { id: r.id, action: 'cancel' })
-                                    }
+                                    onClick={() => {
+                                      // 관리자의 삭제만 한 번 묻습니다. 직원의 취소는 대기 중인 자기 요청을 거두는 것입니다.
+                                      if (!actor.admin || confirm(t('이 휴무 요청을 삭제할까요?')))
+                                        void command('timeOffDecision', { id: r.id, action: 'cancel' });
+                                    }}
                                   >
                                     {actor.admin ? t('삭제') : t('취소')}
                                   </button>
@@ -1690,9 +1687,10 @@ export default function ShiftApp() {
                               <button
                                 className="button"
                                 disabled={busy}
-                                onClick={() =>
-                                  command('availabilityDecision', { id: r.id, action: 'delete' })
-                                }
+                                onClick={() => {
+                                  if (confirm(t('이 근무 가능 시간을 삭제할까요?')))
+                                    void command('availabilityDecision', { id: r.id, action: 'delete' });
+                                }}
                               >
                                 {t('삭제')}
                               </button>
@@ -1776,7 +1774,25 @@ export default function ShiftApp() {
                       onPeriod={(start) => setAtt({ actor: actor.id, who: attWho, from: start })}
                     />
                   )}
-                  <h3 className="punchlog-head">{t('찍힌 출퇴근')}</h3>
+                  <div className="punchlog-headrow">
+                    <h3 className="punchlog-head">{t('찍힌 출퇴근')}</h3>
+                    {/* 찍지 못한 날은 관리자가 날짜를 골라 출근과 퇴근을 직접 넣습니다. */}
+                    {actor.admin && attWho && (
+                      <button
+                        className="button"
+                        onClick={() =>
+                          open('punchAdd', {
+                            employeeId: attWho,
+                            date: today <= attTo ? today : attTo,
+                            in: '',
+                            out: '',
+                          })
+                        }
+                      >
+                        <Plus size={16} /> {t('출퇴근 추가')}
+                      </button>
+                    )}
+                  </div>
                   {/* 한 사람 출근부를 보는 중이면 카드마다 같은 이름을 붙일 까닭이 없습니다. */}
                   <PunchLog
                     punches={attPunches}
@@ -1797,6 +1813,7 @@ export default function ShiftApp() {
                           '휴게',
                           '실근무',
                           '지각',
+                          '조퇴',
                         ].map((h) => (
                           <TableHead key={h}>{t(h)}</TableHead>
                         ))}
@@ -1807,6 +1824,7 @@ export default function ShiftApp() {
                           // 예정 근무가 없는 기록은 지각 기준이 없어 '정시'가 아니라 '예정 없음'입니다.
                           const planned = scheduledFor(data, a);
                           const late = lateBy(data, a);
+                          const early = earlyBy(data, a);
                           return (
                             <TableRow key={a.id}>
                               {!attWho && <TableCell>{box(emp(a.employeeId))}</TableCell>}
@@ -1831,6 +1849,13 @@ export default function ShiftApp() {
                                     ? t('{n}분 지각', { n: late })
                                     : t('정시')}
                               </TableCell>
+                              <TableCell className={early ? 'red' : undefined}>
+                                {early === null
+                                  ? t('예정 없음')
+                                  : early
+                                    ? t('{n}분 조퇴', { n: early })
+                                    : t('정시')}
+                              </TableCell>
                             </TableRow>
                           );
                       })}
@@ -1852,12 +1877,6 @@ export default function ShiftApp() {
               <div className="sectionhead">
                 <div>
                   <h2>{t('예상 급여')}</h2>
-                  <p>
-                    {t(
-                      '정규 {r}시간까지 시급 × 실근무, 초과분 {m}배 가산, 체크인별 지각 차감, 승인된 대체 추가수당',
-                      { r: OT_WEEKLY_HOURS, m: OT_MULTIPLIER },
-                    )}
-                  </p>
                 </div>
                 {actor.admin && (
                   <button className="button" onClick={exportPayroll}>
@@ -1918,8 +1937,8 @@ export default function ShiftApp() {
               )}
               <div className="policy">
                 {t(
-                  '지급액은 단말에서 찍힌 출퇴근을 기준으로 계산합니다. 유급 휴게는 근무로 치고 무급 휴게만 뺍니다. 그 사람 그 날짜에 찍힌 기록이 없을 때만 예전에 가져온 기록을 씁니다. 초과근무는 하루 {d}시간 초과분과 한 주(일요일 시작) {w}시간 초과분 중 큰 쪽만 {m}배로 가산합니다. 지각은 체크인 하나하나 따로 보아 예정 출근 시각을 넘긴 분만큼 그 체크인에서 번 금액까지만 차감하며, 예정 근무가 없는 출근기록은 지각으로 보지 않습니다. 세금·유급휴가를 제외한 예상 금액이고, 시급 0인 직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급 대상이 아니며 실제 출근기록만 지급합니다.',
-                  { d: OT_DAILY_HOURS, w: OT_WEEKLY_HOURS, m: OT_MULTIPLIER },
+                  '지급액은 단말에서 찍힌 출퇴근을 기준으로 계산합니다. 유급 휴게는 근무로 치고 무급 휴게만 뺍니다. 예정 시작보다 일찍 찍어도 예정 시작 시각부터 셉니다. 그 사람 그 날짜에 찍힌 기록이 없을 때만 예전에 가져온 기록을 씁니다. 초과근무는 한 주(일요일 시작) {w}시간을 넘긴 시간만 {m}배로 가산하며, 하루 기준은 없습니다. 지각은 체크인 하나하나 따로 보아 예정 출근 시각을 넘긴 분만큼 그 체크인에서 번 금액까지만 차감하며, 예정 근무가 없는 출근기록은 지각으로 보지 않습니다. 조퇴도 같은 방법으로 예정 퇴근 시각보다 일찍 찍은 분만큼 차감하며, 지각과 조퇴를 합친 차감은 그 체크인에서 번 금액을 넘지 않습니다. 세금·유급휴가를 제외한 예상 금액이고, 시급 0인 직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급 대상이 아니며 실제 출근기록만 지급합니다.',
+                  { w: OT_WEEKLY_HOURS, m: OT_MULTIPLIER },
                 )}
                 {/* 주 단위로 끊기지 않은 구간은 걸쳐 있는 주의 초과근무가 적게 잡힙니다. */}
                 {!wholeWeeks(from, to) && (
@@ -1943,7 +1962,7 @@ export default function ShiftApp() {
                       '기본급',
                       '초과수당',
                       '지각 차감',
-                      '대체 추가수당',
+                      '조퇴 차감',
                       '예상 급여',
                     ].map((h) => (
                       <TableHead key={h}>{t(h)}</TableHead>
@@ -1988,8 +2007,16 @@ export default function ShiftApp() {
                               })
                             : money(0)}
                         </TableCell>
-                        <TableCell className={r.bonus ? 'green' : undefined}>
-                          +{money(r.bonus)}
+                        <TableCell
+                          className={r.earlyDeduction ? 'red' : undefined}
+                        >
+                          {r.earlyMinutes
+                            ? t('-{money} · {n}분 {d}일', {
+                                money: money(r.earlyDeduction),
+                                n: r.earlyMinutes,
+                                d: r.earlyDays,
+                              })
+                            : money(0)}
                         </TableCell>
                         <TableCell>
                           <b>{money(r.total)}</b>
@@ -2061,10 +2088,10 @@ export default function ShiftApp() {
                       <button
                         className="button primary"
                         onClick={() =>
-                          open('approve', { id: r.id, bonus: '0' })
+                          open('approve', { id: r.id })
                         }
                       >
-                        {t('수당 확인 및 승인')}
+                        {t('승인')}
                       </button>
                     )}
                     {['requested', 'accepted'].includes(r.status) &&
@@ -2084,9 +2111,6 @@ export default function ShiftApp() {
                           {t('거절/취소')}
                         </button>
                       )}
-                    {r.status === 'approved' && (
-                      <span>{t('추가수당 {amount}', { amount: money(r.bonus) })}</span>
-                    )}
                   </div>
                 );
               })}
@@ -2501,7 +2525,7 @@ export default function ShiftApp() {
                         >
                           {t('삭제')}
                         </button>
-                        {/* 감추는 삭제 옆의 지우는 삭제. 묻지 않고 그 자리에서 기록까지 지웁니다. */}
+                        {/* 감추는 삭제 옆의 지우는 삭제. 한 번 묻고 기록까지 지웁니다. */}
                         <button
                           className="button danger"
                           disabled={busy || e.id === actor.id}
@@ -2582,7 +2606,7 @@ export default function ShiftApp() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        {['날짜', '예정 근무', '출퇴근', '휴게', '실근무', '지각', '지각 차감', '초과', '금액'].map(
+                        {['날짜', '예정 근무', '출퇴근', '휴게', '실근무', '지각', '조퇴', '지각 차감', '조퇴 차감', '금액'].map(
                           (h) => (
                             <TableHead key={h}>{t(h)}</TableHead>
                           ),
@@ -2590,7 +2614,7 @@ export default function ShiftApp() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {payDays(payDetail).map(({ a, shift, worked, late, lateDeduction }) => (
+                      {payDays(payDetail).map(({ a, shift, worked, late, early, lateDeduction, earlyDeduction }) => (
                         <TableRow key={a.id}>
                           <TableCell>{monthDay(a.date)}</TableCell>
                           <TableCell>
@@ -2610,13 +2634,18 @@ export default function ShiftApp() {
                                 ? t('{n}분 지각', { n: late })
                                 : t('정시')}
                           </TableCell>
+                          <TableCell className={early ? 'red' : undefined}>
+                            {early === null
+                              ? t('예정 없음')
+                              : early
+                                ? t('{n}분 조퇴', { n: early })
+                                : t('정시')}
+                          </TableCell>
                           <TableCell className={lateDeduction ? 'red' : undefined}>
                             {lateDeduction ? '-' + money(lateDeduction) : '—'}
                           </TableCell>
-                          <TableCell>
-                            {worked > OT_DAILY_HOURS
-                              ? (worked - OT_DAILY_HOURS).toFixed(2) + 'h'
-                              : '—'}
+                          <TableCell className={earlyDeduction ? 'red' : undefined}>
+                            {earlyDeduction ? '-' + money(earlyDeduction) : '—'}
                           </TableCell>
                           <TableCell>{money(worked * (emp(payDetail)?.rate ?? 0))}</TableCell>
                         </TableRow>
@@ -2625,18 +2654,18 @@ export default function ShiftApp() {
                   </Table>
                 </div>
                 <p className="hint">
-                  {t('날짜별 금액은 시급 × 실근무이고, 지각 차감은 그 체크인에서 번 금액까지만 그 줄에서 바로 뺍니다. 초과분에 붙는 0.5배 가산만 주 단위로 아래에서 더합니다.')}
+                  {t('날짜별 금액은 시급 × 실근무이고, 지각 차감은 그 체크인에서 번 금액까지만 그 줄에서 바로 뺍니다. 초과분에 붙는 0.5배 가산만 주 단위로 아래에서 더합니다. 조퇴 차감도 같은 줄에서 바로 빼며, 지각과 조퇴를 합쳐도 그 줄에서 번 금액을 넘지 않습니다.')}
                 </p>
                 {payWeeks(payDetail).map((w) => (
                   <p className="hint" key={w.week}>
                     {t(
-                      '{week} 시작 주 · 실근무 {worked}h · 하루 8시간 초과분 합 {daily}h · 주 40시간 초과분 {weekly}h → 1.5배 가산 {applied}h',
+                      '{week} 시작 주 · 실근무 {worked}h · 주 {w}시간 초과분 {applied}h → {m}배 가산',
                       {
                         week: monthDay(w.week),
                         worked: w.worked.toFixed(2),
-                        daily: w.daily.toFixed(2),
-                        weekly: w.weekly.toFixed(2),
                         applied: w.applied.toFixed(2),
+                        w: OT_WEEKLY_HOURS,
+                        m: OT_MULTIPLIER,
                       },
                     )}
                   </p>
@@ -2654,8 +2683,8 @@ export default function ShiftApp() {
                       <span className={sum.lateDeduction ? 'red' : undefined}>
                         {t('지각 차감')} <b>-{money(sum.lateDeduction)}</b>
                       </span>
-                      <span className={sum.bonus ? 'green' : undefined}>
-                        {t('대체 추가수당')} <b>+{money(sum.bonus)}</b>
+                      <span className={sum.earlyDeduction ? 'red' : undefined}>
+                        {t('조퇴 차감')} <b>-{money(sum.earlyDeduction)}</b>
                       </span>
                       <span className="paytotals-sum">
                         {t('예상 급여')} <b>{money(sum.total)}</b>
@@ -2682,6 +2711,9 @@ export default function ShiftApp() {
             // 근무 추가에서는 시작 시간을 고르자마자 종료 시간 시계를 이어서 엽니다.
             if (modal === 'shift' && clockField.key === 'start')
               setClockField({ key: 'end', label: t('종료 시간'), step: clockField.step });
+            // 출퇴근 추가도 출근을 고르면 퇴근 시계를 이어서 엽니다.
+            else if (modal === 'punchAdd' && clockField.key === 'in')
+              setClockField({ key: 'out', label: t('퇴근'), step: clockField.step });
             else setClockField(null);
           }}
         />
@@ -2755,6 +2787,7 @@ export default function ShiftApp() {
                   approve: '대체근무 승인',
                   message: '메시지 작성',
                   punchReview: '근무 기록에 이의',
+                  punchAdd: '출퇴근 추가',
                   detail: '근무 상세',
                 } as Record<string, string>
               )[modal] || '',
@@ -2764,7 +2797,7 @@ export default function ShiftApp() {
             {modal === 'rain'
               ? t('선택한 직원에게 앱 내 공지를 저장하고, 푸시 알림을 켠 직원에게 바로 보냅니다. 기본으로 전 직원이 선택되어 있습니다. 실제 퇴근기록과 급여는 자동 변경하지 않습니다.')
               : modal === 'approve'
-                ? t('수락한 대체 직원에게 근무를 이전합니다. 추가수당은 실제 출근기록이 있을 때 반영합니다.')
+                ? t('수락한 대체 직원에게 근무를 이전합니다. 급여는 실제 출근기록만큼 지급하며 추가수당은 없습니다.')
                 : modal === 'shiftUpdate'
                   ? t('저장하면 스케줄이 작성 중 상태로 바뀝니다. 수정 후 직원에게 공개를 다시 누르세요.')
                   : modal === 'detail'
@@ -3005,8 +3038,8 @@ export default function ShiftApp() {
                 </label>
                 <p className="hint">
                   {t(
-                    '끄면 이 직원이 짜는 근무는 하루 {d}시간, 한 주(일요일 시작) {w}시간까지만 들어갑니다. 켜면 그 선을 넘는 근무도 낼 수 있고, 넘긴 시간에는 급여에서 {m}배가 붙습니다. 관리자는 이 설정과 상관없이 넘겨 짤 수 있습니다.',
-                    { d: OT_DAILY_HOURS, w: OT_WEEKLY_HOURS, m: OT_MULTIPLIER },
+                    '끄면 이 직원이 짜는 근무는 한 주(일요일 시작) {w}시간까지만 들어갑니다. 켜면 그 선을 넘는 근무도 낼 수 있고, 넘긴 시간에는 급여에서 {m}배가 붙습니다. 관리자는 이 설정과 상관없이 넘겨 짤 수 있습니다.',
+                    { w: OT_WEEKLY_HOURS, m: OT_MULTIPLIER },
                   )}
                 </p>
               </>
@@ -3042,12 +3075,6 @@ export default function ShiftApp() {
                 </p>
               </>
             )}
-            {modal === 'approve' &&
-              input(
-                'bonus',
-                t('대체 직원 추가수당 ({currency})', { currency: data.currency }),
-                'number',
-              )}
             {modal === 'punchReview' && (
               <label className="field">
                 {t('어디가 다른가요?')}
@@ -3059,6 +3086,23 @@ export default function ShiftApp() {
                   onChange={(e) => put('note', e.target.value)}
                 />
               </label>
+            )}
+            {modal === 'punchAdd' && (
+              <>
+                {box(emp(form.employeeId || ''))}
+                {input('date', t('근무일'), 'date')}
+                <div className="timerow">
+                  <span className="timebox">
+                    <Clock3 size={16} />
+                    {timeInput('in', t('출근'), 1)}
+                    <em>→</em>
+                    {timeInput('out', t('퇴근'), 1)}
+                  </span>
+                </div>
+                <p className="hint">
+                  {t('퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.')}
+                </p>
+              </>
             )}
             {modal === 'message' && (
               <>
@@ -3157,7 +3201,7 @@ export default function ShiftApp() {
               </div>
             ) : (
               <div className="dialog-actions">
-              {(modal === 'shift' || modal === 'shiftUpdate' || modal === 'detail') && (
+              {(modal === 'shift' || modal === 'shiftUpdate' || modal === 'detail' || modal === 'punchAdd') && (
                 <button className="button cancel" type="button" onClick={() => setModal('')}>
                   {t('취소')}
                 </button>

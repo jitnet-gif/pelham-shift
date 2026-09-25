@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useBackClose } from './use-back';
 import {
   CalendarClock,
   CalendarX,
@@ -66,6 +67,7 @@ export default function PhoneSchedule({
   const { t, days, locale } = useLang();
   // 날씨 칸은 눌러야 열립니다. 닫혀 있는 동안에는 예보를 부르지 않습니다.
   const [weatherOpen, setWeatherOpen] = useState(false);
+  useBackClose(weatherOpen, () => setWeatherOpen(false));
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(week, i));
   // 고른 날이 이 주를 벗어나면 주 첫날부터 보여 줍니다.
   const from = day >= week && day <= weekDates[6] ? day : week;

@@ -425,3 +425,12 @@
   font-style: normal;
   white-space: nowrap;
 }
+
+/* 관리자 출근부의 '찍힌 출퇴근' 머리말. 오른쪽에 출퇴근 추가 단추가 섭니다. */
+.punchlog-headrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
