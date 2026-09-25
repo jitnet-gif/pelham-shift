@@ -32,7 +32,10 @@ export const nameKey=(v:string)=>v.toLowerCase().replace(/\s+/g,' ').trim();
 // 출퇴근을 찍을 수 있는 자리. 관리자가 현장에서 지정하고, 반경(m) 밖이면 찍히지 않습니다.
 export type Workplace = {lat:number;lng:number;radius:number};
 // areas: 이 워크스페이스가 직접 늘려 온 업무(직무) 목록. 비어 있으면 아래 기본값을 씁니다.
-export type State = {workplace?:Workplace;employees:Employee[];shifts:Shift[];swaps:Swap[];attendance:Attendance[];messages:Message[];tasks:Task[];timeOff?:TimeOff[];availability?:Availability[];punches?:Punch[];clockNames?:ClockName[];areas?:string[];currency:string;published:boolean};
+// shifts 는 편성하는 사람이 고치는 작업본, publishedShifts 는 마지막으로 공개한 순간의 근무표(공개본)입니다.
+// 직원은 언제나 공개본만 봅니다 — 작업본을 아무리 고쳐도 직원 화면이 비는 일이 없습니다.
+// published 는 '작업본이 공개본과 같다'는 뜻으로, 저장할 때마다 두 근무표를 견주어 다시 적습니다.
+export type State = {workplace?:Workplace;employees:Employee[];shifts:Shift[];swaps:Swap[];attendance:Attendance[];messages:Message[];tasks:Task[];timeOff?:TimeOff[];availability?:Availability[];punches?:Punch[];clockNames?:ClockName[];areas?:string[];currency:string;published:boolean;publishedShifts?:Shift[]};
 // 클럽이 서 있는 자리의 시간대. 화면·서버·알림이 모두 이 한 줄을 봅니다.
 // 온타리오는 뉴욕과 시각이 같아 예전 기록과 어긋나지 않고, 이름만 자리에 맞게 돌아옵니다.
 export const TIME_ZONE='America/Toronto';
@@ -40,6 +43,8 @@ export const localTime=(d:Date)=>new Intl.DateTimeFormat('en-GB',{timeZone:TIME_
 export const localDate=(d:Date)=>new Intl.DateTimeFormat('en-CA',{timeZone:TIME_ZONE,year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
 export function addDays(date:string,n:number){const d=new Date(date+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)}
 export function weekStart(date:string){return addDays(date,-new Date(date+'T12:00:00Z').getUTCDay())}
+// 스케줄 화면은 관리자·직원 모두 일요일부터 다음 주 토요일까지 두 주를 한 번에 보여 줍니다.
+export const SCHEDULE_DAYS=14;
 export const minutes=(t:string)=>Number(t.slice(0,2))*60+Number(t.slice(3,5));
 export function duration(start:string,end:string,rest=0){let n=minutes(end)-minutes(start);if(n<0)n+=1440;return Math.max(0,n-rest)/60}
 // 휴무·근무 불가 시간·대체 근무는 모두 7일 전에 등록해야 관리자가 스케줄을 다시 짤 여유가 생깁니다. 관리자 본인은 예외입니다.
@@ -98,8 +103,19 @@ export const clubMinutes=(now:Date)=>minutes(new Intl.DateTimeFormat('en-GB',{ti
 export const REMIND_WINDOW=60;
 // 지금부터 근무 시작까지 남은 분. 어제·오늘·내일에 걸친 근무를 함께 보므로 날짜 차이를 같이 셉니다.
 const untilStart=(s:Shift,today:string,current:number)=>(s.date===today?0:s.date>today?1440:-1440)+minutes(s.start)-current;
-// 알림이 걸릴 만한 근무만 걸러 냅니다. 공개하지 않은 근무표는 직원에게 아직 없는 일정이라 알리지 않습니다.
-function nearShifts(state:State,now:Date,keep:(left:number)=>boolean){if(!state.published)return [];const today=localDate(now),current=clubMinutes(now);const days=new Set([addDays(today,-1),today,addDays(today,1)]);return state.shifts.filter(s=>days.has(s.date)&&keep(untilStart(s,today,current)))}
+// 공개본. 공개본을 따로 두기 전의 워크스페이스에는 없으므로, 그때 직원이 보던 것으로 채웁니다 —
+// 공개 중이었으면 근무표 전체, 작성 중이었으면 Unpublished 딱지가 없는 근무(한 번이라도 공개된 모습 그대로인 근무)입니다.
+export const publicShifts=(state:State):Shift[]=>state.publishedShifts??(state.published?state.shifts:state.shifts.filter(x=>!x.draft));
+// 공개를 기다리는 변경 수. 새로 넣거나 고친 근무, 그리고 공개본에는 있는데 작업본에서 지운 근무를 셉니다.
+// draft 딱지는 견주지 않습니다 — 딱지만 다르고 내용이 같으면 직원이 보는 것도 같습니다.
+// 빈 칸(undefined)은 저장하면 사라지므로 없는 칸과 같게 봅니다.
+const shiftKey=({draft:_,...x}:Shift)=>JSON.stringify(Object.entries(x).filter(([,v])=>v!==undefined).sort(([a],[b])=>a.localeCompare(b)));
+export function pendingChanges(state:State){const shown=new Map(publicShifts(state).map(x=>[x.id,shiftKey(x)]));let n=0;for(const x of state.shifts){if(shown.get(x.id)!==shiftKey(x))n++;shown.delete(x.id)}return n+shown.size}
+// 저장할 때마다 부릅니다. 고쳤다가 공개본과 똑같이 되돌린 근무는 Unpublished 딱지를 떼고,
+// '공개 중'은 작업본과 공개본이 같을 때로 다시 적습니다. 명령마다 스위치를 따로 켜고 끄지 않습니다.
+export function settlePublished(state:State){const shown=new Map(publicShifts(state).map(x=>[x.id,shiftKey(x)]));for(const x of state.shifts)if(x.draft&&shown.get(x.id)===shiftKey(x))delete x.draft;state.published=pendingChanges(state)===0}
+// 알림이 걸릴 만한 근무만 걸러 냅니다. 직원이 보는 공개본을 봅니다 — 공개하지 않은 변경은 직원에게 아직 없는 일정이라 알리지 않습니다.
+function nearShifts(state:State,now:Date,keep:(left:number)=>boolean){const today=localDate(now),current=clubMinutes(now);const days=new Set([addDays(today,-1),today,addDays(today,1)]);return publicShifts(state).filter(s=>days.has(s.date)&&keep(untilStart(s,today,current)))}
 // 곧 시작하는 근무. 이미 출근을 찍은 사람에게는 알릴 것이 없어 빠집니다.
 export const dueShifts=(state:State,now=new Date())=>nearShifts(state,now,left=>left>0&&left<=REMIND_WINDOW).filter(s=>!punchedIn(state,s));
 // 출근을 깜빡한 근무. 시작 시각을 지났는데도 출근이 찍히지 않은 사이입니다.
@@ -135,6 +151,18 @@ export function overtimeWorked(state:State,now=new Date()){
  const worked=new Map<string,number>();
  for(const a of [...paidRecords(state).filter(a=>a.date>=week&&a.date<=today),...open])worked.set(a.employeeId,(worked.get(a.employeeId)??0)+payableHours(state,a));
  return state.employees.filter(e=>!e.archived&&(worked.get(e.id)??0)>OT_WEEKLY_HOURS).map(e=>({employee:e,week,hours:worked.get(e.id)!}));
+}
+// 근무표를 고치기 전(before)과 뒤(after)를 견주어, 주 44시간을 새로 넘기거나 더 넘긴 자리를 사람·주마다 돌려줍니다.
+// 편성 권한 검사(overtimeOver)와 같은 선을 봅니다. 줄어든 자리나 그대로인 자리는 빠집니다.
+export function overtimeAdded(before:Shift[],after:Shift[]){
+ const out:{employeeId:string;week:string;hours:number}[]=[];
+ for(const employeeId of new Set(after.map(x=>x.employeeId))){
+  const dates=after.filter(x=>x.employeeId===employeeId).map(x=>x.date);
+  const was=overtimeOver(before,employeeId,dates);
+  for(const [key,over] of overtimeOver(after,employeeId,dates))
+   if(over>(was.get(key)??0)+0.001)out.push({employeeId,week:key.slice(2),hours:OT_WEEKLY_HOURS+over});
+ }
+ return out;
 }
 // 지각 유예 없음: 예정 출근 시각을 1분이라도 넘기면 지각입니다.
 export const LATE_GRACE_MINUTES=0;
@@ -227,6 +255,9 @@ export const isHybrid=(e:Roled)=>AREAS.every(a=>roleList(e).includes(a));
 // 화면에 적는 직군. 두 업무를 함께 맡으면 'Hybrid' 한 단어로 적고, 그 밖의 겸직은 ' · ' 로 나란히 적습니다.
 export const roleLabel=(e:Roled)=>{const roles=roleList(e);return isHybrid(e)?[HYBRID_ROLE,...roles.filter(r=>!(AREAS as readonly string[]).includes(r))].join(' · '):roles.join(' · ')};
 export const hasRole=(e:Roled,area:string)=>roleList(e).includes(area);
+// Workshop 근무는 Workshop 업무를 맡은 사람(Hybrid 포함)에게만 넣습니다. 다른 업무는 누구에게나 넣을 수 있습니다.
+export const RESTRICTED_AREAS:readonly string[]=['Workshop'];
+export const canWorkIn=(e:Roled,area:string)=>!RESTRICTED_AREAS.includes(area)||hasRole(e,area);
 // 한 직군만 맡은 사람과 구분해 표시할 때 씁니다.
 export const isMultiRole=(e:Roled)=>roleList(e).length>1;
 // 직원 구분 — Proshop, Workshop, 둘 다 맡는 Hybrid. 이름을 이 구분의 색으로 적어 한눈에 가려 봅니다.
@@ -238,8 +269,9 @@ export function roleGroup(e:Roled):RoleGroup|null{if(isHybrid(e))return 'Hybrid'
 export const roleTint=(e?:Roled|null)=>{const g=e&&roleGroup(e);return g?ROLE_GROUP_COLORS[g]:undefined};
 // 드롭다운에서 직원을 구분별로 묶어 세우는 순서. 구분이 없는 사람은 맨 뒤 '기타'로 모입니다.
 export const ROLE_GROUPS:RoleGroup[]=['Proshop','Workshop','Hybrid'];
-export function groupByRole<T>(list:T[],groupOf:(x:T)=>RoleGroup|null|undefined):{group:RoleGroup|null;items:T[]}[]{
- return [...ROLE_GROUPS,null].map(group=>({group,items:list.filter(x=>(groupOf(x)??null)===group)})).filter(g=>g.items.length)}
+// order 를 주면 그 순서로 묶음을 세웁니다 — 근무 추가에서 고른 업무의 직원을 맨 위로 올릴 때 씁니다.
+export function groupByRole<T>(list:T[],groupOf:(x:T)=>RoleGroup|null|undefined,order:readonly RoleGroup[]=ROLE_GROUPS):{group:RoleGroup|null;items:T[]}[]{
+ return [...order,null].map(group=>({group,items:list.filter(x=>(groupOf(x)??null)===group)})).filter(g=>g.items.length)}
 export function seed():State{const names=['Josh','Grace','Claudio','Francis','James','Karen','Dylan','Dustin','Sam'];const colors=['#5579cf','#c48537','#20a69a','#9864c3','#e17b57','#5c9d61','#d26395','#628597','#a89643'];const employees=names.map((name,i)=>({id:'E'+String(i+1).padStart(3,'0'),name,color:colors[i],role:AREAS[i%AREAS.length],rate:0,email:'',birthDate:'',phone:'',punchId:String(1001+i)}));const week=weekStart(localDate(new Date()));const shifts:Shift[]=[];for(let d=0;d<7;d++) employees.forEach((e,i)=>{if((i+d)%4!==1) shifts.push({id:`s${d}-${i}`,employeeId:e.id,date:addDays(week,d),start:i%3===0?'10:00':i%3===1?'06:00':'12:00',end:i%3===0?'18:00':i%3===1?'14:00':'20:00',area:e.role})});
  // 지난 두 급여 기간과 이번 기간의 출퇴근 기록. 지난 기간은 이미 확인이 끝나 닫혀 있습니다.
  const today=localDate(new Date());const start=addDays(payPeriodStart(today),-2*PAY_PERIOD_DAYS);const punches:Punch[]=[];
@@ -248,4 +280,4 @@ export function seed():State{const names=['Josh','Grace','Claudio','Francis','Ja
    const open=periodOpen(payPeriodStart(date),today);
    punches.push({id:`p${d}-${i}`,employeeId:e.id,date,in:morning?'07:57':'13:59',out:morning?'12:04':'19:35',area:e.role,
     status:open?'pending':'approved',...(open?{}:{reviewedAt:date+'T23:00:00.000Z'}),...(!open&&(i+d)%5===0?{editedBy:'manager'}:{})})})}
- return {employees,shifts,swaps:[],attendance:[],messages:[],tasks:[],timeOff:[],availability:[],punches,clockNames:[],currency:'CAD',published:false}}
+ return {employees,shifts,swaps:[],attendance:[],messages:[],tasks:[],timeOff:[],availability:[],punches,clockNames:[],currency:'CAD',published:false,publishedShifts:[]}}

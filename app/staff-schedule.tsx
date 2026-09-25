@@ -2,10 +2,10 @@
 import { useEffect, useRef } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Employee, Shift } from '@/lib/domain';
-import { TIME_ZONE, addDays, roleTint, weekdayOf } from '@/lib/domain';
+import { SCHEDULE_DAYS, TIME_ZONE, addDays, roleTint, weekdayOf } from '@/lib/domain';
 import { useLang } from './use-lang';
 
-// 직원이 보는 스케줄. 한 주를 날짜 줄로 펼쳐, 근무가 없는 날도 한 줄씩 남겨 둡니다.
+// 직원이 보는 스케줄. 일요일부터 다음 주 토요일까지 두 주를 날짜 줄로 펼쳐, 근무가 없는 날도 한 줄씩 남겨 둡니다.
 // '내 근무'는 본인 것만, '전체'는 같은 날 일하는 사람을 모두 보여 줍니다.
 const clock = (v: string) => {
   const h = Number(v.slice(0, 2));
@@ -48,8 +48,8 @@ export default function StaffSchedule({
   const { t, days, locale } = useLang();
   // 날짜를 고르면 그 줄만 화면 안으로 올립니다. 목록을 손으로 넘기는 중에는 끼어들지 않습니다.
   const rowsRef = useRef<Record<string, HTMLDivElement | null>>({});
-  const weekDates = Array.from({ length: 7 }, (_, i) => addDays(week, i));
-  const selected = day >= week && day <= weekDates[6] ? day : week;
+  const weekDates = Array.from({ length: SCHEDULE_DAYS }, (_, i) => addDays(week, i));
+  const selected = day >= week && day <= weekDates[SCHEDULE_DAYS - 1] ? day : week;
   useEffect(() => {
     rowsRef.current[selected]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [selected]);
@@ -153,24 +153,27 @@ export default function StaffSchedule({
         >
           <ChevronLeft size={20} />
         </button>
-        {weekDates.map((date, i) => (
-          <button
-            key={date}
-            aria-label={dayLabel(date)}
-            aria-pressed={date === selected}
-            className={
-              'stsched-chip' +
-              (date === selected ? ' on' : '') +
-              (date === today ? ' today' : '')
-            }
-            onClick={() => onDayChange(date)}
-          >
-            <small>{days[i]}</small>
-            <b>{Number(date.slice(8))}</b>
-            {/* 근무가 있는 날에만 점을 찍습니다. 고른 날에는 흰 점으로 뒤집습니다. */}
-            <i className={onDate(date).length ? 'on' : ''} />
-          </button>
-        ))}
+        {/* 한 줄에 한 주씩, 두 줄로 섭니다. */}
+        <div className="stsched-days">
+          {weekDates.map((date, i) => (
+            <button
+              key={date}
+              aria-label={dayLabel(date)}
+              aria-pressed={date === selected}
+              className={
+                'stsched-chip' +
+                (date === selected ? ' on' : '') +
+                (date === today ? ' today' : '')
+              }
+              onClick={() => onDayChange(date)}
+            >
+              <small>{days[i % 7]}</small>
+              <b>{Number(date.slice(8))}</b>
+              {/* 근무가 있는 날에만 점을 찍습니다. 고른 날에는 흰 점으로 뒤집습니다. */}
+              <i className={onDate(date).length ? 'on' : ''} />
+            </button>
+          ))}
+        </div>
         <button
           className="stsched-arrow"
           aria-label={t('다음 주')}

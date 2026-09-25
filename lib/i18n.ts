@@ -156,11 +156,8 @@ const en: Record<string, string> = {
   '직원 공개 중': 'Published to staff',
   '작성 중': 'Draft',
   '직원에게 공개': 'Publish to staff',
-  '게시 해제': 'Unpublish',
   '스케줄 공개 (근무 1건)': 'Publish Schedule (1 shift)',
   '스케줄 공개 (근무 {n}건)': 'Publish Schedule ({n} shifts)',
-  '게시를 해제할까요? 근무표는 그대로 저장되지만 직원 화면에서는 사라집니다. 기록은 지워지지 않습니다.':
-    'Unpublish the schedule? Shifts stay saved but disappear from the staff app. Nothing is deleted.',
   '근무 추가': 'Add shift',
   메뉴: 'Menu',
   '대시보드': 'Dashboard',
@@ -324,6 +321,11 @@ const en: Record<string, string> = {
     'The check-ins taken on the time clock, with the photo from that moment.',
   '찍힌 출퇴근': 'Check-ins',
   '출퇴근 추가': 'Add check-in',
+  '출퇴근 수정': 'Edit check-in',
+  '시급 수정': 'Edit hourly rate',
+  '퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다. 고친 기록은 직원이 다시 확인하도록 확인 대기로 돌아갑니다.':
+    'If check-out is earlier than check-in, it counts as the next day. The edited record goes back to pending so the employee confirms it again.',
+  '아직 퇴근하지 않은 근무는 고칠 수 없습니다.': 'A shift that has not checked out yet cannot be edited.',
   '출근기계에서 가져온 기록': 'Imported from the time clock',
   '아직 찍힌 출퇴근 기록이 없습니다.': 'No check-ins have been recorded yet.',
   // 'Awaiting review' 는 메시지의 '확인 대기'(Not read yet)와 뜻이 달라 앞가지로 갈라 둡니다.
@@ -726,6 +728,9 @@ const en: Record<string, string> = {
   '주 {w}시간 초과': 'Over {w} hours this week',
   '{name}: 이번 주 {hours}시간 일했습니다. 초과 근무 수당이 붙습니다. 눌러서 근무 시간을 확인하세요.':
     '{name} has worked {hours} hours this week. Overtime pay applies. Tap to see their hours.',
+  '주 {w}시간 넘는 근무 편성': 'Shift scheduled over {w} hours',
+  '{who}님이 {name}의 {week} 시작 주 근무를 {hours}시간으로 짰습니다. 눌러서 출근 기록을 확인하세요.':
+    '{who} scheduled {name} for {hours} hours in the week of {week}. Tap to see their attendance.',
   'Pelham Shift 테스트 알림': 'Pelham Shift test notification',
   '이 기기에서 푸시 알림을 받을 수 있습니다.': 'This device can receive push notifications.',
 
@@ -791,6 +796,8 @@ const en: Record<string, string> = {
   '같은 생년월일이 이미 등록되어 있습니다.': 'That birth date is already registered.',
   '출근과 퇴근 시간이 같습니다.': 'Start and end times are the same.',
   '해당 직원의 근무시간이 겹칩니다.': "This overlaps the employee's other shifts.",
+  'Workshop 근무는 Workshop 업무를 맡은 직원에게만 넣을 수 있습니다.':
+    'Workshop shifts can only go to staff who have the Workshop job.',
   '통화를 선택하세요.': 'Choose a currency.',
   '근무를 선택하세요.': 'Choose a shift.',
   '본인 근무만 대체 신청할 수 있습니다.': 'You can only request swaps for your own shifts.',
@@ -839,8 +846,8 @@ const en: Record<string, string> = {
   '더보기': 'More',
   '뒤로': 'Back',
   '오늘로': 'Today',
-  '내 근무': 'My Shifts',
-  '전체 일정': 'Schedule',
+  '내 근무': 'My shifts',
+  '전체 일정': 'Team shifts',
   '근무 일정이 없습니다.': 'You are not scheduled to work.',
   '이 날은 아무도 근무하지 않습니다.': 'No one is scheduled to work.',
   '보기 설정': 'View settings',
@@ -1075,6 +1082,10 @@ const patterns: [RegExp, (match: RegExpMatchArray) => string][] = [
   [
     /^(\S+): 출근과 퇴근 시간이 같습니다\.$/,
     ([, date]) => `${date}: start and end times are the same.`,
+  ],
+  [
+    /^(.+): Workshop 근무는 Workshop 업무를 맡은 직원에게만 넣을 수 있습니다\.$/,
+    ([, employee]) => `${employee}: Workshop shifts can only go to staff who have the Workshop job.`,
   ],
   [
     /^(\S+) (.+): 근무시간이 겹칩니다\.$/,

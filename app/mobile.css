@@ -9,7 +9,7 @@
   main { width: 100%; padding: 28px 24px 18px; }
   .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .gridscroll, .contentpanel { -webkit-overflow-scrolling: touch; }
-  .weekgrid { min-width: 900px; }
+  .weekgrid { min-width: 1800px; }
   .contentpanel { overflow-x: auto; }
   .contentpanel [data-slot=table] { min-width: 660px; }
   .teamlink { max-width: 100%; }
@@ -47,7 +47,7 @@
   .filterbar .field { min-width: 0; flex: 1 1 145px; }
   .filterbar [data-slot=tabs-list] { width: 100%; }
   .filterbar [data-slot=tabs-trigger] { flex: 1; }
-  .weekgrid { min-width: 760px; grid-template-columns: 132px repeat(7, minmax(89px, 1fr)); }
+  .weekgrid { min-width: 1378px; grid-template-columns: 132px repeat(14, minmax(89px, 1fr)); }
   .gridhead { padding: 12px 6px; }
   .staff { padding: 15px 13px; }
   .daycell { min-height: 78px; padding: 7px 5px; }

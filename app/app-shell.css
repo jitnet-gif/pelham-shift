@@ -73,8 +73,6 @@
 .button.publish{min-height:42px;padding-inline:18px;font-weight:600;background:#087e6d;border-color:#087e6d;color:#fff}
 .button.publish:hover{background:#066b5d}
 .button.publish:disabled{background:#d8dcd9;border-color:#c9ceca;color:#5d6764;opacity:1}
-.button.unpublish{min-height:42px;padding-inline:18px;font-weight:600;background:#fff4d4;border-color:#e3c877;color:#6b4e0a}
-.button.unpublish:hover{background:#ffecb8}
 
 /* Filter row */
 .sched-filters{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-bottom:4px}
@@ -85,7 +83,9 @@
 
 /* Roster grid */
 .roster-scroll{border:1px solid var(--line);border-radius:10px;overflow:auto;max-height:calc(100dvh - 230px);min-height:320px;background:#fff}
-.roster{display:grid;grid-template-columns:230px repeat(7,minmax(112px,1fr));min-width:1020px}
+.roster{display:grid;grid-template-columns:230px repeat(14,minmax(112px,1fr));min-width:1798px}
+/* 두 주를 펼칠 때 둘째 주 일요일 앞에 굵은 선을 그어 주를 가릅니다. */
+.roster .split{border-left:2px solid #9aa3a0}
 .roster-group,.roster-row{display:contents}
 .roster-corner,.roster-day{position:sticky;top:0;z-index:6;background:#fff;border-bottom:1px solid var(--line)}
 .roster-corner{left:0;z-index:8;display:flex;align-items:center;gap:8px;padding:10px;border-right:1px solid var(--line)}
@@ -156,7 +156,6 @@
   .app-shell main{padding:14px 16px 0}
   .sched-actions{margin-left:0;width:100%}
   .sched-actions .button.publish{margin-left:auto}
-  .sched-actions .button.publish+.button.unpublish{margin-left:0}
   .roster-scroll{max-height:calc(100dvh - 200px)}
   /* 공개하지 않은 근무가 남았을 때만 뜨는 줄. 탭바(56px)와 홈 인디케이터 위에 얹고,
      z-index 는 탭바(30) 아래로 둡니다 — 겹치면 이동이 먼저입니다. */
@@ -178,8 +177,7 @@
   .sched-filters .button{flex:1 1 calc(50% - 5px)}
   .sched-actions{gap:8px}
   .sched-actions .button.publish,
-  .sched-actions .button.unpublish{flex:1}
-  .roster{grid-template-columns:150px repeat(7,minmax(96px,1fr));min-width:822px}
+  .roster{grid-template-columns:150px repeat(14,minmax(96px,1fr));min-width:1494px}
   .roster-staff{padding:8px 10px;gap:8px}
   .roster-avatar{width:28px;height:28px;font-size:12px}
   .roster-corner{padding:8px}
@@ -326,3 +324,6 @@
 .gps-block .gps-how{margin:0;padding:12px 14px;border-radius:10px;background:#eef3f2;color:#5b6a67;font-size:13px;line-height:1.75;text-align:left}
 .gps-block .button{margin-top:6px;min-height:46px;padding:0 22px;border-radius:24px}
 .gps-note{display:flex;align-items:center;gap:9px;position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:60;max-width:calc(100vw - 32px);padding:11px 16px;border:1px solid #ebdcb6;border-radius:24px;background:#fff5df;color:#7a6326;font-size:13px;line-height:1.5}
+.paydetail-actions{display:flex;justify-content:flex-end;gap:8px}
+.paygroup [data-slot=table-cell]{font-weight:700;font-size:13px;padding-top:16px}
+.paygroup small{color:#8b9691;font-weight:500;margin-left:4px}

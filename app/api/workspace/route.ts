@@ -4,7 +4,7 @@ import {seed,distanceMeters,workplaceOf} from '@/lib/domain';
 import {photoBytes} from '@/lib/punch-photo';
 import {applyCommand,type Command} from '@/lib/operations';
 import {context,visible,json,sameOrigin} from '@/lib/workspace';
-import {notify,remind,forgetPush} from '@/lib/push';
+import {notify,remind,forgetPush,overtimeScheduled} from '@/lib/push';
 import {forgetMember} from '@/lib/birth-auth';
 export const dynamic='force-dynamic';
 export async function GET(req:Request){try{const c=await context(req);if(!c)return json({error:'로그인이 필요합니다.'},401);if(!c.row)return json({setup:true,team:c.user.userId,actor:c.actor,authMethod:c.authMethod,passwordChanged:c.passwordChanged});after(()=>remind(c.team,c.state!,new URL(req.url).origin).catch(()=>0));return json({state:visible(c.state!,c.actor),version:c.row.version,team:c.team,actor:c.actor,authMethod:c.authMethod,passwordChanged:c.passwordChanged})}catch(e){return json({error:e instanceof Error?e.message:'불러오지 못했습니다.'},403)}}
@@ -30,4 +30,6 @@ export async function POST(req:Request){try{if(!sameOrigin(req))return json({err
  const state=applyCommand(c.state,body,c.actor);const result=await env.DB.prepare('UPDATE workspaces SET state = ?, version = version + 1 WHERE id = ? AND version = ?').bind(JSON.stringify(state),c.team,c.row.version).run();if(result.meta.changes!==1)return json({error:'동시 변경이 감지되었습니다. 다시 불러오세요.'},409);
 // 완전히 삭제한 직원은 워크스페이스 바깥(세션·비밀번호·알림 등록)에서도 치웁니다. 상태 저장이 끝난 뒤라야 헛되이 지우지 않습니다.
 if(body.type==='employeePurge'){const wanted=(body.payload as {id?:unknown})?.id;const gone=typeof wanted==='string'?wanted:'';if(gone)after(()=>Promise.all([forgetMember(c.team,gone),forgetPush(c.team,gone)]).catch(()=>0))}
+// 근무표가 바뀐 저장이면, 한 주 44시간을 새로 넘긴 직원이 있는지 보고 관리자에게 알립니다.
+if(JSON.stringify(c.state.shifts)!==JSON.stringify(state.shifts)){const before=c.state;after(()=>overtimeScheduled(c.team,before,state,c.actor.id,new URL(req.url).origin).catch(()=>0))}
 if(body.type==='message'){const m=state.messages.at(-1);const to=m?.to==='all'?state.employees.map(e=>e.id):[m?.to||''];after(()=>notify(c.team,to.filter(id=>id&&id!==c.actor.id),{title:c.actor.admin?'관리자 메시지':'직원 메시지',body:(c.actor.admin?'':(state.employees.find(e=>e.id===c.actor.id)?.name||'')+': ')+(m?.body||''),tag:'message'},new URL(req.url).origin).catch(()=>0))}if(body.type==='rain'){const m=state.messages.at(-1);after(()=>notify(c.team,m?.recipients??state.employees.map(e=>e.id),{title:'우천 근무 종료',body:m?.body||'',tag:'rain'},new URL(req.url).origin).catch(()=>0))}return json({state:visible(state,c.actor),version:c.row.version+1,team:c.team,actor:c.actor})}catch(e){return json({error:e instanceof Error?e.message:'저장하지 못했습니다.'},400)}}

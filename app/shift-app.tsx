@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
+  Pencil,
   CloudRain,
   Bell,
   Download,
@@ -41,7 +42,6 @@ import {
   ArrowLeft,
   Clock,
   X,
-  EyeOff,
   CheckCircle2,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -75,6 +75,7 @@ import {
   seed,
   addDays,
   weekStart,
+  SCHEDULE_DAYS,
   localDate,
   duration,
   payroll,
@@ -103,12 +104,15 @@ import {
   ROLE_GROUP_COLORS,
   type RoleGroup,
   hasRole,
+  canWorkIn,
+  ROLE_GROUPS,
   AREAS,
   HYBRID_ROLE,
   workplaceOf,
   nameKey,
   dueShifts,
   missedShifts,
+  pendingChanges,
   type Employee,
   type Message,
   type Shift,
@@ -167,11 +171,13 @@ function Pick({
   value,
   onChange,
   options,
+  order,
 }: {
   label: string;
   value: string;
   onChange: (s: string) => void;
   options: { value: string; label: string; group?: RoleGroup | null }[];
+  order?: readonly RoleGroup[];
 }) {
   const { t } = useLang();
   // 직원을 고르는 목록은 Proshop · Workshop · Hybrid 로 묶고 그 색을 배경에 깝니다.
@@ -180,6 +186,7 @@ function Pick({
   const grouped = groupByRole(
     options.filter((o) => o.group !== undefined),
     (o) => o.group,
+    order,
   );
   const item = (o: (typeof options)[number]) => {
     const tint = o.group ? ROLE_GROUP_COLORS[o.group] : undefined;
@@ -263,8 +270,8 @@ export default function ShiftApp() {
   const [data, setData] = useState<State>(seed);
   const [week, setWeek] = useState(weekStart(localDate(new Date())));
   const [tab, setTab] = useState('schedule');
-  // 스케줄은 오늘 하루부터 보여줍니다. 주간은 보기 메뉴에서 고릅니다.
-  const [view, setView] = useState('day');
+  // 스케줄은 일요일부터 다음 주 토요일까지 두 주 표로 먼저 보여 줍니다. 하루 보기는 보기 메뉴에서 고릅니다.
+  const [view, setView] = useState('week');
   // 직원 폰 화면의 상태: 스케줄의 '내 근무/전체', 메시지 탭, 지금 보고 있는 급여 기간.
   const [scope, setScope] = useState<'mine' | 'all'>('mine');
   const [msgTab, setMsgTab] = useState<'messages' | 'announcements'>('messages');
@@ -451,17 +458,6 @@ export default function ShiftApp() {
     for (const key of ['open', 'who', 'from']) url.searchParams.delete(key);
     window.history.replaceState(window.history.state, '', url);
   }, [auth, actor.admin, actor.id]);
-  // 게시 해제는 직원 화면에서 근무표가 통째로 사라지므로 한 번 묻습니다. 기록은 지워지지 않습니다.
-  const unpublish = () => {
-    if (
-      confirm(
-        t(
-          '게시를 해제할까요? 근무표는 그대로 저장되지만 직원 화면에서는 사라집니다. 기록은 지워지지 않습니다.',
-        )
-      )
-    )
-      void command('unpublish');
-  };
   async function command(type: string, payload: any = {}) {
     if (setup && type !== 'initialize') {
       setStatus(
@@ -553,6 +549,16 @@ export default function ShiftApp() {
     setBirthOpen(false);
     setBirthMonth(undefined);
   };
+  const editEmployee = (e: Employee) =>
+    open('employee', {
+      ...e,
+      rate: String(e.rate),
+      roles: roleList(e).join(','),
+      taskManager: e.taskManager ? '1' : '',
+      overtimeManager: e.overtimeManager ? '1' : '',
+      admin: e.admin ? '1' : '',
+      archived: e.archived ? '1' : '',
+    });
   const box = (e: Employee | undefined) =>
     e ? (
       <span className="person">
@@ -615,7 +621,8 @@ export default function ShiftApp() {
     </label>
   );
   // 근무 추가·수정은 24시간 시계로 고르고 적습니다.
-  const twentyFour = modal === 'shift' || modal === 'shiftUpdate' || modal === 'punchAdd';
+  const twentyFour =
+    modal === 'shift' || modal === 'shiftUpdate' || modal === 'punchAdd' || modal === 'punchEdit';
   const clockText = (v: string) => {
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(v)) return '';
     if (twentyFour) return v;
@@ -732,19 +739,31 @@ export default function ShiftApp() {
     (s) => canSwap(s.date) && (actor.admin || s.employeeId === actor.id) && !s.originalId,
   );
   // 겸직하는 사람이 있어 직군은 사람 수보다 많을 수 있습니다 — 맡은 직군을 모두 펼쳐 모읍니다.
-  const roles = [...new Set(staff.flatMap((e) => roleList(e)))].sort((a, b) =>
-    a.localeCompare(b),
-  );
   // 고를 수 있는 업무. 작업 화면에서 늘린 목록이 있으면 그것이고, 없으면 기본 두 가지입니다.
   const areas = areaList(data);
+  // 업무 필터의 선택지. 아직 아무도 맡지 않은 업무도 고를 수 있도록 작업 화면의 목록을 함께 넣습니다.
+  const roles = [...new Set([...areas, ...staff.flatMap((e) => roleList(e))])].sort((a, b) =>
+    a.localeCompare(b),
+  );
+  // 직군이 비어 있는 사람의 자리. 이 자리가 없으면 그 사람과 근무가 명단에서 통째로 빠집니다.
+  const NO_ROLE = t('미지정');
   // 명단에서 그 사람이 설 자리. 업무를 좁혀 보면 그 업무 아래, 전체로 보면 기본 업무 아래 한 번만 섭니다.
-  const bandOf = (e: Employee) =>
-    dept === 'all' ? roleList(e)[0] || '' : hasRole(e, dept) ? dept : '';
+  const bandOf = (e: Employee) => (dept === 'all' ? roleList(e)[0] || NO_ROLE : dept);
+  // 업무를 좁혀 볼 때는 그 직군을 맡은 사람에 더해, 이번 주에 그 업무로 근무가 잡힌 사람도 보입니다 —
+  // 근무의 업무는 사람의 직군과 따로 고르므로, 직군으로만 거르면 넣은 근무가 화면에서 사라집니다.
+  const worksIn = (e: Employee, area: string) =>
+    data.shifts.some(
+      (s) =>
+        s.employeeId === e.id &&
+        s.area === area &&
+        s.date >= week &&
+        s.date <= addDays(week, SCHEDULE_DAYS - 1),
+    );
   const visibleEmployees = staff
     .filter(
       (e) =>
         (filter === 'all' || e.id === filter) &&
-        (dept === 'all' || hasRole(e, dept)) &&
+        (dept === 'all' || hasRole(e, dept) || worksIn(e, dept)) &&
         e.name.toLowerCase().includes(search.trim().toLowerCase()),
     )
     .sort((a, b) =>
@@ -761,11 +780,12 @@ export default function ShiftApp() {
       day: 'numeric',
       timeZone: 'UTC',
     }).format(new Date(date + 'T12:00:00Z'));
-  const weekDates = Array.from({ length: 7 }, (_, i) => addDays(week, i));
+  // 스케줄 표는 일요일부터 다음 주 토요일까지 두 주를 폅니다. 앞뒤 화살표는 한 주씩 옮깁니다.
+  const weekDates = Array.from({ length: SCHEDULE_DAYS }, (_, i) => addDays(week, i));
   const rosterShifts = data.shifts.filter(
     (s) =>
       s.date >= week &&
-      s.date <= addDays(week, 6) &&
+      s.date <= addDays(week, SCHEDULE_DAYS - 1) &&
       visibleEmployees.some((e) => e.id === s.employeeId),
   );
   // Scheduled cost is an estimate from planned hours; payroll itself pays actual attendance.
@@ -1072,13 +1092,14 @@ export default function ShiftApp() {
     label: string,
     blank = '',
     list: readonly string[] = areas,
+    onPick: (v: string) => void = (v) => put(key, v),
   ) => {
     const current = form[key] || '';
     return (
       <Pick
         label={label}
         value={current || (blank ? KEEP_AREA : '')}
-        onChange={(v) => put(key, v === KEEP_AREA ? '' : v)}
+        onChange={(v) => onPick(v === KEEP_AREA ? '' : v)}
         options={[
           ...(blank ? [{ value: KEEP_AREA, label: blank }] : []),
           ...list.map((area) => ({ value: area, label: area })),
@@ -1088,6 +1109,26 @@ export default function ShiftApp() {
         ]}
       />
     );
+  };
+  // 근무에 고를 수 있는 업무. Workshop 은 Workshop 업무를 맡은 사람에게만 보입니다.
+  const shiftAreas = (who?: Employee) => (who ? areas.filter((a) => canWorkIn(who, a)) : areas);
+  // 근무를 넣을 수 있는 직원. 고른 업무를 맡은 사람이 앞에 서고, Workshop 이면 그 업무를 맡은 사람만 남습니다.
+  const shiftStaff = (area: string) =>
+    staff
+      .filter((e) => !area || canWorkIn(e, area))
+      .sort((a, b) => Number(hasRole(b, area)) - Number(hasRole(a, area)));
+  // 고른 업무의 구분을 맨 위로, 두 업무를 겸하는 Hybrid 를 그다음으로 세웁니다.
+  // Kitchen 처럼 따로 더한 업무는 그 업무를 맡은 사람이 있는 구분부터 올립니다.
+  const roleOrder = (area: string): RoleGroup[] => {
+    const rank = (g: RoleGroup) =>
+      g === area
+        ? 0
+        : g === 'Hybrid' && (AREAS as readonly string[]).includes(area)
+          ? 1
+          : staff.some((e) => roleGroup(e) === g && hasRole(e, area))
+            ? 2
+            : 3;
+    return [...ROLE_GROUPS].sort((a, b) => rank(a) - rank(b));
   };
   // 직군은 겸할 수 있습니다 — Proshop 과 Workshop 을 함께 뛰는 사람은 Hybrid 한 칸으로 고릅니다.
   // 먼저 고른 업무가 기본 업무가 되어, 새 근무와 출퇴근 기록에 장소로 적힙니다.
@@ -1164,9 +1205,9 @@ export default function ShiftApp() {
         .filter((v) => (v === id ? on : rainTargets.includes(v)))
         .join(','),
     );
-  // 아직 공개하지 않은 근무 수. 공개는 워크스페이스 전체 스위치라 보고 있는 주가 아니라
-  // 전체를 셉니다 — 버튼에 적힌 수가 곧 누르면 공개될 근무 수입니다.
-  const drafts = data.shifts.filter((s) => s.draft).length;
+  // 아직 공개하지 않은 변경 수. 공개는 워크스페이스 전체를 한 번에 떠 두므로 보고 있는 주가 아니라
+  // 전체를 셉니다 — 새로 넣거나 고친 근무에 지운 근무까지 더해, 버튼에 적힌 수가 곧 누르면 바뀌는 근무 수입니다.
+  const drafts = pendingChanges(data);
   // 띄울지 말지는 한 곳에서 정합니다 — 띄우는 자리와, 목록 끝이 가리지 않게 둘 여백이 같은 답을 봐야 합니다.
   const publishBar = phone && canSchedule && tab === 'schedule' && drafts > 0;
   // 출근 알림 띠. 시작 1시간 전부터 뜨고, 출근을 찍으면 사라집니다 — 이미 찍은 사람에게는 할 말이 없습니다.
@@ -1970,7 +2011,20 @@ export default function ShiftApp() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {visibleTotals.map((r) => (
+                  {/* 출근 기록처럼 Proshop · Workshop · Hybrid · 기타 로 묶고, 묶음 안은 이름순으로 세웁니다. */}
+                  {groupByRole(
+                    [...visibleTotals].sort((a, b) => a.e.name.localeCompare(b.e.name, locale)),
+                    (r) => roleGroup(r.e),
+                  ).map((g) => [
+                    <TableRow key={'group-' + (g.group ?? 'other')} className="paygroup">
+                      <TableCell
+                        colSpan={10}
+                        style={{ color: g.group ? ROLE_GROUP_COLORS[g.group] : undefined }}
+                      >
+                        {g.group ?? t('기타')} <small>{g.items.length}</small>
+                      </TableCell>
+                    </TableRow>,
+                    ...g.items.map((r) => (
                       <TableRow
                         key={r.e.id}
                         className="rowlink"
@@ -2022,7 +2076,8 @@ export default function ShiftApp() {
                           <b>{money(r.total)}</b>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    )),
+                  ])}
                 </TableBody>
               </Table>
             </div>
@@ -2307,17 +2362,7 @@ export default function ShiftApp() {
                     roles: areas[0],
                   })
                 }
-                onEdit={(e) =>
-                  open('employee', {
-                    ...e,
-                    rate: String(e.rate),
-                    roles: roleList(e).join(','),
-                    taskManager: e.taskManager ? '1' : '',
-                    overtimeManager: e.overtimeManager ? '1' : '',
-                    admin: e.admin ? '1' : '',
-                    archived: e.archived ? '1' : '',
-                  })
-                }
+                onEdit={editEmployee}
                 onMessage={(e) => open('message', { to: e.id, body: '' })}
                 onRemove={removeEmployee}
                 onPurge={purgeEmployee}
@@ -2505,15 +2550,7 @@ export default function ShiftApp() {
                         <button
                           className="button"
                           onClick={() =>
-                            open('employee', {
-                              ...e,
-                              rate: String(e.rate),
-                              roles: roleList(e).join(','),
-                              taskManager: e.taskManager ? '1' : '',
-                              overtimeManager: e.overtimeManager ? '1' : '',
-                              admin: e.admin ? '1' : '',
-                              archived: e.archived ? '1' : '',
-                            })
+                            editEmployee(e)
                           }
                         >
                           {t('수정')}
@@ -2598,6 +2635,22 @@ export default function ShiftApp() {
             <DialogDescription>
               {from} ~ {to} · {t('저장된 출근기록 기준입니다. 예정 시간이 아니라 실제로 찍힌 기록으로 계산합니다.')}
             </DialogDescription>
+            {/* 급여에서 바로 고칩니다. 시급은 직원 설정에서, 출퇴근 시각은 줄마다 연필 단추로 엽니다.
+                두 창이 겹쳐 뜨지 않게 상세를 닫고 열며, 출퇴근을 저장하면 이 상세로 돌아옵니다. */}
+            {actor.admin && emp(payDetail) && (
+              <div className="paydetail-actions">
+                <button
+                  className="button"
+                  onClick={() => {
+                    const e = emp(payDetail)!;
+                    setPayDetail('');
+                    editEmployee(e);
+                  }}
+                >
+                  <Pencil size={16} /> {t('시급 수정')}
+                </button>
+              </div>
+            )}
             {payDays(payDetail).length === 0 ? (
               <p className="hint">{t('아직 저장된 출근기록이 없습니다.')}</p>
             ) : (
@@ -2606,7 +2659,7 @@ export default function ShiftApp() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        {['날짜', '예정 근무', '출퇴근', '휴게', '실근무', '지각', '조퇴', '지각 차감', '조퇴 차감', '금액'].map(
+                        {['날짜', '예정 근무', '출퇴근', '휴게', '실근무', '지각', '조퇴', '지각 차감', '조퇴 차감', '금액', ...(actor.admin ? [''] : [])].map(
                           (h) => (
                             <TableHead key={h}>{t(h)}</TableHead>
                           ),
@@ -2648,6 +2701,29 @@ export default function ShiftApp() {
                             {earlyDeduction ? '-' + money(earlyDeduction) : '—'}
                           </TableCell>
                           <TableCell>{money(worked * (emp(payDetail)?.rate ?? 0))}</TableCell>
+                          {actor.admin && (
+                            <TableCell>
+                              <button
+                                className="iconbutton"
+                                aria-label={t('출퇴근 수정')}
+                                title={t('출퇴근 수정')}
+                                onClick={() => {
+                                  setPayDetail('');
+                                  open('punchEdit', {
+                                    id: a.id,
+                                    employeeId: a.employeeId,
+                                    date: a.date,
+                                    in: a.start,
+                                    out: a.end,
+                                    breakMinutes: String(a.breakMinutes),
+                                    punched: data.punches?.some((p) => p.id === a.id) ? '1' : '',
+                                  });
+                                }}
+                              >
+                                <Pencil size={15} />
+                              </button>
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))}
                     </TableBody>
@@ -2712,7 +2788,7 @@ export default function ShiftApp() {
             if (modal === 'shift' && clockField.key === 'start')
               setClockField({ key: 'end', label: t('종료 시간'), step: clockField.step });
             // 출퇴근 추가도 출근을 고르면 퇴근 시계를 이어서 엽니다.
-            else if (modal === 'punchAdd' && clockField.key === 'in')
+            else if ((modal === 'punchAdd' || modal === 'punchEdit') && clockField.key === 'in')
               setClockField({ key: 'out', label: t('퇴근'), step: clockField.step });
             else setClockField(null);
           }}
@@ -2788,6 +2864,7 @@ export default function ShiftApp() {
                   message: '메시지 작성',
                   punchReview: '근무 기록에 이의',
                   punchAdd: '출퇴근 추가',
+                  punchEdit: '출퇴근 수정',
                   detail: '근무 상세',
                 } as Record<string, string>
               )[modal] || '',
@@ -2815,6 +2892,9 @@ export default function ShiftApp() {
                 // 근무 상세의 기본 단추는 삭제입니다. 되돌릴 수 없어 한 번 묻고 지웁니다.
                 if (confirm(t('이 근무를 삭제할까요? 되돌릴 수 없고, 직원 화면에서도 사라집니다.')))
                   void command('shiftRemove', { id: form.id });
+              } else if (modal === 'punchEdit') {
+                const back = form.employeeId;
+                void command('punchEdit', form).then((ok) => ok && setPayDetail(back));
               } else void command(modal, form);
             }}
           >
@@ -2858,14 +2938,32 @@ export default function ShiftApp() {
             )}
             {modal === 'shift' && (
               <>
+                {/* 업무를 먼저 고르면 그 업무를 맡은 직원이 목록 맨 위에 섭니다. */}
+                {areaPick(
+                  'area',
+                  t('업무 / 장소'),
+                  '',
+                  shiftAreas(emp(form.employeeId || '')),
+                  (v) =>
+                    setForm((f) => {
+                      const who = emp(f.employeeId || '');
+                      return { ...f, area: v, employeeId: who && !canWorkIn(who, v) ? '' : f.employeeId };
+                    }),
+                )}
                 <Pick
                   label={t('직원')}
                   value={form.employeeId || ''}
-                  onChange={(v) => put('employeeId', v)}
+                  onChange={(v) =>
+                    setForm((f) => {
+                      // Workshop 업무가 없는 사람을 고르면 그 사람의 기본 업무로 바꿔 둡니다.
+                      const who = emp(v);
+                      return { ...f, employeeId: v, area: who && !canWorkIn(who, f.area || '') ? who.role : f.area };
+                    })
+                  }
                   // 근무 추가에서는 이름만 보입니다 — 직원 코드는 적지 않습니다.
-                  options={staff.map((e) => ({ value: e.id, label: e.name, group: roleGroup(e) }))}
+                  options={shiftStaff(form.area || '').map((e) => ({ value: e.id, label: e.name, group: roleGroup(e) }))}
+                  order={roleOrder(form.area || '')}
                 />
-                {areaPick('area', t('업무 / 장소'))}
                 {/* 근무일은 열던 자리에서 정해져 있어 고르지 않고 보여만 줍니다. */}
                 <p className="hint">
                   {t('근무일 · {date}', { date: form.date ? longDate(form.date) : '' })}
@@ -2880,7 +2978,12 @@ export default function ShiftApp() {
             {modal === 'shiftUpdate' && (
               <>
                 {box(emp(data.shifts.find((s) => s.id === form.ids)?.employeeId || ''))}
-                {areaPick('area', t('업무 / 장소'))}
+                {areaPick(
+                  'area',
+                  t('업무 / 장소'),
+                  '',
+                  shiftAreas(emp(data.shifts.find((s) => s.id === form.ids)?.employeeId || '')),
+                )}
                 {input('date', t('근무일'), 'date')}
                 {shiftTimes}
                 <p className="hint">
@@ -3104,6 +3207,27 @@ export default function ShiftApp() {
                 </p>
               </>
             )}
+            {modal === 'punchEdit' && (
+              <>
+                {box(emp(form.employeeId || ''))}
+                {input('date', t('근무일'), 'date')}
+                <div className="timerow">
+                  <span className="timebox">
+                    <Clock3 size={16} />
+                    {timeInput('in', t('출근'), 1)}
+                    <em>→</em>
+                    {timeInput('out', t('퇴근'), 1)}
+                  </span>
+                </div>
+                {/* 찍힌 출퇴근의 휴게는 찍힌 그대로 두고, 출근기계에서 가져온 기록만 휴게 분을 적습니다. */}
+                {!form.punched && input('breakMinutes', t('휴게(분)'), 'number')}
+                <p className="hint">
+                  {form.punched
+                    ? t('퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다. 고친 기록은 직원이 다시 확인하도록 확인 대기로 돌아갑니다.')
+                    : t('퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다.')}
+                </p>
+              </>
+            )}
             {modal === 'message' && (
               <>
                 <Pick
@@ -3201,7 +3325,7 @@ export default function ShiftApp() {
               </div>
             ) : (
               <div className="dialog-actions">
-              {(modal === 'shift' || modal === 'shiftUpdate' || modal === 'detail' || modal === 'punchAdd') && (
+              {(modal === 'shift' || modal === 'shiftUpdate' || modal === 'detail' || modal === 'punchAdd' || modal === 'punchEdit') && (
                 <button className="button cancel" type="button" onClick={() => setModal('')}>
                   {t('취소')}
                 </button>
@@ -3481,7 +3605,7 @@ export default function ShiftApp() {
                   </button>
                   <h2>
                     {week.slice(5).replace('-', '.')} –{' '}
-                    {addDays(week, 6).slice(5).replace('-', '.')}{' '}
+                    {addDays(week, SCHEDULE_DAYS - 1).slice(5).replace('-', '.')}{' '}
                     <span>{week.slice(0, 4)}</span>
                   </h2>
                   <button
@@ -3510,15 +3634,6 @@ export default function ShiftApp() {
                       >
                         {t('직원에게 공개')}
                       </button>
-                      {data.published && (
-                        <button
-                          disabled={busy || setup}
-                          className="button unpublish"
-                          onClick={() => unpublish()}
-                        >
-                          {t('게시 해제')}
-                        </button>
-                      )}
                       <button
                         className="button primary"
                         onClick={() =>
@@ -3599,18 +3714,17 @@ export default function ShiftApp() {
                     <div className="gridhead staffhead">
                       {t('직원')} <span>{t('{n}명', { n: visibleEmployees.length })}</span>
                     </div>
-                    {days.map((d, i) => (
+                    {weekDates.map((date, i) => (
                       <div
                         className={
                           'gridhead ' +
-                          (addDays(week, i) === localDate(new Date())
-                            ? 'today'
-                            : '')
+                          (date === localDate(new Date()) ? 'today' : '') +
+                          (i === 7 ? ' split' : '')
                         }
-                        key={d}
+                        key={date}
                       >
-                        {d}
-                        <strong>{Number(addDays(week, i).slice(8))}</strong>
+                        {days[i % 7]}
+                        <strong>{Number(date.slice(8))}</strong>
                       </div>
                     ))}
                     {visibleEmployees.map((e) => (
@@ -3619,14 +3733,12 @@ export default function ShiftApp() {
                           {box(e)}
                           <small>{roleLabel(e)}</small>
                         </div>
-                        {days.map((_, d) => {
+                        {weekDates.map((date, d) => {
                           const shifts = data.shifts.filter(
-                            (s) =>
-                              s.employeeId === e.id &&
-                              s.date === addDays(week, d),
+                            (s) => s.employeeId === e.id && s.date === date,
                           );
                           return (
-                            <div className="daycell" key={d}>
+                            <div className={'daycell' + (d === 7 ? ' split' : '')} key={date}>
                               {shifts.length ? (
                                 shifts.map((s) => (
                                   <button
@@ -3923,16 +4035,6 @@ export default function ShiftApp() {
                         <Send size={16} />
                         {data.published ? t('공개됨') : t('스케줄 공개')}
                       </button>
-                      {data.published && (
-                        <button
-                          className="button unpublish"
-                          disabled={busy || setup}
-                          onClick={() => unpublish()}
-                        >
-                          <EyeOff size={16} />
-                          {t('게시 해제')}
-                        </button>
-                      )}
                     </div>
   ) : null;
   const schedFiltersNode = staffReadOnly ? null : (
@@ -4166,7 +4268,7 @@ export default function ShiftApp() {
                           <CalendarDays size={18} />
                           {longDate(week)}
                           <ArrowRight size={15} />
-                          {longDate(addDays(week, 6))}
+                          {longDate(addDays(week, SCHEDULE_DAYS - 1))}
                         </span>
                         <button
                           aria-label={t('다음 주')}
@@ -4287,12 +4389,14 @@ export default function ShiftApp() {
                         {weekDates.map((date, i) => (
                           <div
                             className={
-                              'roster-day' + (date === localDate(new Date()) ? ' today' : '')
+                              'roster-day' +
+                              (date === localDate(new Date()) ? ' today' : '') +
+                              (i === 7 ? ' split' : '')
                             }
                             key={date}
                           >
                             <span>
-                              <b>{days[i]}</b>
+                              <b>{days[i % 7]}</b>
                               {monthDay(date)}
                             </span>
                             <small title={t('근무 인원')}>
@@ -4309,7 +4413,7 @@ export default function ShiftApp() {
                         ))}
                         <div className="roster-location">Pelham Hills</div>
                         {/* 한 사람은 한 번만 섭니다 — 겸직자는 기본 업무 아래 두고, 업무를 좁혀 보면 그 업무 자리에 나타납니다. */}
-                        {(dept === 'all' ? roles : [dept])
+                        {(dept === 'all' ? [...roles, NO_ROLE] : [dept])
                           .filter((role) => visibleEmployees.some((e) => bandOf(e) === role))
                           .map((role) => {
                             const members = visibleEmployees.filter((e) => bandOf(e) === role);
@@ -4350,7 +4454,7 @@ export default function ShiftApp() {
                                           </small>
                                         </span>
                                       </div>
-                                      {weekDates.map((date) => {
+                                      {weekDates.map((date, i) => {
                                         const shifts = mine.filter((s) => s.date === date);
                                         const offs = timeOff.filter(
                                           (r) =>
@@ -4366,7 +4470,10 @@ export default function ShiftApp() {
                                             r.weekday === weekdayOf(date),
                                         );
                                         return (
-                                          <div className="roster-cell" key={date}>
+                                          <div
+                                            className={'roster-cell' + (i === 7 ? ' split' : '')}
+                                            key={date}
+                                          >
                                             {offs.map((r) => (
                                               <button
                                                 key={r.id}
@@ -4468,15 +4575,19 @@ export default function ShiftApp() {
                             {showCost && <small>{money(rosterCost(rosterShifts))}</small>}
                           </span>
                         </div>
-                        {weekDates.map((date) => {
+                        {weekDates.map((date, i) => {
                           const list = rosterShifts.filter((s) => s.date === date);
                           const dayHours = list.reduce((n, s) => n + duration(s.start, s.end), 0);
-                          const weekHours = rosterShifts.reduce(
-                            (n, s) => n + duration(s.start, s.end),
-                            0,
-                          );
+                          // 비중은 그 날이 속한 한 주 안에서 셉니다. 두 주를 펼쳐도 주마다 100%가 됩니다.
+                          const from = weekStart(date);
+                          const weekHours = rosterShifts
+                            .filter((s) => s.date >= from && s.date <= addDays(from, 6))
+                            .reduce((n, s) => n + duration(s.start, s.end), 0);
                           return (
-                            <div className="roster-daytotal" key={date}>
+                            <div
+                              className={'roster-daytotal' + (i === 7 ? ' split' : '')}
+                              key={date}
+                            >
                               <em
                                 className={dayHours ? '' : 'none'}
                                 title={t('이번 주 예정 시간 중 비중')}
@@ -4523,7 +4634,6 @@ export default function ShiftApp() {
                       });
                     }}
                     onPublish={() => void command('publish')}
-                    onUnpublish={unpublish}
                   />
                 ) : staffReadOnly || view === 'month' ? (
                   <MonthSchedule

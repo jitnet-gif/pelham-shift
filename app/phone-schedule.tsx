@@ -14,7 +14,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import type { Availability, Employee, Shift, TimeOff } from '@/lib/domain';
-import { TIME_ZONE, addDays, roleTint, weekdayOf } from '@/lib/domain';
+import { SCHEDULE_DAYS, TIME_ZONE, addDays, roleTint, weekdayOf } from '@/lib/domain';
 import { useLang } from './use-lang';
 import WeatherPanel from './weather-panel';
 
@@ -68,9 +68,10 @@ export default function PhoneSchedule({
   // 날씨 칸은 눌러야 열립니다. 닫혀 있는 동안에는 예보를 부르지 않습니다.
   const [weatherOpen, setWeatherOpen] = useState(false);
   useBackClose(weatherOpen, () => setWeatherOpen(false));
-  const weekDates = Array.from({ length: 7 }, (_, i) => addDays(week, i));
-  // 고른 날이 이 주를 벗어나면 주 첫날부터 보여 줍니다.
-  const from = day >= week && day <= weekDates[6] ? day : week;
+  // 일요일부터 다음 주 토요일까지 두 주를 폅니다. 요일 띠는 한 줄에 한 주씩 두 줄로 섭니다.
+  const weekDates = Array.from({ length: SCHEDULE_DAYS }, (_, i) => addDays(week, i));
+  // 고른 날이 이 두 주를 벗어나면 첫날부터 보여 줍니다.
+  const from = day >= week && day <= weekDates[SCHEDULE_DAYS - 1] ? day : week;
   const listDates = weekDates.filter((date) => date >= from);
   const monthLabel = new Intl.DateTimeFormat(locale, {
     year: 'numeric',
@@ -154,7 +155,7 @@ export default function PhoneSchedule({
             }
             onClick={() => onDayChange(date)}
           >
-            <small>{days[i]}</small>
+            <small>{days[i % 7]}</small>
             <b>{Number(date.slice(8))}</b>
           </button>
         ))}

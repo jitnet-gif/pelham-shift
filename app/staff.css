@@ -96,13 +96,19 @@
   font-weight: 600;
 }
 
-/* 한 주 날짜 줄 */
+/* 두 주 날짜 줄 — 가운데 칸에 한 주씩 두 줄로 섭니다. */
 .stsched-strip {
   display: grid;
-  grid-template-columns: 22px repeat(7, 1fr) 22px;
+  grid-template-columns: 22px 1fr 22px;
   gap: 2px;
   padding: 8px 4px 12px;
   touch-action: pan-y;
+}
+/* 한 줄에 7일 */
+.stsched-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px 2px;
 }
 /* 요일 줄 양옆의 앞뒤 주 화살표 */
 .stsched-arrow {
