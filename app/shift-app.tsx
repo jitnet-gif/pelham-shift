@@ -91,6 +91,8 @@ import {
   scheduledFor,
   wholePeriods,
   OT_PERIOD_HOURS,
+  HOLIDAY_MULTIPLIER,
+  holidayOn,
   OT_MULTIPLIER,
   canSwap,
   leadDate,
@@ -969,11 +971,11 @@ export default function ShiftApp() {
         earlyDeduction: deductions.get(a.id)?.early ?? 0,
       }));
   };
-  // 초과근무가 어떤 근거로 잡혔는지. 급여 기간(2주) 88시간을 넘긴 시간만 가산합니다.
+  // 초과근무가 어떤 근거로 잡혔는지. 급여 기간(2주) 88시간을 넘긴 시간만 가산합니다. 공휴일 근무는 따로 가산해 여기서 뺍니다.
   const payPeriodOT = (employeeId: string) => {
     const byDay = new Map<string, number>();
     for (const r of payDays(employeeId))
-      byDay.set(r.a.date, (byDay.get(r.a.date) ?? 0) + r.worked);
+      if (!holidayOn(r.a.date)) byDay.set(r.a.date, (byDay.get(r.a.date) ?? 0) + r.worked);
     const weeks = new Map<string, number[]>();
     for (const [day, h] of byDay)
       weeks.set(payPeriodStart(day), [...(weeks.get(payPeriodStart(day)) ?? []), h]);
@@ -1384,6 +1386,8 @@ export default function ShiftApp() {
         '시급',
         '기본급',
         '초과수당',
+        '공휴일시간',
+        '공휴일수당',
         '지각(분)',
         '지각일수',
         '지각 차감',
@@ -1405,6 +1409,8 @@ export default function ShiftApp() {
         r.e.rate,
         r.base,
         r.otPay,
+        r.holidayHours.toFixed(2),
+        r.holidayPay,
         r.lateMinutes,
         r.lateDays,
         // 화면과 같은 부호로 내보내 시트에서 열을 합산해도 결과가 맞습니다.
@@ -2135,6 +2141,10 @@ export default function ShiftApp() {
                 {t(
                   '지급액은 단말에서 찍힌 출퇴근을 기준으로 계산합니다. 유급 휴게는 근무로 치고 무급 휴게만 뺍니다. 예정 시작보다 일찍 찍어도 예정 시작 시각부터 세고, 퇴근은 찍힌 시각까지 셉니다. 그 사람 그 날짜에 찍힌 기록이 없을 때만 예전에 가져온 기록을 씁니다. 초과근무는 급여 기간(일요일 시작 2주) {w}시간을 넘긴 시간만 {m}배로 가산하며, 하루·한 주 기준은 없습니다. 지각은 체크인 하나하나 따로 보아 예정 출근 시각을 넘긴 분만큼 그 체크인에서 번 금액까지만 차감하며, 예정 근무가 없는 출근기록은 지각으로 보지 않습니다. 조퇴도 같은 방법으로 예정 퇴근 시각보다 일찍 찍은 분만큼 차감하며, 지각과 조퇴를 합친 차감은 그 체크인에서 번 금액을 넘지 않습니다. 세금·유급휴가를 제외한 예상 금액이고, 시급 0인 직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급 대상이 아니며 실제 출근기록만 지급합니다.',
                   { w: OT_PERIOD_HOURS, m: OT_MULTIPLIER },
+                )}{' '}
+                {t(
+                  '온타리오 법정 공휴일 9일에 일한 시간은 {h}배로 지급하며, 이 시간은 초과근무 {w}시간 계산에서 뺍니다.',
+                  { h: HOLIDAY_MULTIPLIER, w: OT_PERIOD_HOURS },
                 )}
                 {/* 급여 기간 단위로 끊기지 않은 구간은 걸쳐 있는 기간의 초과근무가 적게 잡힙니다. */}
                 {!wholePeriods(from, to) && (
@@ -2154,9 +2164,11 @@ export default function ShiftApp() {
                       '실근무',
                       '정규',
                       '초과',
+                      '공휴일',
                       '시급',
                       '기본급',
                       '초과수당',
+                      '공휴일수당',
                       '지각 차감',
                       '조퇴 차감',
                       '예상 급여',
@@ -2173,7 +2185,7 @@ export default function ShiftApp() {
                   ).map((g) => [
                     <TableRow key={'group-' + (g.group ?? 'other')} className="paygroup">
                       <TableCell
-                        colSpan={10}
+                        colSpan={12}
                         style={{ color: g.group ? ROLE_GROUP_COLORS[g.group] : undefined }}
                       >
                         {g.group ?? t('기타')} <small>{g.items.length}</small>
@@ -2198,12 +2210,16 @@ export default function ShiftApp() {
                         <TableCell>{r.hours.toFixed(2)}h</TableCell>
                         <TableCell>{r.regularHours.toFixed(2)}h</TableCell>
                         <TableCell>{r.otHours.toFixed(2)}h</TableCell>
+                        <TableCell>{r.holidayHours.toFixed(2)}h</TableCell>
                         <TableCell>
                           {r.e.rate ? money(r.e.rate) : t('설정 필요')}
                         </TableCell>
                         <TableCell>{money(r.base)}</TableCell>
                         <TableCell className={r.otPay ? 'green' : undefined}>
                           +{money(r.otPay)}
+                        </TableCell>
+                        <TableCell className={r.holidayPay ? 'green' : undefined}>
+                          {money(r.holidayPay)}
                         </TableCell>
                         <TableCell
                           className={r.lateDeduction ? 'red' : undefined}
@@ -2837,7 +2853,10 @@ export default function ShiftApp() {
                     <TableBody>
                       {payDays(payDetail).map(({ a, shift, worked, late, early, lateDeduction, earlyDeduction }) => (
                         <TableRow key={a.id}>
-                          <TableCell>{monthDay(a.date)}</TableCell>
+                          <TableCell>
+                            {monthDay(a.date)}
+                            {holidayOn(a.date) && <small className="green"> · {holidayOn(a.date)}</small>}
+                          </TableCell>
                           <TableCell>
                             {shift ? ampm(shift.start) + ' – ' + ampm(shift.end) : '—'}
                           </TableCell>
@@ -2871,7 +2890,7 @@ export default function ShiftApp() {
                           <TableCell className={earlyDeduction ? 'red' : undefined}>
                             {earlyDeduction ? '-' + money(earlyDeduction) : '—'}
                           </TableCell>
-                          <TableCell>{money(worked * (emp(payDetail)?.rate ?? 0))}</TableCell>
+                          <TableCell>{money(worked * (emp(payDetail)?.rate ?? 0) * (holidayOn(a.date) ? HOLIDAY_MULTIPLIER : 1))}</TableCell>
                           {actor.admin && (
                             <TableCell>
                               <button
@@ -2920,6 +2939,9 @@ export default function ShiftApp() {
                       </span>
                       <span className={sum.otPay ? 'green' : undefined}>
                         {t('초과수당')} <b>+{money(sum.otPay)}</b>
+                      </span>
+                      <span className={sum.holidayPay ? 'green' : undefined}>
+                        {t('공휴일수당')} <b>{money(sum.holidayPay)}</b>
                       </span>
                       <span className={sum.lateDeduction ? 'red' : undefined}>
                         {t('지각 차감')} <b>-{money(sum.lateDeduction)}</b>

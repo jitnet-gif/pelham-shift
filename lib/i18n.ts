@@ -562,6 +562,11 @@ const en: Record<string, string> = {
   '기타': 'Other',
   '초과 근무 편성 권한': 'Overtime scheduling',
   '초과 근무': 'Overtime',
+  공휴일: 'Holiday',
+  공휴일시간: 'Holiday hours',
+  공휴일수당: 'Holiday pay',
+  '온타리오 법정 공휴일 9일에 일한 시간은 {h}배로 지급하며, 이 시간은 초과근무 {w}시간 계산에서 뺍니다.':
+    'Hours worked on the 9 Ontario public holidays are paid at {h}×, and they are left out of the {w}-hour overtime count.',
   '끄면 이 직원이 짜는 근무는 급여 기간(일요일 시작 2주) {w}시간까지만 들어갑니다. 켜면 그 선을 넘는 근무도 낼 수 있고, 넘긴 시간에는 급여에서 {m}배가 붙습니다. 관리자는 이 설정과 상관없이 넘겨 짤 수 있습니다.':
     'With this off, shifts this person schedules stop at {w} hours per two-week pay period (starting Sunday). With it on they can schedule past that line, and the hours over it are paid at {m}× . Administrators can always schedule past it.',
   '대체근무 신청': 'Request a swap',

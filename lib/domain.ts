@@ -130,9 +130,24 @@ export function blockedBy(state:State,shift:Shift):'timeoff'|'unavailable'|null{
 // 온타리오 고용기준법(ESA)의 기본선은 주 44시간이라, 2주 평균으로 세려면 직원마다 서면 합의(averaging agreement)가 있어야 합니다.
 export const OT_PERIOD_HOURS=88;
 export const OT_MULTIPLIER=1.5;
+// 공휴일 · 온타리오 법정 공휴일 9일에 일한 시간은 1.5배로 지급합니다. 이 시간은 초과근무(88시간) 계산에서 뺍니다 —
+// 같은 시간에 두 가산이 겹쳐 붙지 않습니다. 날짜는 해마다 규칙으로 구하고, 주말에 걸려도 그 날짜 그대로 봅니다.
+export const HOLIDAY_MULTIPLIER=1.5;
+const ymd=(y:number,m:number,d:number)=>`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+// 그 달 n 번째 요일(weekday 0=일요일).
+const nthWeekday=(y:number,m:number,weekday:number,n:number)=>{const first=ymd(y,m,1);return addDays(first,(weekday-weekdayOf(first)+7)%7+(n-1)*7)};
+// 부활절(그레고리력). Good Friday 는 그 이틀 전입니다.
+function easter(y:number){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),n=h+l-7*m+114;return ymd(y,Math.floor(n/31),n%31+1)}
+export function ontarioHolidays(y:number){const may24=ymd(y,5,24);return [
+ {date:ymd(y,1,1),name:"New Year's Day"},{date:nthWeekday(y,2,1,3),name:'Family Day'},{date:addDays(easter(y),-2),name:'Good Friday'},
+ // Victoria Day 는 5월 25일 바로 앞 월요일입니다.
+ {date:addDays(may24,-((weekdayOf(may24)+6)%7)),name:'Victoria Day'},{date:ymd(y,7,1),name:'Canada Day'},{date:nthWeekday(y,9,1,1),name:'Labour Day'},
+ {date:nthWeekday(y,10,1,2),name:'Thanksgiving'},{date:ymd(y,12,25),name:'Christmas Day'},{date:ymd(y,12,26),name:'Boxing Day'}]}
+// 그 날짜가 공휴일이면 이름, 아니면 undefined.
+export const holidayOn=(date:string)=>ontarioHolidays(+date.slice(0,4)).find(h=>h.date===date)?.name;
 // 짜 놓은 근무표가 이 선을 얼마나 넘었는지 자리마다 셉니다. 급여가 초과근무를 세는 눈금과 같은 선을 봅니다 —
 // 편성에서 다른 선을 쓰면 통과한 근무가 급여에서 가산되거나 그 반대가 됩니다.
-// 무급 휴게는 빼고 셉니다. dates 에 적은 날이 속한 급여 기간만 보므로, 손대지 않은 기간은 건드리지 않습니다.
+// 무급 휴게와 공휴일 근무는 빼고 셉니다. dates 에 적은 날이 속한 급여 기간만 보므로, 손대지 않은 기간은 건드리지 않습니다.
 // 키는 'w:그 급여 기간의 첫 일요일'. 편성 전후를 같은 키로 견주어, 이미 넘어 있던 근무는 그대로 두고
 // 이번 편성이 더 넘긴 자리만 가려냅니다.
 export function overtimeOver(shifts:Shift[],employeeId:string,dates:string[]):Map<string,number>{
@@ -141,7 +156,7 @@ export function overtimeOver(shifts:Shift[],employeeId:string,dates:string[]):Ma
  const over=new Map<string,number>();
  for(const week of [...new Set(dates.map(d=>payPeriodStart(d)))].sort()){
   const end=addDays(week,PAY_PERIOD_DAYS);
-  const total=hours(mine.filter(x=>x.date>=week&&x.date<end))-OT_PERIOD_HOURS;
+  const total=hours(mine.filter(x=>x.date>=week&&x.date<end&&!holidayOn(x.date)))-OT_PERIOD_HOURS;
   if(total>0)over.set('w:'+week,total);
  }
  return over;
@@ -153,7 +168,7 @@ export function overtimeWorked(state:State,now=new Date()){
  const today=localDate(now),week=payPeriodStart(today),current=localTime(now);
  const open=livePunches(state).filter(p=>!p.out&&p.date>=week&&p.date>=addDays(today,-1)).map(p=>({id:p.id,employeeId:p.employeeId,date:p.date,start:p.in,end:current,breakMinutes:(p.breaks??[]).reduce((n,b)=>n+(!b.paid&&b.end?Math.round(duration(b.start,b.end)*60):0),0)}));
  const worked=new Map<string,number>();
- for(const a of [...paidRecords(state).filter(a=>a.date>=week&&a.date<=today),...open])worked.set(a.employeeId,(worked.get(a.employeeId)??0)+payableHours(state,a));
+ for(const a of [...paidRecords(state).filter(a=>a.date>=week&&a.date<=today),...open].filter(a=>!holidayOn(a.date)))worked.set(a.employeeId,(worked.get(a.employeeId)??0)+payableHours(state,a));
  return state.employees.filter(e=>!e.archived&&(worked.get(e.id)??0)>OT_PERIOD_HOURS).map(e=>({employee:e,week,hours:worked.get(e.id)!}));
 }
 // 근무표를 고치기 전(before)과 뒤(after)를 견주어, 급여 기간 88시간을 새로 넘기거나 더 넘긴 자리를 사람·기간마다 돌려줍니다.
@@ -234,9 +249,9 @@ export function shownPunch(state:{shifts:Shift[]},p:Punch){
 // 지각한 출근·조퇴한 퇴근 시각을 적는 글자색. 직원·관리자 화면이 모두 이 한 색을 씁니다.
 export const OFF_TIME_COLOR='#d0302f';
 export function payroll(state:State,employeeId:string,from:string,to:string){const e=state.employees.find(e=>e.id===employeeId)!;const records=paidRecords(state).filter(a=>a.employeeId===employeeId&&a.date>=from&&a.date<=to);const worked=(a:Attendance)=>payableHours(state,a);const hours=records.reduce((s,a)=>s+worked(a),0);
- // 날짜별로 합친 뒤 급여 기간(2주)별로 묶어 가산 시간을 구합니다.
- const byDay=new Map<string,number>();for(const a of records)byDay.set(a.date,(byDay.get(a.date)??0)+worked(a));const byPeriod=new Map<string,number[]>();for(const [day,h] of byDay){const w=payPeriodStart(day);byPeriod.set(w,[...(byPeriod.get(w)??[]),h])}
- const otHours=[...byPeriod.values()].reduce((s,days)=>s+Math.max(0,days.reduce((n,h)=>n+h,0)-OT_PERIOD_HOURS),0);const regularHours=hours-otHours;
+ // 날짜별로 합친 뒤 급여 기간(2주)별로 묶어 가산 시간을 구합니다. 공휴일에 일한 시간은 따로 1.5배로 세고 88시간 합에는 넣지 않습니다.
+ const byDay=new Map<string,number>();for(const a of records)byDay.set(a.date,(byDay.get(a.date)??0)+worked(a));const byPeriod=new Map<string,number[]>();for(const [day,h] of byDay){if(holidayOn(day))continue;const w=payPeriodStart(day);byPeriod.set(w,[...(byPeriod.get(w)??[]),h])}
+ const otHours=[...byPeriod.values()].reduce((s,days)=>s+Math.max(0,days.reduce((n,h)=>n+h,0)-OT_PERIOD_HOURS),0);const holidayHours=[...byDay].reduce((s,[day,h])=>s+(holidayOn(day)?h:0),0);const regularHours=hours-otHours-holidayHours;
  // 지각과 조퇴는 체크인 하나하나 따로 셉니다. 둘은 겹치지 않습니다 — 지각은 예정 출근부터 찍은 출근까지,
  // 조퇴는 찍은 퇴근부터 예정 퇴근까지라, 합치면 예정 근무 중 일하지 않은 시간 그대로입니다. 한 시간을 두 번 물리지 않습니다.
  // 차감은 둘을 합쳐 그 체크인에서 번 금액까지만입니다. 한 번 빠진 날이 다른 날 번 돈까지 갉아먹지 않습니다.
@@ -248,10 +263,10 @@ export function payroll(state:State,employeeId:string,from:string,to:string){con
   return {id:a.id,date:a.date,minutes,deduction,early,earlyDeduction:Math.min(cap-deduction,(early/60)*e.rate)}});
  const lateMinutes=lates.reduce((s,r)=>s+r.minutes,0);const lateDays=new Set(lates.filter(r=>r.minutes>0).map(r=>r.date)).size;
  const earlyMinutes=lates.reduce((s,r)=>s+r.early,0);const earlyDays=new Set(lates.filter(r=>r.early>0).map(r=>r.date)).size;
- const base=regularHours*e.rate,otPay=otHours*e.rate*OT_MULTIPLIER,earned=base+otPay,cents=(n:number)=>Math.round(n*100)/100;
+ const base=regularHours*e.rate,otPay=otHours*e.rate*OT_MULTIPLIER,holidayPay=holidayHours*e.rate*HOLIDAY_MULTIPLIER,earned=base+otPay+holidayPay,cents=(n:number)=>Math.round(n*100)/100;
  // 체크인마다 이미 그 체크인에서 번 금액으로 막아 두어, 엑셀 열을 잘못 연결해도 합계가 번 돈을 넘지 않습니다.
  const lateDeduction=lates.reduce((s,r)=>s+r.deduction,0),earlyDeduction=lates.reduce((s,r)=>s+r.earlyDeduction,0);
- return {hours,regularHours,otHours,lateMinutes,lateDays,earlyMinutes,earlyDays,lates:lates.map(r=>({...r,deduction:cents(r.deduction),earlyDeduction:cents(r.earlyDeduction)})),base:cents(base),otPay:cents(otPay),lateDeduction:cents(lateDeduction),earlyDeduction:cents(earlyDeduction),total:cents(earned-lateDeduction-earlyDeduction),...punchReviewCounts(state,employeeId,from,to)}}
+ return {hours,regularHours,otHours,holidayHours,lateMinutes,lateDays,earlyMinutes,earlyDays,lates:lates.map(r=>({...r,deduction:cents(r.deduction),earlyDeduction:cents(r.earlyDeduction)})),base:cents(base),otPay:cents(otPay),holidayPay:cents(holidayPay),lateDeduction:cents(lateDeduction),earlyDeduction:cents(earlyDeduction),total:cents(earned-lateDeduction-earlyDeduction),...punchReviewCounts(state,employeeId,from,to)}}
 // 근무지 이름. 직원 화면과 출퇴근 단말이 같은 이름을 씁니다.
 export const LOCATION='Pelham Hills Golf Club';
 // 날씨와 일출·일몰은 클럽이 서 있는 자리의 것입니다 — 출퇴근을 찍는 자리와 같은 좌표를 봅니다.
