@@ -2,7 +2,7 @@
 // next/image 를 쓰지 않습니다. 그 파이프라인은 이미지를 서버에 캐시하는데,
 // 이 사진은 사람 얼굴이라 no-store 로 내보내고 있습니다. 캐시하면 그 뜻이 사라집니다.
 // oxlint-disable next/no-img-element
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Camera, Coffee, MapPin, Pencil, Trash2, X } from 'lucide-react';
 import type { Employee, Punch, PunchSpot, Shift } from '@/lib/domain';
 import { OFF_TIME_COLOR, duration, localDate, missingOut, shownPunch } from '@/lib/domain';
@@ -26,6 +26,7 @@ export default function PunchLog({
   isAdmin,
   onEdit,
   onRemove,
+  focus,
 }: {
   punches: Punch[];
   employees: Employee[];
@@ -37,8 +38,14 @@ export default function PunchLog({
   // 관리자가 한 사람의 출근부를 볼 때만 넘어옵니다. 급여 시간은 여기, 원본 기록에서 고칩니다.
   onEdit?: (p: Punch) => void;
   onRemove?: (p: Punch) => void;
+  // 출근부에서 누른 기록. 그 카드를 형광색으로 짚고 화면 가운데로 끌어옵니다.
+  focus?: string;
 }) {
   const { t, locale } = useLang();
+  const focused = useRef<HTMLElement>(null);
+  useEffect(() => {
+    focused.current?.scrollIntoView({ block: 'center' });
+  }, [focus]);
   // 사진은 서버에 없습니다. 찍은 기기 안에만 있어, 그 기기에서 볼 때만 뜹니다.
   const [mine, setMine] = useState<Record<string, string>>({});
   const [big, setBig] = useState<{ src: string; who: string } | null>(null);
@@ -113,7 +120,11 @@ export default function PunchLog({
         const outAt = paid.out ?? p.out;
         const clipped = actual && !!p.out && (paid.in !== p.in || paid.out !== p.out);
         return (
-          <article className="punchlog-row" key={p.id}>
+          <article
+            className={'punchlog-row' + (p.id === focus ? ' focus' : '')}
+            key={p.id}
+            ref={p.id === focus ? focused : undefined}
+          >
             <div className="punchlog-when">
               <b>{dayLabel(p.date)}</b>
               {isAdmin && (

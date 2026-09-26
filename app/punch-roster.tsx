@@ -54,7 +54,7 @@ type RosterProps = {
   shifts: Shift[];
   today: string;
   // 표에서 고르면 그 칸의 급여 기간을 함께 넘깁니다. 카드는 언제나 지금 기간입니다.
-  onPick: (employeeId: string, from?: string) => void;
+  onPick: (employeeId: string, from?: string, id?: string) => void;
   // 급여 상세에서 건너온 줄. 출근부 보기로 그 기간을 열고 그 줄을 형광색으로 짚습니다.
   focus?: { id: string; from: string };
 };

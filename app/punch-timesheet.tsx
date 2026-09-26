@@ -220,7 +220,8 @@ export function PunchTimesheet({
   employees: Employee[];
   from: string;
   today: string;
-  onPick: (employeeId: string, from?: string) => void;
+  // 줄을 누르면 그 기록의 id 도 넘겨, 그 사람 출퇴근 카드에서 바로 그 카드를 짚습니다.
+  onPick: (employeeId: string, from?: string, id?: string) => void;
   // 형광색으로 짚을 줄(급여 상세에서 누른 기록). 그려지면 화면 가운데로 끌어옵니다.
   focus?: string;
 }) {
@@ -327,7 +328,7 @@ export function PunchTimesheet({
                           (x.key === focus ? ' focus' : '')
                         }
                         ref={x.key === focus ? focused : undefined}
-                        onClick={() => onPick(e.id, from)}
+                        onClick={() => onPick(e.id, from, x.key)}
                       >
                         <td>{md(x.date)}</td>
                         <td className="timesheet-shift">

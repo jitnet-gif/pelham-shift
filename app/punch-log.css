@@ -645,6 +645,8 @@
 /* 급여 상세에서 누른 줄. 형광펜처럼 칠해 여러 사람 표 사이에서도 바로 찾게 합니다. */
 .timesheet-line.focus td { background: #fff200; color: #1f2a26; font-weight: 700; }
 .timesheet-line.focus td:first-child { box-shadow: inset 4px 0 0 #e0c800; }
+/* 출근부에서 누른 기록의 카드. 출근부 줄과 같은 형광색으로 짚습니다. */
+.punchlog-row.focus { background: #fffbb0; border-color: #e0c800; box-shadow: inset 4px 0 0 #e0c800; }
 .timesheet-flags { color: #b0321f; }
 .timesheet-table .timesheet-label { text-align: right; }
 .timesheet-weekly td { background: #eceeed; font-weight: 600; }

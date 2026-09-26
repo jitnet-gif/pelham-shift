@@ -337,7 +337,12 @@ export default function ShiftApp() {
   const [paySheet, setPaySheet] = useState(false);
   // 관리자 출근 기록: 어느 이름의 출근부를 어느 2주 기간으로 보고 있는지.
   // 로그인한 사람(actor)을 함께 들고 있어, 사람이 바뀌면 앞사람 출근부에 서 있지 않고 이름 목록부터 다시 엽니다.
-  const [att, setAtt] = useState({ actor: '', who: '', from: '' });
+  // focus 는 출근부에서 누른 기록 — 그 사람 출퇴근 카드 중 그 카드를 짚습니다.
+  const [att, setAtt] = useState<{ actor: string; who: string; from: string; focus?: string }>({
+    actor: '',
+    who: '',
+    from: '',
+  });
   const seenMessages = useRef<Set<string>>(new Set());
   // 앱을 연 시각. 열기 전부터 쌓여 있던 메시지와 방금 온 메시지를 가릅니다.
   const bootedAt = useRef('');
@@ -394,6 +399,8 @@ export default function ShiftApp() {
     if (modal) return setModal('');
     // 아래 화면이 열어 둔 창(날씨, 급여 기간 펼침 등)을 닫습니다.
     if (closeTop()) return;
+    // 출근부 줄을 눌러 들어온 카드 화면은 한 걸음에 그 출근부로 돌아갑니다.
+    if (tab === 'attendance' && att.who && att.focus) return setAtt({ actor: att.actor, who: '', from: att.from });
     // 급여 상세에서 건너온 출근부는 한 걸음에 급여 상세로 돌아갑니다.
     if (payFocus && tab === 'attendance') {
       state.trail.pop();
@@ -1990,8 +1997,8 @@ export default function ShiftApp() {
                     punches={data.punches ?? []}
                     shifts={data.shifts}
                     today={today}
-                    onPick={(who, from) =>
-                      setAtt({ actor: actor.id, who, from: from ?? payPeriodStart(today) })
+                    onPick={(who, from, id) =>
+                      setAtt({ actor: actor.id, who, from: from ?? payPeriodStart(today), focus: id })
                     }
                   />
                 </>
@@ -2035,6 +2042,7 @@ export default function ShiftApp() {
                     shifts={data.shifts}
                     actual={actor.admin}
                     isAdmin={actor.admin && !attWho}
+                    focus={attMine ? att.focus : undefined}
                     onEdit={
                       actor.admin && attWho
                         ? (p) =>
