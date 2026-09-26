@@ -217,7 +217,11 @@ export function punchReviewCounts(state:State,employeeId:string,from:string,to:s
 // (22:00 근무에 00:30 출근). 예정 근무가 없는 날의 기록은 기준이 없어 찍힌 그대로 셉니다.
 export const EARLY_PAY_WINDOW_MINUTES=720;
 export function paidStart(state:State,a:Attendance){const shift=scheduledFor(state,a);if(!shift)return a.start;const ahead=minutes(shift.start)-minutes(a.start);return ahead>0&&ahead<=EARLY_PAY_WINDOW_MINUTES?shift.start:a.start}
-export const payableHours=(state:State,a:Attendance)=>duration(paidStart(state,a),a.end,a.breakMinutes);
+// 끝도 같습니다. 예정 퇴근보다 늦게 찍어도 예정 퇴근 시각까지만 지급합니다 — 남아서 일한 시간은 급여에 넣지 않습니다.
+// 시계 글자로 견주되 하루를 돌려 봅니다. 자정을 넘기는 근무(22:00-02:00)에 02:20 퇴근도, 퇴근을 늦게 찍어 새벽이 된 기록도
+// 예정 퇴근 뒤 12시간 안이면 넘긴 것으로 보고 자릅니다. 예정 근무가 없는 날의 기록은 찍힌 그대로 셉니다.
+export function paidEnd(state:State,a:Attendance){const shift=scheduledFor(state,a);if(!shift)return a.end;const over=(minutes(a.end)-minutes(shift.end)+1440)%1440;return over>0&&over<=EARLY_PAY_WINDOW_MINUTES?shift.end:a.end}
+export const payableHours=(state:State,a:Attendance)=>duration(paidStart(state,a),paidEnd(state,a),a.breakMinutes);
 export function payroll(state:State,employeeId:string,from:string,to:string){const e=state.employees.find(e=>e.id===employeeId)!;const records=paidRecords(state).filter(a=>a.employeeId===employeeId&&a.date>=from&&a.date<=to);const worked=(a:Attendance)=>payableHours(state,a);const hours=records.reduce((s,a)=>s+worked(a),0);
  // 날짜별로 합친 뒤 주(일요일 시작)별로 묶어 가산 시간을 구합니다.
  const byDay=new Map<string,number>();for(const a of records)byDay.set(a.date,(byDay.get(a.date)??0)+worked(a));const byWeek=new Map<string,number[]>();for(const [day,h] of byDay){const w=weekStart(day);byWeek.set(w,[...(byWeek.get(w)??[]),h])}
