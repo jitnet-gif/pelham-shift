@@ -218,14 +218,11 @@ export function punchReviewCounts(state:State,employeeId:string,from:string,to:s
 export const EARLY_PAY_WINDOW_MINUTES=720;
 export function payIn(shift:Shift|undefined,at:string){if(!shift)return at;const ahead=minutes(shift.start)-minutes(at);return ahead>0&&ahead<=EARLY_PAY_WINDOW_MINUTES?shift.start:at}
 export const paidStart=(state:{shifts:Shift[]},a:Attendance)=>payIn(scheduledFor(state,a),a.start);
-// 끝도 같습니다. 예정 퇴근보다 늦게 찍어도 예정 퇴근 시각까지만 지급합니다 — 남아서 일한 시간은 급여에 넣지 않습니다.
-// 시계 글자로 견주되 하루를 돌려 봅니다. 자정을 넘기는 근무(22:00-02:00)에 02:20 퇴근도, 퇴근을 늦게 찍어 새벽이 된 기록도
-// 예정 퇴근 뒤 12시간 안이면 넘긴 것으로 보고 자릅니다. 예정 근무가 없는 날의 기록은 찍힌 그대로 셉니다.
-export function payOut(shift:Shift|undefined,at:string){if(!shift)return at;const over=(minutes(at)-minutes(shift.end)+1440)%1440;return over>0&&over<=EARLY_PAY_WINDOW_MINUTES?shift.end:at}
-export const paidEnd=(state:{shifts:Shift[]},a:Attendance)=>payOut(scheduledFor(state,a),a.end);
+// 끝은 다릅니다. 퇴근은 찍힌 시각 그대로 지급합니다 — 예정 퇴근보다 늦게 찍었으면 남아서 일한 시간까지 셉니다.
+export const paidEnd=(_state:{shifts:Shift[]},a:Attendance)=>a.end;
 export const payableHours=(state:{shifts:Shift[]},a:Attendance)=>duration(paidStart(state,a),paidEnd(state,a),a.breakMinutes);
-// 직원 화면에 적는 출퇴근. 급여가 세는 시각과 같습니다 — 예정 근무 안에서 찍었으면 예정 시작·종료로 적고,
-// 지각·조퇴만 찍힌 그대로 적습니다. 실제로 찍힌 시각은 관리자 출근부에만 보입니다.
+// 직원 화면에 적는 출퇴근. 급여가 세는 시각과 같습니다 — 출근은 예정 시작 전에 찍었으면 예정 시작으로 적고
+// 지각만 찍힌 그대로 적습니다. 퇴근은 언제나 찍힌 그대로입니다. 실제로 찍힌 출근 시각은 관리자 출근부에만 보입니다.
 // 아직 퇴근 전인 기록은 겹침으로 근무를 고를 끝이 없어, 그날 예정 출근이 가장 가까운 근무를 봅니다(출퇴근 화면과 같은 규칙).
 export function shownPunch(state:{shifts:Shift[]},p:Punch){
  const unpaid=(p.breaks??[]).reduce((n,b)=>n+(!b.paid&&b.end?Math.round(duration(b.start,b.end)*60):0),0);
