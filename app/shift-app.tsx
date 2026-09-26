@@ -1910,8 +1910,8 @@ export default function ShiftApp() {
                     punches={data.punches ?? []}
                     shifts={data.shifts}
                     today={today}
-                    onPick={(who) =>
-                      setAtt({ actor: actor.id, who, from: payPeriodStart(today) })
+                    onPick={(who, from) =>
+                      setAtt({ actor: actor.id, who, from: from ?? payPeriodStart(today) })
                     }
                   />
                 </>

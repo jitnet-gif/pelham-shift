@@ -1,8 +1,14 @@
 'use client';
+import { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Employee, Punch, Shift } from '@/lib/domain';
 import {
+  HOLIDAY_MULTIPLIER,
+  OFF_TIME_COLOR,
+  OT_PERIOD_HOURS,
   PAY_PERIOD_DAYS,
+  holidayOn,
+  weekdayOf,
   ROLE_GROUP_COLORS,
   addDays,
   groupByRole,
@@ -39,19 +45,303 @@ const tally = (rows: Punch[], shifts: Shift[], today: string) => {
 const waiting = (rows: Punch[]) =>
   rows.filter((p) => p.out && (p.status ?? 'pending') === 'pending').length;
 
-export function PunchRoster({
+type RosterProps = {
+  employees: Employee[];
+  punches: Punch[];
+  shifts: Shift[];
+  today: string;
+  // 표에서 고르면 그 칸의 급여 기간을 함께 넘깁니다. 카드는 언제나 지금 기간입니다.
+  onPick: (employeeId: string, from?: string) => void;
+};
+
+// 관리자가 고른 보기. 이 기기에서만 기억합니다 — 막혀 있어도 기본 보기로 그립니다.
+const VIEW_KEY = 'pelham.punchroster.view';
+const CELL_KEY = 'pelham.punchroster.cell';
+const recall = <T extends string>(key: string, allowed: readonly T[], fallback: T): T => {
+  try {
+    const v = window.localStorage.getItem(key);
+    return allowed.includes(v as T) ? (v as T) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+const keep = (key: string, value: string) => {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {}
+};
+
+// 카드(한 사람씩)와 표(엑셀처럼 2주를 한눈에) 두 보기. 표 안에서는 칸에 출퇴근 시각을 적을지
+// 그날 일한 시간을 적을지 고릅니다. 처음에는 표 · 시각으로 엽니다.
+export function PunchRoster(props: RosterProps) {
+  const { t } = useLang();
+  // 출근 기록은 데이터를 받은 뒤 브라우저에서만 그려져, 저장된 보기를 처음부터 읽어도 됩니다.
+  const [view, setView] = useState(() => recall(VIEW_KEY, ['sheet', 'cards'] as const, 'sheet'));
+  const [cell, setCell] = useState(() => recall(CELL_KEY, ['clock', 'hours'] as const, 'clock'));
+  const pick = <T extends string>(set: (v: T) => void, key: string) => (v: T) => {
+    set(v);
+    keep(key, v);
+  };
+  if (!props.employees.length)
+    return <p className="punchroster-empty">{t('등록된 직원이 없습니다.')}</p>;
+  return (
+    <>
+      <div className="punchroster-tools">
+        <Switch
+          label={t('보기')}
+          value={view}
+          onChange={pick<'sheet' | 'cards'>(setView, VIEW_KEY)}
+          options={[
+            ['sheet', t('sheet::표')],
+            ['cards', t('카드')],
+          ]}
+        />
+        {view === 'sheet' && (
+          <Switch
+            label={t('칸에 적을 것')}
+            value={cell}
+            onChange={pick<'clock' | 'hours'>(setCell, CELL_KEY)}
+            options={[
+              ['clock', t('출퇴근 시각')],
+              ['hours', t('일한 시간')],
+            ]}
+          />
+        )}
+      </div>
+      {view === 'sheet' ? <PunchSheet {...props} cell={cell} /> : <RosterCards {...props} />}
+    </>
+  );
+}
+
+function Switch<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: [T, string][];
+  onChange: (v: T) => void;
+}) {
+  return (
+    <fieldset className="punchroster-switch" aria-label={label}>
+      {options.map(([v, text]) => (
+        <button key={v} aria-pressed={value === v} onClick={() => onChange(v)}>
+          {text}
+        </button>
+      ))}
+    </fieldset>
+  );
+}
+
+const clockShort = (v: string) => {
+  const h = Number(v.slice(0, 2));
+  return `${h % 12 || 12}:${v.slice(3, 5)}${h < 12 ? 'a' : 'p'}`;
+};
+
+// 엑셀 출근부처럼 줄은 직원, 칸은 급여 기간 14일. 칸을 누르면 그 사람 출근부로 넘어가 고칩니다.
+function PunchSheet({
   employees,
   punches,
   shifts,
   today,
   onPick,
+  cell,
+}: RosterProps & { cell: 'clock' | 'hours' }) {
+  const { t, locale, days: weekdayNames } = useLang();
+  const [from, setFrom] = useState(() => payPeriodStart(today));
+  const to = payPeriodEnd(from);
+  const dates = Array.from({ length: PAY_PERIOD_DAYS }, (_, i) => addDays(from, i));
+  const groups = groupByRole(
+    [...employees].sort((a, b) => a.name.localeCompare(b.name, locale)),
+    roleGroup,
+  );
+  const span = (date: string) =>
+    new Intl.DateTimeFormat(locale, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone: 'UTC',
+    }).format(new Date(date + 'T12:00:00Z'));
+  const inPeriod = punches.filter((p) => p.date >= from && p.date <= to);
+  const atNow = from >= payPeriodStart(today);
+
+  return (
+    <div className="punchsheet">
+      <div className="punchperiod-nav">
+        <button
+          className="punchperiod-step"
+          aria-label={t('이전 급여 기간')}
+          onClick={() => setFrom(addDays(from, -PAY_PERIOD_DAYS))}
+        >
+          <ChevronLeft size={18} />
+        </button>
+        <span className="punchperiod-range">
+          <b>
+            {span(from)} – {span(to)}
+          </b>
+          <small>{periodOpen(from, today) ? t('진행 중인 기간') : t('마감된 기간')}</small>
+        </span>
+        <button
+          className="punchperiod-step"
+          aria-label={t('다음 급여 기간')}
+          disabled={atNow}
+          onClick={() => setFrom(addDays(from, PAY_PERIOD_DAYS))}
+        >
+          <ChevronRight size={18} />
+        </button>
+      </div>
+      <div className="punchsheet-scroll">
+        <table className={'punchsheet-table ' + cell}>
+          <thead>
+            <tr>
+              <th className="punchsheet-name">{t('직원')}</th>
+              {dates.map((d) => {
+                const holiday = holidayOn(d);
+                return (
+                  <th
+                    key={d}
+                    className={
+                      (d === today ? 'today ' : '') +
+                      (holiday ? 'holiday ' : '') +
+                      (weekdayOf(d) === 0 || weekdayOf(d) === 6 ? 'weekend' : '')
+                    }
+                    title={holiday}
+                  >
+                    <small>{weekdayNames[weekdayOf(d)]}</small>
+                    <b>{Number(d.slice(8))}</b>
+                    {holiday && <em>×{HOLIDAY_MULTIPLIER}</em>}
+                  </th>
+                );
+              })}
+              <th className="punchsheet-total">{t('합계')}</th>
+            </tr>
+          </thead>
+          {groups.map((g) => (
+            <tbody key={g.group ?? 'other'}>
+              <tr className="punchsheet-group">
+                <th
+                  colSpan={dates.length + 2}
+                  style={{ color: g.group ? ROLE_GROUP_COLORS[g.group] : undefined }}
+                >
+                  <span>
+                    {g.group ?? t('기타')} <small>{g.items.length}</small>
+                  </span>
+                </th>
+              </tr>
+              {g.items.map((e) => {
+                const mine = inPeriod.filter((p) => p.employeeId === e.id);
+                const hours = mine.reduce(
+                  (n, p) => n + (p.out ? shownPunch({ shifts }, p).hours : 0),
+                  0,
+                );
+                // 공휴일에 일한 시간은 초과근무에 세지 않습니다(급여와 같은 규칙).
+                const otBase = mine.reduce(
+                  (n, p) => n + (p.out && !holidayOn(p.date) ? shownPunch({ shifts }, p).hours : 0),
+                  0,
+                );
+                const pending = waiting(mine);
+                return (
+                  <tr key={e.id}>
+                    <th className="punchsheet-name">
+                      <button onClick={() => onPick(e.id, from)}>
+                        <i style={{ background: e.color }} />
+                        <b style={{ color: roleTint(e) }}>{e.name}</b>
+                        {e.archived && <small className="punchroster-gone">{t('퇴사')}</small>}
+                      </button>
+                    </th>
+                    {dates.map((d) => (
+                      <SheetCell
+                        key={d}
+                        rows={mine.filter((p) => p.date === d).sort((a, b) => a.in.localeCompare(b.in))}
+                        shifts={shifts}
+                        today={today}
+                        cell={cell}
+                        className={
+                          (d === today ? 'today ' : '') + (holidayOn(d) ? 'holiday' : '')
+                        }
+                        onOpen={() => onPick(e.id, from)}
+                      />
+                    ))}
+                    <td className="punchsheet-total">
+                      <b style={otBase > OT_PERIOD_HOURS ? { color: OFF_TIME_COLOR } : undefined}>
+                        {hours ? hours.toFixed(2) : '–'}
+                      </b>
+                      {pending > 0 && (
+                        <em className="punchroster-flag">{t('확인 대기 {n}', { n: pending })}</em>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          ))}
+        </table>
+      </div>
+      <p className="punchsheet-legend">
+        <span className="pending">{t('review::확인 대기')}</span>
+        <span className="noout">{t('퇴근 미기록')}</span>
+        <span className="live">{t('근무 중')}</span>
+        <span style={{ color: OFF_TIME_COLOR }}>{t('지각·조퇴')}</span>
+        <span className="holiday">{t('공휴일 ×{m}', { m: HOLIDAY_MULTIPLIER })}</span>
+      </p>
+    </div>
+  );
+}
+
+function SheetCell({
+  rows,
+  shifts,
+  today,
+  cell,
+  className,
+  onOpen,
 }: {
-  employees: Employee[];
-  punches: Punch[];
+  rows: Punch[];
   shifts: Shift[];
   today: string;
-  onPick: (employeeId: string) => void;
+  cell: 'clock' | 'hours';
+  className: string;
+  onOpen: () => void;
 }) {
+  const { t } = useLang();
+  if (!rows.length) return <td className={className} aria-label={t('찍힌 기록 없음')} />;
+  const shown = rows.map((p) => ({ p, s: shownPunch({ shifts }, p) }));
+  // 칸의 바탕은 그날 기록 가운데 가장 손이 가야 하는 상태를 따릅니다.
+  const state = rows.some((p) => missingOut(p, today))
+    ? 'noout'
+    : rows.some((p) => !p.out)
+      ? 'live'
+      : rows.some((p) => (p.status ?? 'pending') === 'pending')
+        ? 'pending'
+        : rows.some((p) => p.status === 'disputed')
+          ? 'disputed'
+          : '';
+  const hours = shown.reduce((n, x) => n + x.s.hours, 0);
+  return (
+    <td className={className + ' ' + state}>
+      <button onClick={onOpen} title={t('출근부 열기')}>
+        {cell === 'hours'
+          ? state === 'noout' && !hours
+            ? '?'
+            : state === 'live' && !hours
+              ? '●'
+              : hours.toFixed(2)
+          : shown.map(({ p, s }) => (
+              <span key={p.id} className="punchsheet-pair">
+                <span style={s.late ? { color: OFF_TIME_COLOR } : undefined}>{clockShort(s.in)}</span>
+                <span style={s.early ? { color: OFF_TIME_COLOR } : undefined}>
+                  {s.out ? clockShort(s.out) : missingOut(p, today) ? '?' : '●'}
+                </span>
+              </span>
+            ))}
+      </button>
+    </td>
+  );
+}
+
+function RosterCards({ employees, punches, shifts, today, onPick }: RosterProps) {
   const { t, locale } = useLang();
   // 직원 드롭다운과 같이 Proshop · Workshop · Hybrid · 기타 로 묶고, 묶음 안은 이름순으로 세웁니다.
   const groups = groupByRole(

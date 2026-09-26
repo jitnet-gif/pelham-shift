@@ -430,6 +430,160 @@
   white-space: nowrap;
 }
 
+/* 출근 기록 보기 고르기: 표·카드, 그리고 표 칸에 시각·시간. */
+.punchroster-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin: 2px 0 10px;
+}
+.punchroster-switch {
+  min-width: 0;
+  margin: 0;
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #f4f6f5;
+}
+.punchroster-switch button {
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #5d6a65;
+  font-size: 13px;
+  cursor: pointer;
+}
+.punchroster-switch button[aria-pressed='true'] {
+  background: #fff;
+  color: #1f2b2e;
+  font-weight: 650;
+  box-shadow: 0 1px 2px rgb(0 0 0 / .08);
+}
+
+/* 엑셀처럼 펼친 출근 기록. 이름 칸은 옆으로 밀어도 제자리에 붙어 있습니다. */
+.punchsheet { display: flex; flex-direction: column; gap: 10px; }
+.punchsheet-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}
+.punchsheet-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.punchsheet-table th,
+.punchsheet-table td {
+  border-right: 1px solid #eef1f0;
+  border-bottom: 1px solid #eef1f0;
+  padding: 0;
+  text-align: center;
+  vertical-align: middle;
+}
+.punchsheet-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 6px 2px;
+  background: #f7f9f8;
+  color: #5d6a65;
+  font-weight: 500;
+}
+.punchsheet-table thead th small { display: block; font-size: 10px; color: #8b9691; }
+.punchsheet-table thead th b { font-size: 13px; color: #1f2b2e; }
+.punchsheet-table thead th em { display: block; font-size: 10px; font-style: normal; color: #b0321f; }
+.punchsheet-table thead th.weekend { background: #f0f3f2; }
+.punchsheet-table thead th.holiday { background: #fdecea; }
+.punchsheet-table thead th.today b { color: #1f63b5; }
+.punchsheet-table td.today { box-shadow: inset 2px 0 0 #cfe0f3, inset -2px 0 0 #cfe0f3; }
+.punchsheet-table td.holiday { background: #fff8f7; }
+.punchsheet-name {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  min-width: 170px;
+  background: #fff;
+  text-align: left !important;
+}
+.punchsheet-table thead .punchsheet-name { z-index: 3; padding-left: 12px; background: #f7f9f8; }
+.punchsheet-name button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.punchsheet-name button:hover { background: #fafcfb; }
+.punchsheet-name i { flex: none; width: 9px; height: 9px; border-radius: 2px; }
+.punchsheet-name b { font-size: 13px; font-weight: 650; white-space: nowrap; }
+.punchsheet-group th {
+  position: sticky;
+  left: 0;
+  padding: 10px 12px 4px !important;
+  background: #fff;
+  text-align: left !important;
+  font-size: 12px;
+  font-weight: 700;
+}
+.punchsheet-group th span { position: sticky; left: 12px; }
+.punchsheet-group th small { margin-left: 4px; font-weight: 500; color: #8b9691; }
+.punchsheet-table td { min-width: 58px; height: 40px; }
+.punchsheet-table td > button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+  min-height: 40px;
+  padding: 4px 2px;
+  border: 0;
+  background: transparent;
+  color: #1f2b2e;
+  font: inherit;
+  cursor: pointer;
+}
+.punchsheet-table td > button:hover { outline: 2px solid #b7c6c0; outline-offset: -2px; }
+.punchsheet-pair { display: flex; flex-direction: column; line-height: 1.25; }
+.punchsheet-pair + .punchsheet-pair { padding-top: 3px; border-top: 1px dashed #dde3e1; }
+.punchsheet-table td.pending { background: #fffbea; }
+.punchsheet-table td.noout { background: #fdf1e3; }
+.punchsheet-table td.noout > button { color: #9a5b18; }
+.punchsheet-table td.live { background: #e6f3ec; }
+.punchsheet-table td.live > button { color: #1f6b47; }
+.punchsheet-table td.disputed { background: #fdecea; }
+.punchsheet-table.hours td > button { font-size: 13px; }
+.punchsheet-total {
+  min-width: 84px;
+  padding: 4px 8px !important;
+  background: #f7f9f8;
+  border-right: 0 !important;
+}
+.punchsheet-total b { display: block; font-size: 13px; }
+.punchsheet-total .punchroster-flag { display: inline-block; margin-top: 3px; font-size: 10px; }
+.punchsheet-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin: 0;
+  font-size: 11px;
+  color: #69767a;
+}
+.punchsheet-legend span { padding: 2px 7px; border-radius: 4px; }
+.punchsheet-legend .pending { background: #fffbea; }
+.punchsheet-legend .noout { background: #fdf1e3; color: #9a5b18; }
+.punchsheet-legend .live { background: #e6f3ec; color: #1f6b47; }
+.punchsheet-legend .holiday { background: #fdecea; color: #b0321f; }
+
 /* 관리자 출근부의 '찍힌 출퇴근' 머리말. 오른쪽에 출퇴근 추가 단추가 섭니다. */
 .punchlog-headrow {
   display: flex;
