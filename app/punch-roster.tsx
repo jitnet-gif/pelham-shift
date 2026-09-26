@@ -1,7 +1,8 @@
 'use client';
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import type { Employee, Punch, Shift } from '@/lib/domain';
+import type { Employee, Punch, Shift, State } from '@/lib/domain';
+import { PunchTimesheet } from './punch-timesheet';
 import {
   HOLIDAY_MULTIPLIER,
   OFF_TIME_COLOR,
@@ -46,6 +47,8 @@ const waiting = (rows: Punch[]) =>
   rows.filter((p) => p.out && (p.status ?? 'pending') === 'pending').length;
 
 type RosterProps = {
+  // 출근부 보기는 급여와 같은 계산(payroll)을 써서 시급·근무 기록 전부가 필요합니다.
+  state: State;
   employees: Employee[];
   punches: Punch[];
   shifts: Shift[];
@@ -71,12 +74,16 @@ const keep = (key: string, value: string) => {
   } catch {}
 };
 
-// 카드(한 사람씩)와 표(엑셀처럼 2주를 한눈에) 두 보기. 표 안에서는 칸에 출퇴근 시각을 적을지
-// 그날 일한 시간을 적을지 고릅니다. 처음에는 표 · 시각으로 엽니다.
+// 세 보기. 출근부(급여 명세처럼 사람마다 주별 근무 줄과 합계), 표(엑셀처럼 2주를 한눈에), 카드(한 사람씩).
+// 표 안에서는 칸에 출퇴근 시각을 적을지 그날 일한 시간을 적을지 고릅니다. 처음에는 출근부로 엽니다.
+// 출근부와 표는 같은 급여 기간을 보고, 보기를 바꿔도 보던 기간에 머뭅니다.
 export function PunchRoster(props: RosterProps) {
   const { t } = useLang();
   // 출근 기록은 데이터를 받은 뒤 브라우저에서만 그려져, 저장된 보기를 처음부터 읽어도 됩니다.
-  const [view, setView] = useState(() => recall(VIEW_KEY, ['sheet', 'cards'] as const, 'sheet'));
+  const [view, setView] = useState(() =>
+    recall(VIEW_KEY, ['ledger', 'sheet', 'cards'] as const, 'ledger'),
+  );
+  const [from, setFrom] = useState(() => payPeriodStart(props.today));
   const [cell, setCell] = useState(() => recall(CELL_KEY, ['clock', 'hours'] as const, 'clock'));
   const pick = <T extends string>(set: (v: T) => void, key: string) => (v: T) => {
     set(v);
@@ -90,8 +97,9 @@ export function PunchRoster(props: RosterProps) {
         <Switch
           label={t('보기')}
           value={view}
-          onChange={pick<'sheet' | 'cards'>(setView, VIEW_KEY)}
+          onChange={pick<'ledger' | 'sheet' | 'cards'>(setView, VIEW_KEY)}
           options={[
+            ['ledger', t('ledger::출근부')],
             ['sheet', t('sheet::표')],
             ['cards', t('카드')],
           ]}
@@ -108,7 +116,20 @@ export function PunchRoster(props: RosterProps) {
           />
         )}
       </div>
-      {view === 'sheet' ? <PunchSheet {...props} cell={cell} /> : <RosterCards {...props} />}
+      {view !== 'cards' && <PeriodNav from={from} today={props.today} onPeriod={setFrom} />}
+      {view === 'ledger' ? (
+        <PunchTimesheet
+          state={props.state}
+          employees={props.employees}
+          from={from}
+          today={props.today}
+          onPick={props.onPick}
+        />
+      ) : view === 'sheet' ? (
+        <PunchSheet {...props} cell={cell} from={from} />
+      ) : (
+        <RosterCards {...props} />
+      )}
     </>
   );
 }
@@ -135,6 +156,51 @@ function Switch<T extends string>({
   );
 }
 
+// 출근부·표가 함께 쓰는 급여 기간 머리말. 아직 오지 않은 기간은 볼 것이 없어 막아 둡니다.
+function PeriodNav({
+  from,
+  today,
+  onPeriod,
+}: {
+  from: string;
+  today: string;
+  onPeriod: (from: string) => void;
+}) {
+  const { t, locale } = useLang();
+  const span = (date: string) =>
+    new Intl.DateTimeFormat(locale, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone: 'UTC',
+    }).format(new Date(date + 'T12:00:00Z'));
+  return (
+    <div className="punchperiod-nav punchsheet-period">
+      <button
+        className="punchperiod-step"
+        aria-label={t('이전 급여 기간')}
+        onClick={() => onPeriod(addDays(from, -PAY_PERIOD_DAYS))}
+      >
+        <ChevronLeft size={18} />
+      </button>
+      <span className="punchperiod-range">
+        <b>
+          {span(from)} – {span(payPeriodEnd(from))}
+        </b>
+        <small>{periodOpen(from, today) ? t('진행 중인 기간') : t('마감된 기간')}</small>
+      </span>
+      <button
+        className="punchperiod-step"
+        aria-label={t('다음 급여 기간')}
+        disabled={from >= payPeriodStart(today)}
+        onClick={() => onPeriod(addDays(from, PAY_PERIOD_DAYS))}
+      >
+        <ChevronRight size={18} />
+      </button>
+    </div>
+  );
+}
+
 const clockShort = (v: string) => {
   const h = Number(v.slice(0, 2));
   return `${h % 12 || 12}:${v.slice(3, 5)}${h < 12 ? 'a' : 'p'}`;
@@ -148,50 +214,19 @@ function PunchSheet({
   today,
   onPick,
   cell,
-}: RosterProps & { cell: 'clock' | 'hours' }) {
+  from,
+}: RosterProps & { cell: 'clock' | 'hours'; from: string }) {
   const { t, locale, days: weekdayNames } = useLang();
-  const [from, setFrom] = useState(() => payPeriodStart(today));
   const to = payPeriodEnd(from);
   const dates = Array.from({ length: PAY_PERIOD_DAYS }, (_, i) => addDays(from, i));
   const groups = groupByRole(
     [...employees].sort((a, b) => a.name.localeCompare(b.name, locale)),
     roleGroup,
   );
-  const span = (date: string) =>
-    new Intl.DateTimeFormat(locale, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      timeZone: 'UTC',
-    }).format(new Date(date + 'T12:00:00Z'));
   const inPeriod = punches.filter((p) => p.date >= from && p.date <= to);
-  const atNow = from >= payPeriodStart(today);
 
   return (
     <div className="punchsheet">
-      <div className="punchperiod-nav">
-        <button
-          className="punchperiod-step"
-          aria-label={t('이전 급여 기간')}
-          onClick={() => setFrom(addDays(from, -PAY_PERIOD_DAYS))}
-        >
-          <ChevronLeft size={18} />
-        </button>
-        <span className="punchperiod-range">
-          <b>
-            {span(from)} – {span(to)}
-          </b>
-          <small>{periodOpen(from, today) ? t('진행 중인 기간') : t('마감된 기간')}</small>
-        </span>
-        <button
-          className="punchperiod-step"
-          aria-label={t('다음 급여 기간')}
-          disabled={atNow}
-          onClick={() => setFrom(addDays(from, PAY_PERIOD_DAYS))}
-        >
-          <ChevronRight size={18} />
-        </button>
-      </div>
       <div className="punchsheet-scroll">
         <table className={'punchsheet-table ' + cell}>
           <thead>

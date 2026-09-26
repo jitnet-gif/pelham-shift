@@ -584,6 +584,69 @@
 .punchsheet-legend .live { background: #e6f3ec; color: #1f6b47; }
 .punchsheet-legend .holiday { background: #fdecea; color: #b0321f; }
 
+.punchsheet-period { margin-bottom: 10px; }
+
+/* 급여 명세 엑셀처럼 적은 출근부. 사람마다 검은 머리줄, 주 합계는 옅은 회색, 사람 합계는 짙은 회색. */
+.timesheet-tools { display: flex; justify-content: flex-end; margin-bottom: 6px; }
+.timesheet-group { margin: 16px 0 6px; font-size: 13px; font-weight: 700; }
+.timesheet-group small { margin-left: 4px; font-weight: 500; color: #8b9691; }
+.timesheet-scroll {
+  overflow-x: auto;
+  margin-bottom: 14px;
+  border: 1px solid #d9dfdd;
+  background: #fff;
+}
+.timesheet-table {
+  width: 100%;
+  min-width: 1280px;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: #1f2b2e;
+}
+.timesheet-table th,
+.timesheet-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid #eef1f0;
+  text-align: left;
+  white-space: nowrap;
+}
+.timesheet-table .n { text-align: right; }
+.timesheet-who th { padding: 0; background: #fff; }
+.timesheet-who button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  background: transparent;
+  color: #1f2b2e;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.timesheet-who button:hover { background: #fafcfb; }
+.timesheet-who i { width: 9px; height: 9px; border-radius: 2px; }
+.timesheet-head th {
+  background: #111;
+  color: #fff;
+  font-weight: 600;
+  font-size: 11px;
+}
+.timesheet-week td { padding-top: 9px; font-weight: 700; background: #fff; }
+.timesheet-none { color: #69767a; }
+.timesheet-line { cursor: pointer; }
+.timesheet-line:hover td { background: #f4f7f6; }
+.timesheet-line.pending td { background: #fffbea; }
+.timesheet-line.open td { background: #fdf1e3; color: #9a5b18; }
+.timesheet-line.holiday td:first-child { color: #b0321f; font-weight: 600; }
+.timesheet-flags { color: #b0321f; }
+.timesheet-table .timesheet-label { text-align: right; }
+.timesheet-weekly td { background: #eceeed; font-weight: 600; }
+.timesheet-grand td { background: #c9cccb; font-weight: 700; }
+
 /* 관리자 출근부의 '찍힌 출퇴근' 머리말. 오른쪽에 출퇴근 추가 단추가 섭니다. */
 .punchlog-headrow {
   display: flex;

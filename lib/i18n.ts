@@ -309,7 +309,8 @@ const en: Record<string, string> = {
   '확인 대기 {n}': '{n} awaiting review',
   '아직 끝난 근무가 없습니다': 'No finished shifts yet',
   // 출근 기록을 엑셀처럼 펼친 표 보기. 칸에는 출퇴근 시각이나 일한 시간을 적습니다.
-  'sheet::표': 'Sheet',
+  'ledger::출근부': 'Timesheet',
+  'sheet::표': 'Grid',
   카드: 'Cards',
   '칸에 적을 것': 'Cell shows',
   '출퇴근 시각': 'Clock times',

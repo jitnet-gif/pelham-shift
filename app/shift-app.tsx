@@ -1906,6 +1906,7 @@ export default function ShiftApp() {
                 <>
                   <h3 className="punchlog-head">{t('직원별 출근 기록')}</h3>
                   <PunchRoster
+                    state={data}
                     employees={attRoster}
                     punches={data.punches ?? []}
                     shifts={data.shifts}
