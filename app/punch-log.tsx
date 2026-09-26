@@ -4,8 +4,8 @@
 // oxlint-disable next/no-img-element
 import { useEffect, useState } from 'react';
 import { Camera, Coffee, MapPin, Pencil, Trash2, X } from 'lucide-react';
-import type { Employee, Punch, PunchSpot } from '@/lib/domain';
-import { duration, localDate, missingOut } from '@/lib/domain';
+import type { Employee, Punch, PunchSpot, Shift } from '@/lib/domain';
+import { duration, localDate, missingOut, shownPunch } from '@/lib/domain';
 import { useLang } from './use-lang';
 import { prunePunchPhotos, readPunchPhoto } from './punch-photo-store';
 
@@ -21,12 +21,17 @@ const clock = (v: string) => {
 export default function PunchLog({
   punches,
   employees,
+  shifts,
+  actual,
   isAdmin,
   onEdit,
   onRemove,
 }: {
   punches: Punch[];
   employees: Employee[];
+  shifts: Shift[];
+  // 관리자는 실제로 찍힌 시각을 봅니다. 직원은 급여가 세는 시각(예정 근무 기준, 지각·조퇴만 찍힌 그대로)을 봅니다.
+  actual: boolean;
   isAdmin: boolean;
   // 관리자가 한 사람의 출근부를 볼 때만 넘어옵니다. 급여 시간은 여기, 원본 기록에서 고칩니다.
   onEdit?: (p: Punch) => void;
@@ -77,7 +82,7 @@ export default function PunchLog({
       (n, b) => n + (b.end ? Math.round(duration(b.start, b.end) * 60) : 0),
       0,
     );
-  // 근무시간에서 빠지는 건 무급 휴게뿐입니다. 유급 휴게는 일한 시간으로 칩니다 — 급여도 같은 규칙입니다.
+  // 휴게 표시에서 무급만 따로 적는 데 씁니다. 근무시간은 급여와 같은 shownPunch 로 셉니다.
   const unpaidMinutes = (p: Punch) =>
     (p.breaks ?? []).reduce(
       (n, b) => n + (!b.paid && b.end ? Math.round(duration(b.start, b.end) * 60) : 0),
@@ -100,7 +105,12 @@ export default function PunchLog({
       {list.map((p) => {
         const who = of(p.employeeId);
         const rest = restMinutes(p);
-        const worked = p.out ? Math.max(0, duration(p.in, p.out) - unpaidMinutes(p) / 60) : 0;
+        // 시간은 누가 보든 급여가 세는 시간입니다. 관리자에게는 찍힌 시각과 다를 때 급여가 센 구간을 함께 적습니다.
+        const paid = shownPunch({ shifts }, p);
+        const worked = paid.hours;
+        const inAt = actual ? p.in : paid.in;
+        const outAt = actual ? p.out : (paid.out ?? p.out);
+        const clipped = actual && !!p.out && (paid.in !== p.in || paid.out !== p.out);
         return (
           <article className="punchlog-row" key={p.id}>
             <div className="punchlog-when">
@@ -141,18 +151,23 @@ export default function PunchLog({
             <div className="punchlog-times">
               <span className="punchlog-stamp">
                 <small>{t('출근')}</small>
-                <b>{clock(p.in)}</b>
+                <b>{clock(inAt)}</b>
               </span>
               <em>→</em>
               <span className="punchlog-stamp">
                 <small>{t('퇴근')}</small>
                 <b className={missingOut(p, today) ? 'punchlog-noout' : undefined}>
-                  {p.out ? clock(p.out) : missingOut(p, today) ? t('퇴근 미기록') : t('근무 중')}
+                  {outAt ? clock(outAt) : missingOut(p, today) ? t('퇴근 미기록') : t('근무 중')}
                 </b>
               </span>
               {p.out && (
                 <span className="punchlog-worked">
                   {t('{h}시간', { h: worked.toFixed(2) })}
+                  {clipped && (
+                    <small className="punchlog-paid">
+                      {t('급여 {a} – {b}', { a: clock(paid.in), b: clock(paid.out ?? '') })}
+                    </small>
+                  )}
                 </span>
               )}
             </div>

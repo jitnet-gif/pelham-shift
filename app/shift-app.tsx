@@ -82,6 +82,7 @@ import {
   payroll,
   paidRecords,
   payableHours,
+  shownPunch,
   earlyBy,
   lateBy,
   scheduledFor,
@@ -1869,8 +1870,8 @@ export default function ShiftApp() {
                     <span>
                       {myPunch
                         ? myPunch.out
-                          ? myPunch.in + ' → ' + myPunch.out
-                          : myPunch.in + t(' 출근')
+                          ? shownPunch(data, myPunch).in + ' → ' + shownPunch(data, myPunch).out
+                          : shownPunch(data, myPunch).in + t(' 출근')
                         : t('일을 시작할 때 눌러주세요. 찍히는 시각은 매장 서버 시각입니다.')}
                     </span>
                   </div>
@@ -1933,6 +1934,8 @@ export default function ShiftApp() {
                   <PunchLog
                     punches={attPunches}
                     employees={data.employees}
+                    shifts={data.shifts}
+                    actual={actor.admin}
                     isAdmin={actor.admin && !attWho}
                     onEdit={
                       actor.admin && attWho
@@ -4924,6 +4927,7 @@ export default function ShiftApp() {
               <StaffTimesheets
                 me={actor.id}
                 punches={data.punches ?? []}
+                shifts={data.shifts}
                 employee={emp(actor.id)}
                 location={LOCATION}
                 today={today}

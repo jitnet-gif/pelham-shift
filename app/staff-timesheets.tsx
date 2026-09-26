@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useBackClose } from './use-back';
 import { ChevronDown, ChevronRight, Info } from 'lucide-react';
-import type { Employee, Punch } from '@/lib/domain';
+import type { Employee, Punch, Shift } from '@/lib/domain';
 import {
   PAY_PERIOD_DAYS,
   addDays,
@@ -10,7 +10,7 @@ import {
   payPeriodStart,
   missingOut,
   periodOpen,
-  punchHours,
+  shownPunch,
 } from '@/lib/domain';
 import { useLang } from './use-lang';
 
@@ -26,6 +26,7 @@ const PERIODS = 12;
 export default function StaffTimesheets({
   me,
   punches,
+  shifts,
   employee,
   location,
   today,
@@ -37,6 +38,8 @@ export default function StaffTimesheets({
 }: {
   me: string;
   punches: Punch[];
+  // 출퇴근 시각을 예정 근무에 맞춰 적는 기준입니다(shownPunch).
+  shifts: Shift[];
   employee?: Employee;
   location: string;
   today: string;
@@ -116,7 +119,8 @@ export default function StaffTimesheets({
   const to = addDays(from, PAY_PERIOD_DAYS - 1);
   const rows = inPeriod(from);
   const live = periodOpen(from, today);
-  const hours = rows.reduce((sum, p) => sum + punchHours(p), 0);
+  // 급여가 세는 시간과 같은 눈금입니다. 예정 시작 전·예정 종료 뒤에 찍힌 시간은 빠집니다.
+  const hours = rows.reduce((sum, p) => sum + shownPunch({ shifts }, p).hours, 0);
   const counts = {
     approved: rows.filter((p) => p.status === 'approved').length,
     disputed: rows.filter((p) => p.status === 'disputed').length,
@@ -202,8 +206,8 @@ export default function StaffTimesheets({
             {shown && (
               <div className="stsheet-detail">
                 <b>
-                  {clock(p.in)}
-                  {p.out ? ` - ${clock(p.out)}` : ''}
+                  {clock(shownPunch({ shifts }, p).in)}
+                  {p.out ? ` - ${clock(shownPunch({ shifts }, p).out ?? p.out)}` : ''}
                   {missingOut(p, today) && ` - ${t('퇴근 미기록')}`}
                 </b>
                 <small>

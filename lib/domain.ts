@@ -170,7 +170,7 @@ export function overtimeAdded(before:Shift[],after:Shift[]){
 // 지각 유예 없음: 예정 출근 시각을 1분이라도 넘기면 지각입니다.
 export const LATE_GRACE_MINUTES=0;
 // 출근기록의 기준이 되는 예정 근무. 같은 날 겹치는 근무 중 예정 출근 시각이 가장 가까운 것을 봅니다.
-export function scheduledFor(state:State,a:Attendance){const worked={...a,area:''};return state.shifts.filter(x=>x.employeeId===a.employeeId&&x.date===a.date&&overlap(x,worked)).sort((x,y)=>Math.abs(minutes(x.start)-minutes(a.start))-Math.abs(minutes(y.start)-minutes(a.start)))[0]}
+export function scheduledFor(state:{shifts:Shift[]},a:Attendance){const worked={...a,area:''};return state.shifts.filter(x=>x.employeeId===a.employeeId&&x.date===a.date&&overlap(x,worked)).sort((x,y)=>Math.abs(minutes(x.start)-minutes(a.start))-Math.abs(minutes(y.start)-minutes(a.start)))[0]}
 // 지각 분. 예정 근무가 없으면 기준이 없으므로 null 을 돌려 '정시(0분)'와 구분합니다.
 export function lateBy(state:State,a:Attendance){const shift=scheduledFor(state,a);return shift?Math.max(0,minutes(a.start)-minutes(shift.start)-LATE_GRACE_MINUTES):null}
 // 조퇴 유예 없음: 예정 퇴근 시각보다 1분이라도 일찍 찍으면 조퇴입니다.
@@ -216,12 +216,23 @@ export function punchReviewCounts(state:State,employeeId:string,from:string,to:s
 // 예정 시작보다 12시간 넘게 앞선 출근은 일찍 온 것이 아니라 자정을 넘긴 근무에 늦게 온 것이라 그대로 둡니다
 // (22:00 근무에 00:30 출근). 예정 근무가 없는 날의 기록은 기준이 없어 찍힌 그대로 셉니다.
 export const EARLY_PAY_WINDOW_MINUTES=720;
-export function paidStart(state:State,a:Attendance){const shift=scheduledFor(state,a);if(!shift)return a.start;const ahead=minutes(shift.start)-minutes(a.start);return ahead>0&&ahead<=EARLY_PAY_WINDOW_MINUTES?shift.start:a.start}
+export function payIn(shift:Shift|undefined,at:string){if(!shift)return at;const ahead=minutes(shift.start)-minutes(at);return ahead>0&&ahead<=EARLY_PAY_WINDOW_MINUTES?shift.start:at}
+export const paidStart=(state:{shifts:Shift[]},a:Attendance)=>payIn(scheduledFor(state,a),a.start);
 // 끝도 같습니다. 예정 퇴근보다 늦게 찍어도 예정 퇴근 시각까지만 지급합니다 — 남아서 일한 시간은 급여에 넣지 않습니다.
 // 시계 글자로 견주되 하루를 돌려 봅니다. 자정을 넘기는 근무(22:00-02:00)에 02:20 퇴근도, 퇴근을 늦게 찍어 새벽이 된 기록도
 // 예정 퇴근 뒤 12시간 안이면 넘긴 것으로 보고 자릅니다. 예정 근무가 없는 날의 기록은 찍힌 그대로 셉니다.
-export function paidEnd(state:State,a:Attendance){const shift=scheduledFor(state,a);if(!shift)return a.end;const over=(minutes(a.end)-minutes(shift.end)+1440)%1440;return over>0&&over<=EARLY_PAY_WINDOW_MINUTES?shift.end:a.end}
-export const payableHours=(state:State,a:Attendance)=>duration(paidStart(state,a),paidEnd(state,a),a.breakMinutes);
+export function payOut(shift:Shift|undefined,at:string){if(!shift)return at;const over=(minutes(at)-minutes(shift.end)+1440)%1440;return over>0&&over<=EARLY_PAY_WINDOW_MINUTES?shift.end:at}
+export const paidEnd=(state:{shifts:Shift[]},a:Attendance)=>payOut(scheduledFor(state,a),a.end);
+export const payableHours=(state:{shifts:Shift[]},a:Attendance)=>duration(paidStart(state,a),paidEnd(state,a),a.breakMinutes);
+// 직원 화면에 적는 출퇴근. 급여가 세는 시각과 같습니다 — 예정 근무 안에서 찍었으면 예정 시작·종료로 적고,
+// 지각·조퇴만 찍힌 그대로 적습니다. 실제로 찍힌 시각은 관리자 출근부에만 보입니다.
+// 아직 퇴근 전인 기록은 겹침으로 근무를 고를 끝이 없어, 그날 예정 출근이 가장 가까운 근무를 봅니다(출퇴근 화면과 같은 규칙).
+export function shownPunch(state:{shifts:Shift[]},p:Punch){
+ const unpaid=(p.breaks??[]).reduce((n,b)=>n+(!b.paid&&b.end?Math.round(duration(b.start,b.end)*60):0),0);
+ if(p.out){const a={id:p.id,employeeId:p.employeeId,date:p.date,start:p.in,end:p.out,breakMinutes:unpaid};
+  return {in:paidStart(state,a),out:paidEnd(state,a) as string|undefined,hours:payableHours(state,a)}}
+ const shift=state.shifts.filter(x=>x.employeeId===p.employeeId&&x.date===p.date).sort((x,y)=>Math.abs(minutes(x.start)-minutes(p.in))-Math.abs(minutes(y.start)-minutes(p.in)))[0];
+ return {in:payIn(shift,p.in),out:undefined as string|undefined,hours:0}}
 export function payroll(state:State,employeeId:string,from:string,to:string){const e=state.employees.find(e=>e.id===employeeId)!;const records=paidRecords(state).filter(a=>a.employeeId===employeeId&&a.date>=from&&a.date<=to);const worked=(a:Attendance)=>payableHours(state,a);const hours=records.reduce((s,a)=>s+worked(a),0);
  // 날짜별로 합친 뒤 주(일요일 시작)별로 묶어 가산 시간을 구합니다.
  const byDay=new Map<string,number>();for(const a of records)byDay.set(a.date,(byDay.get(a.date)??0)+worked(a));const byWeek=new Map<string,number[]>();for(const [day,h] of byDay){const w=weekStart(day);byWeek.set(w,[...(byWeek.get(w)??[]),h])}
