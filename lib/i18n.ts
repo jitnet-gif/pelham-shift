@@ -322,6 +322,10 @@ const en: Record<string, string> = {
   '찍힌 출퇴근': 'Check-ins',
   '출퇴근 추가': 'Add check-in',
   '출퇴근 수정': 'Edit check-in',
+  '출퇴근 삭제': 'Delete check-in',
+  '이 출퇴근 기록을 지울까요? 급여에서 빠지고 직원 화면에서도 사라집니다.':
+    'Delete this check-in? It comes out of pay and disappears from the staff screen too.',
+  '출근 기록에서 고치기': 'Fix in check-in records',
   '시급 수정': 'Edit hourly rate',
   '퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다. 고친 기록은 직원이 다시 확인하도록 확인 대기로 돌아갑니다.':
     'If check-out is earlier than check-in, it counts as the next day. The edited record goes back to pending so the employee confirms it again.',

@@ -3,7 +3,7 @@
 // 이 사진은 사람 얼굴이라 no-store 로 내보내고 있습니다. 캐시하면 그 뜻이 사라집니다.
 // oxlint-disable next/no-img-element
 import { useEffect, useState } from 'react';
-import { Camera, Coffee, MapPin, X } from 'lucide-react';
+import { Camera, Coffee, MapPin, Pencil, Trash2, X } from 'lucide-react';
 import type { Employee, Punch, PunchSpot } from '@/lib/domain';
 import { duration, localDate, missingOut } from '@/lib/domain';
 import { useLang } from './use-lang';
@@ -22,10 +22,15 @@ export default function PunchLog({
   punches,
   employees,
   isAdmin,
+  onEdit,
+  onRemove,
 }: {
   punches: Punch[];
   employees: Employee[];
   isAdmin: boolean;
+  // 관리자가 한 사람의 출근부를 볼 때만 넘어옵니다. 급여 시간은 여기, 원본 기록에서 고칩니다.
+  onEdit?: (p: Punch) => void;
+  onRemove?: (p: Punch) => void;
 }) {
   const { t, locale } = useLang();
   // 사진은 서버에 없습니다. 찍은 기기 안에만 있어, 그 기기에서 볼 때만 뜹니다.
@@ -104,6 +109,31 @@ export default function PunchLog({
                 <span className="punchlog-who">
                   <i style={{ background: who?.color }} />
                   {who?.name ?? p.employeeId}
+                </span>
+              )}
+              {(onEdit || onRemove) && (
+                <span className="punchlog-tools">
+                  {/* 퇴근 전 기록은 끝 시각이 없어 고칠 수 없습니다(서버 규칙과 같음). 잘못 찍은 출근은 지울 수 있습니다. */}
+                  {onEdit && p.out && (
+                    <button
+                      className="iconbutton"
+                      aria-label={t('출퇴근 수정')}
+                      title={t('출퇴근 수정')}
+                      onClick={() => onEdit(p)}
+                    >
+                      <Pencil size={15} />
+                    </button>
+                  )}
+                  {onRemove && (
+                    <button
+                      className="iconbutton"
+                      aria-label={t('출퇴근 삭제')}
+                      title={t('출퇴근 삭제')}
+                      onClick={() => onRemove(p)}
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  )}
                 </span>
               )}
             </div>

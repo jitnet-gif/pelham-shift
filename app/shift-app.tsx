@@ -1929,10 +1929,33 @@ export default function ShiftApp() {
                     )}
                   </div>
                   {/* 한 사람 출근부를 보는 중이면 카드마다 같은 이름을 붙일 까닭이 없습니다. */}
+                  {/* 급여 시간은 여기서 고칩니다. 급여 상세는 결과를 보는 곳이라 이 화면으로 넘어옵니다. */}
                   <PunchLog
                     punches={attPunches}
                     employees={data.employees}
                     isAdmin={actor.admin && !attWho}
+                    onEdit={
+                      actor.admin && attWho
+                        ? (p) =>
+                            open('punchEdit', {
+                              id: p.id,
+                              employeeId: p.employeeId,
+                              date: p.date,
+                              in: p.in,
+                              out: p.out ?? '',
+                              punched: '1',
+                            })
+                        : undefined
+                    }
+                    onRemove={
+                      actor.admin && attWho
+                        ? (p) => {
+                            // 연달아 눌러 생긴 0분 기록처럼 고칠 수 없는 중복을 치웁니다. 데이터에는 지운 표시만 남습니다.
+                            if (confirm(t('이 출퇴근 기록을 지울까요? 급여에서 빠지고 직원 화면에서도 사라집니다.')))
+                              void command('punchRemove', { id: p.id });
+                          }
+                        : undefined
+                    }
                   />
                   <h3 className="punchlog-head">{t('출근기계에서 가져온 기록')}</h3>
                   <Table>
@@ -1949,6 +1972,7 @@ export default function ShiftApp() {
                           '실근무',
                           '지각',
                           '조퇴',
+                          ...(actor.admin && attWho ? [''] : []),
                         ].map((h) => (
                           <TableHead key={h}>{t(h)}</TableHead>
                         ))}
@@ -1991,6 +2015,28 @@ export default function ShiftApp() {
                                     ? t('{n}분 조퇴', { n: early })
                                     : t('정시')}
                               </TableCell>
+                              {actor.admin && attWho && (
+                                <TableCell>
+                                  <button
+                                    className="iconbutton"
+                                    aria-label={t('출퇴근 수정')}
+                                    title={t('출퇴근 수정')}
+                                    onClick={() =>
+                                      open('punchEdit', {
+                                        id: a.id,
+                                        employeeId: a.employeeId,
+                                        date: a.date,
+                                        in: a.start,
+                                        out: a.end,
+                                        breakMinutes: String(a.breakMinutes),
+                                        punched: '',
+                                      })
+                                    }
+                                  >
+                                    <Pencil size={15} />
+                                  </button>
+                                </TableCell>
+                              )}
                             </TableRow>
                           );
                       })}
@@ -2742,8 +2788,8 @@ export default function ShiftApp() {
             <DialogDescription>
               {from} ~ {to} · {t('저장된 출근기록 기준입니다. 예정 시간이 아니라 실제로 찍힌 기록으로 계산합니다.')}
             </DialogDescription>
-            {/* 급여에서 바로 고칩니다. 시급은 직원 설정에서, 출퇴근 시각은 줄마다 연필 단추로 엽니다.
-                두 창이 겹쳐 뜨지 않게 상세를 닫고 열며, 출퇴근을 저장하면 이 상세로 돌아옵니다. */}
+            {/* 급여 상세는 결과를 보는 곳입니다. 시급은 직원 설정에서 고치고, 출퇴근 시각은 줄마다 단추를 눌러
+                그 직원의 출근 기록(원본)으로 넘어가 고칩니다 — 추가·수정·삭제가 한 화면에 모입니다. */}
             {actor.admin && emp(payDetail) && (
               <div className="paydetail-actions">
                 <button
@@ -2812,22 +2858,15 @@ export default function ShiftApp() {
                             <TableCell>
                               <button
                                 className="iconbutton"
-                                aria-label={t('출퇴근 수정')}
-                                title={t('출퇴근 수정')}
+                                aria-label={t('출근 기록에서 고치기')}
+                                title={t('출근 기록에서 고치기')}
                                 onClick={() => {
                                   setPayDetail('');
-                                  open('punchEdit', {
-                                    id: a.id,
-                                    employeeId: a.employeeId,
-                                    date: a.date,
-                                    in: a.start,
-                                    out: a.end,
-                                    breakMinutes: String(a.breakMinutes),
-                                    punched: data.punches?.some((p) => p.id === a.id) ? '1' : '',
-                                  });
+                                  setTab('attendance');
+                                  setAtt({ actor: actor.id, who: a.employeeId, from: payPeriodStart(a.date) });
                                 }}
                               >
-                                <Pencil size={15} />
+                                <ArrowRight size={15} />
                               </button>
                             </TableCell>
                           )}
@@ -3000,8 +3039,7 @@ export default function ShiftApp() {
                 if (confirm(t('이 근무를 삭제할까요? 되돌릴 수 없고, 직원 화면에서도 사라집니다.')))
                   void command('shiftRemove', { id: form.id });
               } else if (modal === 'punchEdit') {
-                const back = form.employeeId;
-                void command('punchEdit', form).then((ok) => ok && setPayDetail(back));
+                void command('punchEdit', form);
               } else if (modal === 'message')
                 void command(msgNotice ? 'notice' : 'message', {
                   to: actor.admin ? msgTargets.join(',') : msgTargets[0],

@@ -1,4 +1,4 @@
-import {MAX_AREAS,MIN_WORKPLACE_RADIUS,MAX_WORKPLACE_RADIUS,OT_WEEKLY_HOURS,type State,type Shift,type Attendance,type Punch,areaList,canSwap,publicShifts,settlePublished,canWorkIn,leadDate,localDate,localTime,minutes,nameKey,overlap,overtimeOver,duration,payPeriodStart,payPeriodEnd,periodOpen} from './domain';
+import {MAX_AREAS,MIN_WORKPLACE_RADIUS,MAX_WORKPLACE_RADIUS,OT_WEEKLY_HOURS,type State,type Shift,type Attendance,type Punch,areaList,canSwap,publicShifts,settlePublished,canWorkIn,leadDate,localDate,localTime,minutes,nameKey,overlap,overtimeOver,duration,payPeriodStart,payPeriodEnd,periodOpen,livePunches} from './domain';
 export type Actor={id:string;admin:boolean};
 export type Command={type:string;payload:any};
 const fail=(message:string):never=>{throw new Error(message)};
@@ -109,15 +109,15 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
  case 'punchIn': {const target=punchTarget(p.employeeId);const day=localDate(now),at=localTime(now);
   // 퇴근을 찍지 않은 채 날이 바뀌어도 새 날의 출근은 찍힙니다. 어제 기록이 오늘을 막지 않도록 오늘 찍은 출근만 봅니다.
   // 닫히지 않은 어제 기록은 그대로 남아 '퇴근 미기록'으로 보이며, 급여는 퇴근까지 찍힌 것만 셉니다.
-  if(s.punches!.some(x=>x.employeeId===target&&!x.out&&x.date===day))fail('이미 출근으로 찍혀 있습니다. 먼저 퇴근을 찍으세요.');const who=employee(target);if(who.punchId&&!actor.admin&&String(p.punchId||'')!==who.punchId)fail('직원 ID가 맞지 않습니다.');const near=s.shifts.filter(x=>x.employeeId===target&&x.date===day).sort((x,y)=>Math.abs(minutes(x.start)-minutes(at))-Math.abs(minutes(y.start)-minutes(at)))[0];s.punches!.push({id:id(),employeeId:target,date:day,in:at,area:near?.area||employee(target).role,...(p.photoAt?{photoAt:String(p.photoAt)}:{}),...(spotOf(p)?{spot:spotOf(p)}:{}),status:'pending'});break;}
- case 'punchOut': {const target=punchTarget(p.employeeId);const open=[...s.punches!].reverse().find(x=>x.employeeId===target&&!x.out)??fail('출근으로 찍힌 기록이 없습니다.');const running=(open.breaks??[]).find(b=>!b.end);if(running)running.end=localTime(now);open.out=localTime(now);if(p.photoAt)open.outPhotoAt=String(p.photoAt);const out=spotOf(p);if(out)open.outSpot=out;open.status??='pending';break;}
+  if(livePunches(s).some(x=>x.employeeId===target&&!x.out&&x.date===day))fail('이미 출근으로 찍혀 있습니다. 먼저 퇴근을 찍으세요.');const who=employee(target);if(who.punchId&&!actor.admin&&String(p.punchId||'')!==who.punchId)fail('직원 ID가 맞지 않습니다.');const near=s.shifts.filter(x=>x.employeeId===target&&x.date===day).sort((x,y)=>Math.abs(minutes(x.start)-minutes(at))-Math.abs(minutes(y.start)-minutes(at)))[0];s.punches!.push({id:id(),employeeId:target,date:day,in:at,area:near?.area||employee(target).role,...(p.photoAt?{photoAt:String(p.photoAt)}:{}),...(spotOf(p)?{spot:spotOf(p)}:{}),status:'pending'});break;}
+ case 'punchOut': {const target=punchTarget(p.employeeId);const open=[...livePunches(s)].reverse().find(x=>x.employeeId===target&&!x.out)??fail('출근으로 찍힌 기록이 없습니다.');const running=(open.breaks??[]).find(b=>!b.end);if(running)running.end=localTime(now);open.out=localTime(now);if(p.photoAt)open.outPhotoAt=String(p.photoAt);const out=spotOf(p);if(out)open.outSpot=out;open.status??='pending';break;}
  // 휴게 시작과 종료. 유급 휴게는 근무시간에 그대로 남고 무급 휴게만 빠집니다.
- case 'punchBreak': {const target=punchTarget(p.employeeId);const open=[...s.punches!].reverse().find(x=>x.employeeId===target&&!x.out)??fail('출근으로 찍힌 기록이 없습니다.');open.breaks??=[];const running=open.breaks.find(b=>!b.end);
+ case 'punchBreak': {const target=punchTarget(p.employeeId);const open=[...livePunches(s)].reverse().find(x=>x.employeeId===target&&!x.out)??fail('출근으로 찍힌 기록이 없습니다.');open.breaks??=[];const running=open.breaks.find(b=>!b.end);
   if(p.action==='end'){(running??fail('휴게 중이 아닙니다.')).end=localTime(now)}
   else if(p.action==='start'){if(running)fail('이미 휴게 중입니다.');if(open.breaks.length>=12)fail('휴게는 하루 12번까지 찍을 수 있습니다.');open.breaks.push({start:localTime(now),paid:p.paid===true||p.paid==='1'})}
   else fail('잘못된 휴게 처리입니다.');break;}
  // 직원이 자기 근무 기록을 확인합니다. 지난 급여 기간은 이미 지급이 끝나 손댈 수 없습니다.
- case 'punchReview': {const punch:Punch=s.punches!.find(x=>x.id===text(p.id,120))??fail('근무 기록을 찾을 수 없습니다.');
+ case 'punchReview': {const punch:Punch=livePunches(s).find(x=>x.id===text(p.id,120))??fail('근무 기록을 찾을 수 없습니다.');
   if(!actor.admin&&punch.employeeId!==actor.id)fail('본인 근무 기록만 확인할 수 있습니다.');
   if(!punch.out)fail('퇴근까지 찍힌 근무만 확인할 수 있습니다.');
   if(!periodOpen(payPeriodStart(punch.date),localDate(now)))fail('마감된 근무표입니다. 관리자에게 문의하세요.');
@@ -129,7 +129,7 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
   if(from!==payPeriodStart(from))fail('급여 기간의 시작일이 아닙니다.');
   if(!periodOpen(from,localDate(now)))fail('마감된 근무표입니다. 관리자에게 문의하세요.');
   const who=actor.admin&&p.employeeId?employee(p.employeeId).id:actor.id;
-  const mine=s.punches!.filter(x=>x.employeeId===who&&x.date>=from&&x.date<=to&&x.out&&x.status!=='approved');
+  const mine=livePunches(s).filter(x=>x.employeeId===who&&x.date>=from&&x.date<=to&&x.out&&x.status!=='approved');
   if(!mine.length)fail('확인할 근무가 없습니다.');
   for(const punch of mine){punch.status='approved';punch.disputeNote=undefined;punch.reviewedAt=now.toISOString()}break;}
  // 관리자가 한 날짜의 출근과 퇴근을 손으로 넣습니다. 찍지 못한 날을 메우는 자리라 퇴근까지 함께 받습니다.
@@ -137,22 +137,26 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
  case 'punchAdd': {admin();const who=employee(p.employeeId).id;const day=date(p.date);if(day>localDate(now))fail('아직 오지 않은 날짜에는 출퇴근을 넣을 수 없습니다.');
   const at=time(p.in),out=time(p.out);if(at===out)fail('출근과 퇴근 시각이 같습니다.');
   const span=(d:string,start:string,end:string)=>({date:d,start,end} as Shift);
-  if(s.punches!.some(x=>x.employeeId===who&&overlap(span(x.date,x.in,x.out??x.in),span(day,at,out))))fail('이 시간에 이미 찍힌 출퇴근이 있습니다.');
+  if(livePunches(s).some(x=>x.employeeId===who&&overlap(span(x.date,x.in,x.out??x.in),span(day,at,out))))fail('이 시간에 이미 찍힌 출퇴근이 있습니다.');
   const near=s.shifts.filter(x=>x.employeeId===who&&x.date===day).sort((x,y)=>Math.abs(minutes(x.start)-minutes(at))-Math.abs(minutes(y.start)-minutes(at)))[0];
   s.punches!.push({id:id(),employeeId:who,date:day,in:at,out,area:near?.area||employee(who).role,status:'pending',editedBy:actor.id});break;}
- // 급여 상세에서 관리자가 한 기록의 출근·퇴근(과 출근기계 기록이면 휴게)을 고칩니다.
+ // 출근 기록 화면에서 관리자가 한 기록의 출근·퇴근(과 출근기계 기록이면 휴게)을 고칩니다.
  // 찍힌 출퇴근이면 시각이 바뀌었으니 직원이 다시 확인하도록 확인 대기로 돌립니다.
  case 'punchEdit': {admin();const key=text(p.id,120);const at=time(p.in),out=time(p.out);if(at===out)fail('출근과 퇴근 시각이 같습니다.');
   const day=date(p.date);if(day>localDate(now))fail('아직 오지 않은 날짜에는 출퇴근을 넣을 수 없습니다.');
   const span=(d:string,start:string,end:string)=>({date:d,start,end} as Shift);
-  const punch=s.punches!.find(x=>x.id===key);
+  const punch=livePunches(s).find(x=>x.id===key);
   if(punch){if(!punch.out)fail('아직 퇴근하지 않은 근무는 고칠 수 없습니다.');
-   if(s.punches!.some(x=>x.id!==key&&x.employeeId===punch.employeeId&&overlap(span(x.date,x.in,x.out??x.in),span(day,at,out))))fail('이 시간에 이미 찍힌 출퇴근이 있습니다.');
+   if(livePunches(s).some(x=>x.id!==key&&x.employeeId===punch.employeeId&&overlap(span(x.date,x.in,x.out??x.in),span(day,at,out))))fail('이 시간에 이미 찍힌 출퇴근이 있습니다.');
    Object.assign(punch,{date:day,in:at,out,status:'pending',disputeNote:undefined,reviewedAt:undefined,editedBy:actor.id});break;}
   const a=s.attendance.find(x=>x.id===key)??fail('근무 기록을 찾을 수 없습니다.');const rest=number(p.breakMinutes??a.breakMinutes,1440);
   if(rest>=duration(at,out)*60)fail('퇴근 시간과 휴게시간을 확인하세요.');
   if(s.attendance.some(x=>x.id!==key&&x.employeeId===a.employeeId&&overlap({...x,area:''},span(day,at,out))))fail('이 시간에 이미 찍힌 출퇴근이 있습니다.');
   Object.assign(a,{date:day,start:at,end:out,breakMinutes:rest});break;}
+ // 잘못 찍힌 출퇴근(연달아 누른 0분 기록 등)을 관리자가 지웁니다. 겹침 검사에 걸려 고칠 수 없는 중복을 치우는 자리입니다.
+ // 데이터에서 빼지 않고 지운 표시만 답니다 — 화면과 급여에서는 사라지고, 엑셀 백업에는 남습니다.
+ case 'punchRemove': {admin();const punch=livePunches(s).find(x=>x.id===text(p.id,120))??fail('근무 기록을 찾을 수 없습니다.');
+  punch.removedAt=now.toISOString();punch.removedBy=actor.id;break;}
  // 출근기계 이름과 직원을 한 번 승인해 두면 다음 타임카드부터 자동으로 이어집니다. 비슷한 이름은 후보로만 제안하고, 확정은 관리자가 합니다.
  case 'clockName': {admin();const who=employee(p.employeeId).id;const key=nameKey(text(p.name,80));if(!key)fail('출근기계에 찍힌 이름을 확인하세요.');const rest=s.clockNames!.filter(x=>x.name!==key);if(rest.length>=500)fail('이름 연결은 500개까지 저장할 수 있습니다.');s.clockNames=[...rest,{name:key,raw:text(p.name,80),employeeId:who}];break;}
  // 잘못 승인한 연결은 지워야 다시 후보로 올라옵니다.

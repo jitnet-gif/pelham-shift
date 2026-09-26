@@ -1,5 +1,5 @@
 import { env } from '@/lib/db';
-import { localDate, roleTint, workplaceOf, type Punch, type State } from '@/lib/domain';
+import { livePunches, localDate, roleTint, workplaceOf, type Punch, type State } from '@/lib/domain';
 import { context, json, sameOrigin } from '@/lib/workspace';
 
 export const dynamic = 'force-dynamic';
@@ -9,7 +9,7 @@ type Row = { actor: string; lat: number; lng: number; accuracy: number | null; a
 // 자리를 받는 것은 출근을 찍어 둔 동안뿐입니다. 퇴근했거나 출근 전이면 받지 않고, 남아 있던 자리도 지웁니다.
 // '오늘' 찍은 출근만 봅니다 — 퇴근을 잊은 어제 기록 때문에 집에서까지 자리가 잡히면 안 됩니다.
 const openPunch = (state: State, employeeId: string, today = localDate(new Date())) =>
-  (state.punches ?? []).find((p) => p.employeeId === employeeId && p.date === today && !p.out);
+  livePunches(state).find((p) => p.employeeId === employeeId && p.date === today && !p.out);
 
 // 표를 아직 만들지 않았으면(42P01) 무엇을 해야 하는지 알려 줍니다.
 const missingTable = (error: unknown) => (error as { code?: string })?.code === '42P01';

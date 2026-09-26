@@ -23,7 +23,10 @@ export type PunchBreak = {start:string;end?:string;paid:boolean};
 // 위치 권한을 막아 둔 기기도 있어 없을 수 있습니다 — 없으면 그냥 비워 둡니다.
 export type PunchSpot = {lat:number;lng:number;accuracy?:number};
 // 직원이 그 자리에서 찍은 실제 출퇴근. status 는 급여 기간이 닫히기 전 직원 본인이 확인한 결과입니다.
-export type Punch = {id:string;employeeId:string;date:string;in:string;out?:string;area?:string;breaks?:PunchBreak[];photoAt?:string;outPhotoAt?:string;spot?:PunchSpot;outSpot?:PunchSpot;status?:'pending'|'approved'|'disputed';disputeNote?:string;editedBy?:string;reviewedAt?:string};
+// removedAt/removedBy: 관리자가 지운 출퇴근(잘못 누른 중복 등). 화면과 급여에서만 빠지고 데이터와 엑셀 백업에는 남습니다.
+export type Punch = {id:string;employeeId:string;date:string;in:string;out?:string;area?:string;breaks?:PunchBreak[];photoAt?:string;outPhotoAt?:string;spot?:PunchSpot;outSpot?:PunchSpot;status?:'pending'|'approved'|'disputed';disputeNote?:string;editedBy?:string;reviewedAt?:string;removedAt?:string;removedBy?:string};
+// 살아 있는 출퇴근. 지운 기록은 급여·알림·겹침 검사 어디에도 세지 않습니다.
+export const livePunches=(state:{punches?:Punch[]})=>(state.punches??[]).filter(p=>!p.removedAt);
 // 출근기계 타임카드는 사람을 이름으로만 알려 줍니다. 한 번 승인한 이름은 이 목록에 남아 다음 임포트부터 자동으로 이어집니다.
 export type ClockName = {name:string;raw:string;employeeId:string};
 // name 은 비교용으로 다듬은 값, raw 는 출근기계에 찍힌 그대로의 표기입니다.
@@ -94,7 +97,7 @@ export function punchedIn(state:State,shift:Shift){
  const sameDay=state.shifts.filter(x=>x.employeeId===shift.employeeId&&x.date===shift.date);
  const nearest=(p:Punch)=>[...sameDay].sort((x,y)=>Math.abs(minutes(x.start)-minutes(p.in))-Math.abs(minutes(y.start)-minutes(p.in)))[0];
  // 근무표에 없는 근무로 물어 오면 기댈 기준이 없습니다. 그 날 찍힌 출근이 있으면 찍은 것으로 봅니다.
- return (state.punches??[]).some(p=>p.employeeId===shift.employeeId&&p.date===shift.date&&(nearest(p)?.id??shift.id)===shift.id);
+ return livePunches(state).some(p=>p.employeeId===shift.employeeId&&p.date===shift.date&&(nearest(p)?.id??shift.id)===shift.id);
 }
 // 클럽 시각으로 본 지금의 분. 근무 시작까지 남은 시간을 셀 때 기준이 됩니다.
 export const clubMinutes=(now:Date)=>minutes(new Intl.DateTimeFormat('en-GB',{timeZone:TIME_ZONE,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(now));
@@ -147,7 +150,7 @@ export function overtimeOver(shifts:Shift[],employeeId:string,dates:string[]):Ma
 // 근무 중에 선을 넘는 순간 알 수 있게 하려는 것입니다. 퇴근을 잊고 며칠 열려 있는 기록은 어제·오늘 것만 셉니다.
 export function overtimeWorked(state:State,now=new Date()){
  const today=localDate(now),week=weekStart(today),current=localTime(now);
- const open=(state.punches??[]).filter(p=>!p.out&&p.date>=week&&p.date>=addDays(today,-1)).map(p=>({id:p.id,employeeId:p.employeeId,date:p.date,start:p.in,end:current,breakMinutes:(p.breaks??[]).reduce((n,b)=>n+(!b.paid&&b.end?Math.round(duration(b.start,b.end)*60):0),0)}));
+ const open=livePunches(state).filter(p=>!p.out&&p.date>=week&&p.date>=addDays(today,-1)).map(p=>({id:p.id,employeeId:p.employeeId,date:p.date,start:p.in,end:current,breakMinutes:(p.breaks??[]).reduce((n,b)=>n+(!b.paid&&b.end?Math.round(duration(b.start,b.end)*60):0),0)}));
  const worked=new Map<string,number>();
  for(const a of [...paidRecords(state).filter(a=>a.date>=week&&a.date<=today),...open])worked.set(a.employeeId,(worked.get(a.employeeId)??0)+payableHours(state,a));
  return state.employees.filter(e=>!e.archived&&(worked.get(e.id)??0)>OT_WEEKLY_HOURS).map(e=>({employee:e,week,hours:worked.get(e.id)!}));
@@ -196,7 +199,7 @@ export function wholeWeeks(from:string,to:string){return weekStart(from)===from&
 // 같은 날을 두 번 세지 않으려는 규칙입니다 — 둘 다 세면 하루치가 두 번 지급됩니다.
 // 퇴근까지 찍힌 것만 셉니다. 아직 근무 중인 기록은 끝 시각이 없어 계산할 수 없습니다.
 export function paidRecords(state:State):Attendance[]{
- const punched=(state.punches??[]).filter(p=>p.out);
+ const punched=livePunches(state).filter(p=>p.out);
  const punchedDays=new Set(punched.map(p=>p.employeeId+'|'+p.date));
  // 유급 휴게는 일한 시간으로 칩니다. 근무시간에서 빠지는 건 무급 휴게뿐이고, 그것도 끝까지 찍힌 것만입니다.
  const unpaid=(p:Punch)=>(p.breaks??[]).reduce((n,b)=>n+(!b.paid&&b.end?Math.round(duration(b.start,b.end)*60):0),0);
@@ -205,7 +208,7 @@ export function paidRecords(state:State):Attendance[]{
 }
 // 아직 아무도 보지 않은 기록과, 직원이 틀렸다고 한 기록. 지급 전에 관리자가 알아야 할 숫자라 따로 셉니다.
 export function punchReviewCounts(state:State,employeeId:string,from:string,to:string){
- const mine=(state.punches??[]).filter(p=>p.employeeId===employeeId&&p.date>=from&&p.date<=to&&p.out);
+ const mine=livePunches(state).filter(p=>p.employeeId===employeeId&&p.date>=from&&p.date<=to&&p.out);
  return {unconfirmed:mine.filter(p=>p.status!=='approved'&&p.status!=='disputed').length,
   disputed:mine.filter(p=>p.status==='disputed').length};
 }

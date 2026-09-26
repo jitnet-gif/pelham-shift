@@ -39,6 +39,8 @@
   text-overflow: ellipsis;
 }
 .punchlog-who i { flex: none; width: 9px; height: 9px; border-radius: 2px; background: #9fb0aa; }
+/* 관리자용 수정·삭제 단추. 날짜 줄 오른쪽 끝에 붙습니다. */
+.punchlog-tools { display: inline-flex; gap: 4px; margin-left: auto; align-self: center; }
 
 .punchlog-times {
   display: flex;
