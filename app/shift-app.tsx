@@ -83,6 +83,8 @@ import {
   paidRecords,
   payableHours,
   shownPunch,
+  paidStart,
+  paidEnd,
   earlyBy,
   lateBy,
   scheduledFor,
@@ -1892,6 +1894,7 @@ export default function ShiftApp() {
                   <PunchRoster
                     employees={attRoster}
                     punches={data.punches ?? []}
+                    shifts={data.shifts}
                     today={today}
                     onPick={(who) =>
                       setAtt({ actor: actor.id, who, from: payPeriodStart(today) })
@@ -1904,6 +1907,7 @@ export default function ShiftApp() {
                     <PunchPeriodBar
                       employee={emp(attWho)}
                       rows={attPunches}
+                      shifts={data.shifts}
                       from={attFrom}
                       today={today}
                       onBack={() => setAtt({ actor: actor.id, who: '', from: '' })}
@@ -2829,8 +2833,9 @@ export default function ShiftApp() {
                           <TableCell>
                             {shift ? ampm(shift.start) + ' – ' + ampm(shift.end) : '—'}
                           </TableCell>
+                          {/* 급여가 세는 시각입니다. 예정 근무 안에서 찍었으면 예정 시각, 지각·조퇴만 찍힌 그대로입니다. */}
                           <TableCell>
-                            {ampm(a.start)} – {ampm(a.end)}
+                            {ampm(paidStart(data, a))} – {ampm(paidEnd(data, a))}
                           </TableCell>
                           <TableCell>
                             {a.breakMinutes ? t('{n}분', { n: a.breakMinutes }) : '—'}

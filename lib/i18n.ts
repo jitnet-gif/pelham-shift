@@ -387,7 +387,7 @@ const en: Record<string, string> = {
   '{n}분 지각': '{n} min late',
   조퇴: 'Undertime',
   '{n}분 조퇴': '{n} min early',
-  '급여 {a} – {b}': 'Paid {a} – {b}',
+  '찍힌 시각 {a} – {b}': 'Punched {a} – {b}',
   정시: 'On time',
   '예정 없음': 'Unscheduled',
   ' (+1일)': ' (+1 day)',

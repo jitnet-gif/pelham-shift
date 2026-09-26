@@ -1,7 +1,7 @@
 'use client';
 import { LogIn, LogOut } from 'lucide-react';
 import type { Employee, Punch, Shift } from '@/lib/domain';
-import { TIME_ZONE, roleTint } from '@/lib/domain';
+import { TIME_ZONE, roleTint, shownPunch } from '@/lib/domain';
 import { useLang } from './use-lang';
 
 const minutes = (v: string) => Number(v.slice(0, 2)) * 60 + Number(v.slice(3, 5));
@@ -124,10 +124,14 @@ export default function WhosWorking({
                   <span className="working-name">
                     <b style={{ color: roleTint(person) }}>{person.name}</b>
                     <small>
+                      {/* 급여가 세는 시각으로 적습니다 — 예정 근무 안에서 찍었으면 예정 시각, 지각·조퇴만 찍힌 그대로입니다. */}
                       {punch
                         ? punch.out
-                          ? t('{a} 출근 · {b} 퇴근', { a: stamp(punch.in), b: stamp(punch.out) })
-                          : t('{a} 출근', { a: stamp(punch.in) })
+                          ? t('{a} 출근 · {b} 퇴근', {
+                              a: stamp(shownPunch({ shifts }, punch).in),
+                              b: stamp(shownPunch({ shifts }, punch).out ?? punch.out),
+                            })
+                          : t('{a} 출근', { a: stamp(shownPunch({ shifts }, punch).in) })
                         : t('기록 없음')}
                     </small>
                   </span>

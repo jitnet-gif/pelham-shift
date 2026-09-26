@@ -1,6 +1,6 @@
 'use client';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import type { Employee, Punch } from '@/lib/domain';
+import type { Employee, Punch, Shift } from '@/lib/domain';
 import {
   PAY_PERIOD_DAYS,
   ROLE_GROUP_COLORS,
@@ -10,7 +10,7 @@ import {
   payPeriodStart,
   periodOpen,
   missingOut,
-  punchHours,
+  shownPunch,
   roleGroup,
   roleLabel,
   roleTint,
@@ -24,12 +24,13 @@ import { useLang } from './use-lang';
 // 함께 세면 '1건 · 0.00시간' 처럼 고장난 것처럼 읽힙니다. 대신 live 로 따로 알립니다.
 // 퇴근을 못 찍은 채 날이 바뀐 기록은 지금 일하는 사람이 아닙니다. live 에 함께 세면
 // 그 사람이 급여 기간 내내 '근무 중'으로 박혀 있어, noOut 으로 갈라 셉니다.
-const tally = (rows: Punch[], today: string) => {
+// 시간은 급여가 세는 시간입니다(shownPunch) — 예정 시작 전·예정 종료 뒤는 빠집니다.
+const tally = (rows: Punch[], shifts: Shift[], today: string) => {
   const done = rows.filter((p) => p.out);
   const noOut = rows.filter((p) => missingOut(p, today));
   return {
     count: done.length,
-    hours: done.reduce((n, p) => n + punchHours(p), 0),
+    hours: done.reduce((n, p) => n + shownPunch({ shifts }, p).hours, 0),
     live: rows.length - done.length - noOut.length,
     noOut: noOut.length,
   };
@@ -41,11 +42,13 @@ const waiting = (rows: Punch[]) =>
 export function PunchRoster({
   employees,
   punches,
+  shifts,
   today,
   onPick,
 }: {
   employees: Employee[];
   punches: Punch[];
+  shifts: Shift[];
   today: string;
   onPick: (employeeId: string) => void;
 }) {
@@ -75,7 +78,7 @@ export function PunchRoster({
         {g.items.map((e) => {
           const mine = punches.filter((p) => p.employeeId === e.id);
           const now = mine.filter((p) => p.date >= open && p.date <= openEnd);
-          const seen = tally(now, today);
+          const seen = tally(now, shifts, today);
           // 가장 최근에 찍은 날. 이번 기간에 아무것도 없는 사람도 언제까지 일했는지 보입니다.
           const last = mine.reduce((v, p) => (p.date > v ? p.date : v), '');
           const pending = waiting(now);
@@ -125,6 +128,7 @@ export function PunchRoster({
 export function PunchPeriodBar({
   employee,
   rows,
+  shifts,
   from,
   today,
   onBack,
@@ -132,6 +136,7 @@ export function PunchPeriodBar({
 }: {
   employee?: Employee;
   rows: Punch[];
+  shifts: Shift[];
   from: string;
   today: string;
   onBack: () => void;
@@ -139,7 +144,7 @@ export function PunchPeriodBar({
 }) {
   const { t, locale } = useLang();
   const to = payPeriodEnd(from);
-  const seen = tally(rows, today);
+  const seen = tally(rows, shifts, today);
   // 아직 오지 않은 기간은 볼 것이 없어 막아 둡니다.
   const atNow = from >= payPeriodStart(today);
   const span = (date: string) =>

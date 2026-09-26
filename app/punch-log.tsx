@@ -30,7 +30,8 @@ export default function PunchLog({
   punches: Punch[];
   employees: Employee[];
   shifts: Shift[];
-  // 관리자는 실제로 찍힌 시각을 봅니다. 직원은 급여가 세는 시각(예정 근무 기준, 지각·조퇴만 찍힌 그대로)을 봅니다.
+  // 시각은 누구에게나 급여가 세는 시각(예정 근무 기준, 지각·조퇴만 찍힌 그대로)으로 적습니다.
+  // 관리자에게는 실제로 찍힌 시각이 다를 때 그 시각을 줄 밑에 함께 적습니다.
   actual: boolean;
   isAdmin: boolean;
   // 관리자가 한 사람의 출근부를 볼 때만 넘어옵니다. 급여 시간은 여기, 원본 기록에서 고칩니다.
@@ -105,11 +106,11 @@ export default function PunchLog({
       {list.map((p) => {
         const who = of(p.employeeId);
         const rest = restMinutes(p);
-        // 시간은 누가 보든 급여가 세는 시간입니다. 관리자에게는 찍힌 시각과 다를 때 급여가 센 구간을 함께 적습니다.
+        // 시각과 시간은 누가 보든 급여가 세는 것입니다.
         const paid = shownPunch({ shifts }, p);
         const worked = paid.hours;
-        const inAt = actual ? p.in : paid.in;
-        const outAt = actual ? p.out : (paid.out ?? p.out);
+        const inAt = paid.in;
+        const outAt = paid.out ?? p.out;
         const clipped = actual && !!p.out && (paid.in !== p.in || paid.out !== p.out);
         return (
           <article className="punchlog-row" key={p.id}>
@@ -165,7 +166,7 @@ export default function PunchLog({
                   {t('{h}시간', { h: worked.toFixed(2) })}
                   {clipped && (
                     <small className="punchlog-paid">
-                      {t('급여 {a} – {b}', { a: clock(paid.in), b: clock(paid.out ?? '') })}
+                      {t('찍힌 시각 {a} – {b}', { a: clock(p.in), b: clock(p.out ?? '') })}
                     </small>
                   )}
                 </span>
