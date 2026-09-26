@@ -1,1 +1,6 @@
 .timeline-scroll{max-height:min(70vh,760px);overflow:auto;overscroll-behavior:contain}.timeline .timeruler{position:sticky;top:0;z-index:12;background:#fff;box-shadow:0 1px 0 var(--border)}.timeline .timeruler>span{position:sticky;left:0;z-index:14;background:#fff}.timeline .timerow .staff{position:sticky;left:0;z-index:5;background:#fff;box-shadow:1px 0 0 #edf0ef}.timeline-day{display:block}.timeline-day-label{display:flex;align-items:center;gap:10px;min-height:42px;padding:0 20px;background:#edf7f2;border-top:1px solid #d8eae1;border-bottom:1px solid #d8eae1;color:#087e6d}.timeline-day-label span{font-size:13px;font-weight:700}.timeline-day-label strong{font-size:14px;font-weight:500;color:#4b7466}@media(max-width:700px){.timeline-scroll{max-height:66vh}.timeline-day-label{min-height:38px;padding:0 14px}.timeline .timeruler>span,.timeline .timerow .staff{box-shadow:1px 0 0 #edf0ef}}
+
+/* 폼의 .timerow(flex, 줄바꿈)가 타임라인 줄을 덮어 막대 칸이 0 너비가 되지 않게 합니다. */
+.timeline .timerow{display:grid;grid-template-columns:170px 1fr;align-items:stretch;gap:0;flex-wrap:nowrap;margin:0}
+@media (max-width:1024px){.timeline .timerow{grid-template-columns:145px 1fr}}
+@media (max-width:700px){.timeline .timerow{grid-template-columns:132px 1fr}}
