@@ -1,7 +1,7 @@
 'use client';
 import { LogIn, LogOut } from 'lucide-react';
 import type { Employee, Punch, Shift } from '@/lib/domain';
-import { TIME_ZONE, roleTint, shownPunch } from '@/lib/domain';
+import { OFF_TIME_COLOR, TIME_ZONE, roleTint, shownPunch } from '@/lib/domain';
 import { useLang } from './use-lang';
 
 const minutes = (v: string) => Number(v.slice(0, 2)) * 60 + Number(v.slice(3, 5));
@@ -77,6 +77,19 @@ export default function WhosWorking({
     if (!live) return 'soon';
     return cursor < minutes(s.start) ? 'soon' : cursor < endOf(s) ? 'late' : 'missed';
   };
+  // 번역된 문장 안의 출근()·퇴근() 자리에 시각을 넣습니다. 지각한 출근·조퇴한 퇴근은 빨간 글자입니다.
+  const marked = (text: string, punch: Punch) => {
+    const at = shownPunch({ shifts }, punch);
+    return text.split(/([])/).map((part, i) =>
+      part === '' ? (
+        <span key={i} style={at.late ? { color: OFF_TIME_COLOR } : undefined}>{stamp(at.in)}</span>
+      ) : part === '' ? (
+        <span key={i} style={at.early ? { color: OFF_TIME_COLOR } : undefined}>{stamp(at.out ?? punch.out ?? '')}</span>
+      ) : (
+        part
+      ),
+    );
+  };
   const count = (kind: string) => today.filter((s) => state(s) === kind).length;
   const blocks: [string, string, number][] = [
     ['on', '근무 중', count('on')],
@@ -127,11 +140,8 @@ export default function WhosWorking({
                       {/* 급여가 세는 시각으로 적습니다 — 예정 근무 안에서 찍었으면 예정 시각, 지각·조퇴만 찍힌 그대로입니다. */}
                       {punch
                         ? punch.out
-                          ? t('{a} 출근 · {b} 퇴근', {
-                              a: stamp(shownPunch({ shifts }, punch).in),
-                              b: stamp(shownPunch({ shifts }, punch).out ?? punch.out),
-                            })
-                          : t('{a} 출근', { a: stamp(shownPunch({ shifts }, punch).in) })
+                          ? marked(t('{a} 출근 · {b} 퇴근', { a: '', b: '' }), punch)
+                          : marked(t('{a} 출근', { a: '' }), punch)
                         : t('기록 없음')}
                     </small>
                   </span>

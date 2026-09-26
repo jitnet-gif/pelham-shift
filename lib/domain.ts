@@ -172,7 +172,7 @@ export const LATE_GRACE_MINUTES=0;
 // 출근기록의 기준이 되는 예정 근무. 같은 날 겹치는 근무 중 예정 출근 시각이 가장 가까운 것을 봅니다.
 export function scheduledFor(state:{shifts:Shift[]},a:Attendance){const worked={...a,area:''};return state.shifts.filter(x=>x.employeeId===a.employeeId&&x.date===a.date&&overlap(x,worked)).sort((x,y)=>Math.abs(minutes(x.start)-minutes(a.start))-Math.abs(minutes(y.start)-minutes(a.start)))[0]}
 // 지각 분. 예정 근무가 없으면 기준이 없으므로 null 을 돌려 '정시(0분)'와 구분합니다.
-export function lateBy(state:State,a:Attendance){const shift=scheduledFor(state,a);return shift?Math.max(0,minutes(a.start)-minutes(shift.start)-LATE_GRACE_MINUTES):null}
+export function lateBy(state:{shifts:Shift[]},a:Attendance){const shift=scheduledFor(state,a);return shift?Math.max(0,minutes(a.start)-minutes(shift.start)-LATE_GRACE_MINUTES):null}
 // 조퇴 유예 없음: 예정 퇴근 시각보다 1분이라도 일찍 찍으면 조퇴입니다.
 export const EARLY_GRACE_MINUTES=0;
 // 예정 퇴근 시각까지 몇 분 남았는지. 예정 근무가 없으면 기준이 없으므로 null 을 돌려 '정시(0분)'와 구분합니다 —
@@ -189,7 +189,7 @@ export function earlyOut(shift:Shift|undefined,inAt:string,outAt:string){
 }
 // 조퇴 분. 지각과 같은 예정 근무(scheduledFor)를 기준으로 삼습니다 —
 // 한 기록을 두 눈금이 서로 다른 근무로 재면, 지각은 있는데 조퇴는 '예정 없음'인 줄이 나옵니다.
-export function earlyBy(state:State,a:Attendance){return earlyOut(scheduledFor(state,a),a.start,a.end)}
+export function earlyBy(state:{shifts:Shift[]},a:Attendance){return earlyOut(scheduledFor(state,a),a.start,a.end)}
 // 조회 구간이 주(일요일 시작) 경계에 맞지 않으면 걸쳐 있는 주의 초과근무가 실제보다 적게 잡힙니다.
 export function wholeWeeks(from:string,to:string){return weekStart(from)===from&&weekStart(addDays(to,1))===addDays(to,1)}
 // 실근무시간을 정규·초과로 나눠 시급을 곱한 뒤 지각·조퇴한 만큼 차감합니다. 대체 근무에 붙는 추가수당은 없습니다 —
@@ -230,9 +230,11 @@ export const payableHours=(state:{shifts:Shift[]},a:Attendance)=>duration(paidSt
 export function shownPunch(state:{shifts:Shift[]},p:Punch){
  const unpaid=(p.breaks??[]).reduce((n,b)=>n+(!b.paid&&b.end?Math.round(duration(b.start,b.end)*60):0),0);
  if(p.out){const a={id:p.id,employeeId:p.employeeId,date:p.date,start:p.in,end:p.out,breakMinutes:unpaid};
-  return {in:paidStart(state,a),out:paidEnd(state,a) as string|undefined,hours:payableHours(state,a)}}
+  return {in:paidStart(state,a),out:paidEnd(state,a) as string|undefined,hours:payableHours(state,a),late:(lateBy(state,a)??0)>0,early:(earlyBy(state,a)??0)>0}}
  const shift=state.shifts.filter(x=>x.employeeId===p.employeeId&&x.date===p.date).sort((x,y)=>Math.abs(minutes(x.start)-minutes(p.in))-Math.abs(minutes(y.start)-minutes(p.in)))[0];
- return {in:payIn(shift,p.in),out:undefined as string|undefined,hours:0}}
+ return {in:payIn(shift,p.in),out:undefined as string|undefined,hours:0,late:!!shift&&minutes(p.in)-minutes(shift.start)>LATE_GRACE_MINUTES,early:false}}
+// 지각한 출근·조퇴한 퇴근 시각을 적는 글자색. 직원·관리자 화면이 모두 이 한 색을 씁니다.
+export const OFF_TIME_COLOR='#d0302f';
 export function payroll(state:State,employeeId:string,from:string,to:string){const e=state.employees.find(e=>e.id===employeeId)!;const records=paidRecords(state).filter(a=>a.employeeId===employeeId&&a.date>=from&&a.date<=to);const worked=(a:Attendance)=>payableHours(state,a);const hours=records.reduce((s,a)=>s+worked(a),0);
  // 날짜별로 합친 뒤 주(일요일 시작)별로 묶어 가산 시간을 구합니다.
  const byDay=new Map<string,number>();for(const a of records)byDay.set(a.date,(byDay.get(a.date)??0)+worked(a));const byWeek=new Map<string,number[]>();for(const [day,h] of byDay){const w=weekStart(day);byWeek.set(w,[...(byWeek.get(w)??[]),h])}

@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react';
 import { Camera, Coffee, MapPin, Pencil, Trash2, X } from 'lucide-react';
 import type { Employee, Punch, PunchSpot, Shift } from '@/lib/domain';
-import { duration, localDate, missingOut, shownPunch } from '@/lib/domain';
+import { OFF_TIME_COLOR, duration, localDate, missingOut, shownPunch } from '@/lib/domain';
 import { useLang } from './use-lang';
 import { prunePunchPhotos, readPunchPhoto } from './punch-photo-store';
 
@@ -152,12 +152,16 @@ export default function PunchLog({
             <div className="punchlog-times">
               <span className="punchlog-stamp">
                 <small>{t('출근')}</small>
-                <b>{clock(inAt)}</b>
+                {/* 지각한 출근·조퇴한 퇴근은 빨간 글자로 적습니다. */}
+                <b style={paid.late ? { color: OFF_TIME_COLOR } : undefined}>{clock(inAt)}</b>
               </span>
               <em>→</em>
               <span className="punchlog-stamp">
                 <small>{t('퇴근')}</small>
-                <b className={missingOut(p, today) ? 'punchlog-noout' : undefined}>
+                <b
+                  className={missingOut(p, today) ? 'punchlog-noout' : undefined}
+                  style={paid.early ? { color: OFF_TIME_COLOR } : undefined}
+                >
                   {outAt ? clock(outAt) : missingOut(p, today) ? t('퇴근 미기록') : t('근무 중')}
                 </b>
               </span>

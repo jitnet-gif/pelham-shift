@@ -6,7 +6,7 @@ import { AlarmClock, Camera, Check, Coffee, Hourglass, LogOut } from 'lucide-rea
 import type { Employee, Punch, Shift, Workplace } from '@/lib/domain';
 import { say } from './say';
 import { FIX_MAX_AGE_MS, type GpsState } from './gps-guard';
-import { TIME_ZONE, distanceMeters, roleTint, duration, earlyOut, minutes, payIn } from '@/lib/domain';
+import { TIME_ZONE, OFF_TIME_COLOR, distanceMeters, roleTint, duration, earlyOut, minutes, payIn } from '@/lib/domain';
 import { useLang } from './use-lang';
 
 // 직원이 자기 폰으로 출퇴근을 찍는 화면입니다.
@@ -491,8 +491,9 @@ export default function StaffClock({
           <span>
             <b>
               {/* 예정 시작 전에 찍었으면 예정 시작 시각으로 적습니다 — 급여가 세는 시각과 같습니다. */}
+              {/* 예정 시작보다 늦게 찍었으면 지각이라 빨간 글자로 적습니다. */}
               {working
-                ? clock(payIn(shift, working.in))
+                ? <span style={shift && minutes(working.in) > minutes(shift.start) ? { color: OFF_TIME_COLOR } : undefined}>{clock(payIn(shift, working.in))}</span>
                 : shift
                   ? `${clock(shift.start)}–${clock(shift.end)} (${duration(shift.start, shift.end)}${t('h::시간')})`
                   : t('예정된 근무가 없습니다')}

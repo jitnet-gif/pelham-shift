@@ -83,6 +83,7 @@ import {
   paidRecords,
   payableHours,
   shownPunch,
+  OFF_TIME_COLOR,
   paidStart,
   paidEnd,
   earlyBy,
@@ -1872,8 +1873,15 @@ export default function ShiftApp() {
                     <span>
                       {myPunch
                         ? myPunch.out
-                          ? shownPunch(data, myPunch).in + ' → ' + shownPunch(data, myPunch).out
-                          : shownPunch(data, myPunch).in + t(' 출근')
+                          ? <>
+                              <b style={shownPunch(data, myPunch).late ? { color: OFF_TIME_COLOR } : undefined}>{shownPunch(data, myPunch).in}</b>
+                              {' → '}
+                              <b style={shownPunch(data, myPunch).early ? { color: OFF_TIME_COLOR } : undefined}>{shownPunch(data, myPunch).out}</b>
+                            </>
+                          : <>
+                              <b style={shownPunch(data, myPunch).late ? { color: OFF_TIME_COLOR } : undefined}>{shownPunch(data, myPunch).in}</b>
+                              {t(' 출근')}
+                            </>
                         : t('일을 시작할 때 눌러주세요. 찍히는 시각은 매장 서버 시각입니다.')}
                     </span>
                   </div>
@@ -2835,7 +2843,9 @@ export default function ShiftApp() {
                           </TableCell>
                           {/* 급여가 세는 시각입니다. 예정 근무 안에서 찍었으면 예정 시각, 지각·조퇴만 찍힌 그대로입니다. */}
                           <TableCell>
-                            {ampm(paidStart(data, a))} – {ampm(paidEnd(data, a))}
+                            <span style={late ? { color: OFF_TIME_COLOR, fontWeight: 600 } : undefined}>{ampm(paidStart(data, a))}</span>
+                            {' – '}
+                            <span style={early ? { color: OFF_TIME_COLOR, fontWeight: 600 } : undefined}>{ampm(paidEnd(data, a))}</span>
                           </TableCell>
                           <TableCell>
                             {a.breakMinutes ? t('{n}분', { n: a.breakMinutes }) : '—'}

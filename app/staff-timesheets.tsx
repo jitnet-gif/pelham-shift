@@ -11,6 +11,7 @@ import {
   missingOut,
   periodOpen,
   shownPunch,
+  OFF_TIME_COLOR,
 } from '@/lib/domain';
 import { useLang } from './use-lang';
 
@@ -163,6 +164,7 @@ export default function StaffTimesheets({
       <h3 className="stsheet-section">{t('근무한 날')}</h3>
       {rows.map((p) => {
         const shown = open === p.id;
+        const at = shownPunch({ shifts }, p);
         return (
           <div className={'stsheet-row' + (shown ? ' on' : '')} key={p.id}>
             <div className="stsheet-rowhead">
@@ -206,8 +208,12 @@ export default function StaffTimesheets({
             {shown && (
               <div className="stsheet-detail">
                 <b>
-                  {clock(shownPunch({ shifts }, p).in)}
-                  {p.out ? ` - ${clock(shownPunch({ shifts }, p).out ?? p.out)}` : ''}
+                  {/* 지각한 출근·조퇴한 퇴근은 빨간 글자로 적습니다. */}
+                  <span style={at.late ? { color: OFF_TIME_COLOR, fontWeight: 600 } : undefined}>{clock(at.in)}</span>
+                  {p.out && ' - '}
+                  {p.out && (
+                    <span style={at.early ? { color: OFF_TIME_COLOR, fontWeight: 600 } : undefined}>{clock(at.out ?? p.out)}</span>
+                  )}
                   {missingOut(p, today) && ` - ${t('퇴근 미기록')}`}
                 </b>
                 <small>
