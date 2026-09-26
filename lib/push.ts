@@ -1,6 +1,6 @@
 import {env} from '@/lib/db';
 import {buildPushPayload} from '@block65/webcrypto-web-push';
-import {type Shift,type State,OT_WEEKLY_HOURS,dueShifts,missedShifts,overtimeWorked,overtimeAdded,payPeriodStart} from './domain';
+import {type Shift,type State,OT_PERIOD_HOURS,PAY_PERIOD_DAYS,dueShifts,missedShifts,overtimeWorked,overtimeAdded,payPeriodStart} from './domain';
 import {rosterAdminIds} from './birth-auth';
 import {translate,isLang,SCREEN_LANG,type Vars} from './i18n';
 // link: 알림을 눌렀을 때 앱 주소 뒤에 붙일 값. 누르면 곧장 그 화면이 열립니다.
@@ -27,19 +27,19 @@ export async function remind(workspace:string,state:State,origin:string,now=new 
  const vars=(s:Shift)=>({date:s.date.slice(5).replace('-','/'),start:s.start,area:s.area});
  for(const s of dueShifts(state,now)) sent+=await claimed(workspace,s,'',{title:'출근 1시간 전 알림',body:'{date} {start} · {area} 근무가 1시간 이내에 시작됩니다.',vars:vars(s),tag:'shift-'+s.id},origin,now);
  for(const s of missedShifts(state,now)) sent+=await claimed(workspace,s,':missed',{title:'출근 기록이 아직 없습니다',body:'{start} · {area} 근무가 시작됐는데 출근이 찍히지 않았습니다. 출퇴근 화면에서 출근을 찍어 주세요.',vars:vars(s),tag:'missed-'+s.id},origin,now);
- // 한 주 44시간을 넘긴 직원은 관리자에게 알립니다. 누르면 그 직원의 출근 기록이 그 주가 든 급여 기간으로 열립니다. 사람마다 그 주에 한 번뿐입니다 — 보낸 기록의 키가 그 주의 일요일을 품습니다.
- // 보낸 기록은 7일 뒤 치워지지만, 그때는 이미 다음 주라 키가 달라 다시 가지 않습니다.
+ // 급여 기간(2주) 88시간을 넘긴 직원은 관리자에게 알립니다. 누르면 그 직원의 출근 기록이 그 급여 기간으로 열립니다. 사람마다 그 기간에 한 번뿐입니다 — 보낸 기록의 키가 그 기간의 첫 일요일을 품습니다.
+ // 보낸 기록은 한 급여 기간(14일)이 지나야 치웁니다. 더 일찍 치우면 같은 기간 안에서 알림이 다시 갑니다.
  const admins=adminsOf(state);
- for(const o of overtimeWorked(state,now)) sent+=await once(workspace,`${workspace}:ot:${o.employee.id}:${o.week}`,admins,{title:'주 {w}시간 초과',body:'{name}: 이번 주 {hours}시간 일했습니다. 초과 근무 수당이 붙습니다. 눌러서 근무 시간을 확인하세요.',vars:{w:OT_WEEKLY_HOURS,name:o.employee.name,hours:o.hours.toFixed(1)},tag:'overtime-'+o.employee.id,link:{open:'attendance',who:o.employee.id,from:payPeriodStart(o.week)}},origin,now);
- if(sent)await env.DB.prepare('DELETE FROM push_sent WHERE workspace = ? AND sent_at < ?').bind(workspace,new Date(now.getTime()-7*86400000).toISOString()).run();return sent}
+ for(const o of overtimeWorked(state,now)) sent+=await once(workspace,`${workspace}:ot:${o.employee.id}:${o.week}`,admins,{title:'급여 기간 {w}시간 초과',body:'{name}: 이번 급여 기간 {hours}시간 일했습니다. 초과 근무 수당이 붙습니다. 눌러서 근무 시간을 확인하세요.',vars:{w:OT_PERIOD_HOURS,name:o.employee.name,hours:o.hours.toFixed(1)},tag:'overtime-'+o.employee.id,link:{open:'attendance',who:o.employee.id,from:payPeriodStart(o.week)}},origin,now);
+ if(sent)await env.DB.prepare('DELETE FROM push_sent WHERE workspace = ? AND sent_at < ?').bind(workspace,new Date(now.getTime()-PAY_PERIOD_DAYS*86400000).toISOString()).run();return sent}
 const adminsOf=(state:State)=>[...rosterAdminIds(),...state.employees.filter(e=>e.admin&&!e.archived).map(e=>e.id)];
-// 근무를 넣거나 고쳐 한 주 44시간을 넘기게 되면, 저장하는 그 순간 관리자에게 알립니다. 누르면 그 직원의 출근 기록이 열립니다.
+// 근무를 넣거나 고쳐 급여 기간(2주) 88시간을 넘기게 되면, 저장하는 그 순간 관리자에게 알립니다. 누르면 그 직원의 출근 기록이 열립니다.
 // 저장한 사람 본인에게는 보내지 않습니다 — 방금 스스로 낸 근무라 알릴 것이 없습니다.
 export async function overtimeScheduled(workspace:string,before:State,after:State,actor:string,origin:string){
  const admins=adminsOf(after).filter(id=>id!==actor);if(!admins.length)return 0;let sent=0;
  const who=after.employees.find(e=>e.id===actor)?.name||'Admin';
  for(const o of overtimeAdded(before.shifts,after.shifts)){const e=after.employees.find(x=>x.id===o.employeeId);if(!e)continue;
-  sent+=await notify(workspace,admins,{title:'주 {w}시간 넘는 근무 편성',body:'{who}님이 {name}의 {week} 시작 주 근무를 {hours}시간으로 짰습니다. 눌러서 출근 기록을 확인하세요.',vars:{w:OT_WEEKLY_HOURS,who,name:e.name,week:o.week.slice(5).replace('-','/'),hours:o.hours.toFixed(1)},tag:'ot-plan-'+e.id+'-'+o.week,link:{open:'attendance',who:e.id,from:payPeriodStart(o.week)}},origin).catch(()=>0)}
+  sent+=await notify(workspace,admins,{title:'급여 기간 {w}시간 넘는 근무 편성',body:'{who}님이 {name}의 {week} 시작 급여 기간 근무를 {hours}시간으로 짰습니다. 눌러서 출근 기록을 확인하세요.',vars:{w:OT_PERIOD_HOURS,who,name:e.name,week:o.week.slice(5).replace('-','/'),hours:o.hours.toFixed(1)},tag:'ot-plan-'+e.id+'-'+o.week,link:{open:'attendance',who:e.id,from:payPeriodStart(o.week)}},origin).catch(()=>0)}
  return sent}
 // 완전히 삭제한 직원에게는 알림이 갈 곳이 없습니다. 기기 등록을 함께 지웁니다.
 export async function forgetPush(workspace:string,member:string){await env.DB.prepare('DELETE FROM push_subscriptions WHERE workspace = ? AND member = ?').bind(workspace,member).run()}

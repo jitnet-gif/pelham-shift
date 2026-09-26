@@ -1,4 +1,4 @@
-import {MAX_AREAS,MIN_WORKPLACE_RADIUS,MAX_WORKPLACE_RADIUS,OT_WEEKLY_HOURS,type State,type Shift,type Attendance,type Punch,areaList,canSwap,publicShifts,settlePublished,canWorkIn,leadDate,localDate,localTime,minutes,nameKey,overlap,overtimeOver,duration,payPeriodStart,payPeriodEnd,periodOpen,livePunches} from './domain';
+import {MAX_AREAS,MIN_WORKPLACE_RADIUS,MAX_WORKPLACE_RADIUS,OT_PERIOD_HOURS,type State,type Shift,type Attendance,type Punch,areaList,canSwap,publicShifts,settlePublished,canWorkIn,leadDate,localDate,localTime,minutes,nameKey,overlap,overtimeOver,duration,payPeriodStart,payPeriodEnd,periodOpen,livePunches} from './domain';
 export type Actor={id:string;admin:boolean};
 export type Command={type:string;payload:any};
 const fail=(message:string):never=>{throw new Error(message)};
@@ -30,7 +30,7 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
  // Payroll and staff records stay with the administrator.
  const taskManager=actor.admin||!!s.employees.find(e=>e.id===actor.id)?.taskManager;
  const scheduler=()=>{if(!taskManager)fail('작업 지시 권한이 필요합니다.')};
- // 초과 근무 편성은 따로 엽니다. 근무표는 짜도 한 주 44시간을 넘기는 근무는 이 권한을 받은 사람만 냅니다.
+ // 초과 근무 편성은 따로 엽니다. 근무표는 짜도 급여 기간(2주) 88시간을 넘기는 근무는 이 권한을 받은 사람만 냅니다.
  // 근무를 s 에 반영한 뒤에, 손대기 전 모습(before)과 견주어 부릅니다. 이미 넘어 있던 근무의 장소나 메모를
  // 고치는 것까지 막으면 예전에 짜 둔 근무표를 손볼 수 없게 되므로, 이번 편성이 더 넘긴 자리만 막습니다.
  // 막히면 그 자리에서 throw 되고, 손대던 s 는 복제본이라 그대로 버려집니다.
@@ -42,7 +42,7 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
    // 분 단위로 세다 보면 소수점 끝자리가 흔들립니다. 1분(0.017시간)보다 적게 늘어난 것은 늘어난 것으로 보지 않습니다.
    if(hours<=(was.get(key)??0)+0.001)continue;
    const name=employee(employeeId).name,extra=Math.round(hours*100)/100,day=key.slice(2);
-   fail(`${day} 주 ${name}: 주 ${OT_WEEKLY_HOURS}시간을 ${extra}시간 넘깁니다. 초과 근무 편성 권한이 필요합니다.`);
+   fail(`${day} 시작 급여 기간 ${name}: ${OT_PERIOD_HOURS}시간을 ${extra}시간 넘깁니다. 초과 근무 편성 권한이 필요합니다.`);
   }
  };
  const MANAGED=['taskCreate','taskRemove','areaAdd','shift','shiftUpdate','shiftRemove','publish'];

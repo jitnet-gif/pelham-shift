@@ -2,7 +2,7 @@
 // 흔적까지 지우는 쪽은 employeePurge 입니다 — 그 사람의 근무·출퇴근·급여·작업·메시지가 함께 사라지고 되돌릴 수 없습니다.
 // roles: 그 사람이 맡은 직군 전부. Proshop 과 Workshop 을 함께 맡는 멀티 플레이어를 위해 둡니다.
 // role: 그중 첫째 직군. 근무와 출퇴근은 장소를 하나만 적기에, 비워 둔 자리를 이 값으로 채웁니다.
-// overtimeManager: 한 주 44시간을 넘는 근무를 짤 수 있는 사람. 근무 편성 권한과 따로 둡니다 —
+// overtimeManager: 급여 기간(2주) 88시간을 넘는 근무를 짤 수 있는 사람. 근무 편성 권한과 따로 둡니다 —
 // 근무표를 짜는 것과 초과근무 수당이 붙는 근무를 내는 것은 다른 결정이기 때문입니다.
 export type Employee = {id:string;name:string;color:string;role:string;roles?:string[];rate:number;email:string;birthDate:string;phone?:string;punchId?:string;taskManager?:boolean;overtimeManager?:boolean;admin?:boolean;archived?:boolean};
 // draft: 새로 넣거나 고친 근무는 직원에게 공개하기 전까지 Unpublished 딱지를 답니다. publish 하면 지워집니다.
@@ -125,37 +125,38 @@ export const dueShifts=(state:State,now=new Date())=>nearShifts(state,now,left=>
 export const missedShifts=(state:State,now=new Date())=>nearShifts(state,now,left=>left<=0&&left>=-REMIND_WINDOW).filter(s=>!punchedIn(state,s));
 // What an approved time off or unavailability blocks on a shift's date, if anything. Managers are warned, not stopped.
 export function blockedBy(state:State,shift:Shift):'timeoff'|'unavailable'|null{const hits=(allDay:boolean,start?:string,end?:string)=>allDay||!start||!end||overlap(shift,{...shift,start,end});if((state.timeOff??[]).some(r=>r.status==='approved'&&r.employeeId===shift.employeeId&&shift.date>=r.from&&shift.date<=r.to&&hits(r.allDay,r.start,r.end)))return 'timeoff';if((state.availability??[]).some(r=>r.status==='approved'&&r.employeeId===shift.employeeId&&r.weekday===weekdayOf(shift.date)&&(!r.effectiveFrom||shift.date>=r.effectiveFrom)&&hits(r.allDay,r.start,r.end)))return 'unavailable';return null}
-// 급여 규칙 · 온타리오 고용기준법(ESA)을 따라 한 주(일요일 시작) 44시간을 넘긴 시간만 1.5배로 가산합니다.
-// 하루 기준은 없습니다 — 하루 10시간을 일해도 그 주 합이 44시간 안이면 가산하지 않습니다.
-export const OT_WEEKLY_HOURS=44;
+// 급여 규칙 · 급여 기간(일요일 시작 2주) 88시간을 넘긴 시간만 1.5배로 가산합니다.
+// 하루·한 주 기준은 없습니다 — 한 주에 50시간을 일해도 두 주 합이 88시간 안이면 가산하지 않습니다.
+// 온타리오 고용기준법(ESA)의 기본선은 주 44시간이라, 2주 평균으로 세려면 직원마다 서면 합의(averaging agreement)가 있어야 합니다.
+export const OT_PERIOD_HOURS=88;
 export const OT_MULTIPLIER=1.5;
 // 짜 놓은 근무표가 이 선을 얼마나 넘었는지 자리마다 셉니다. 급여가 초과근무를 세는 눈금과 같은 선을 봅니다 —
 // 편성에서 다른 선을 쓰면 통과한 근무가 급여에서 가산되거나 그 반대가 됩니다.
-// 무급 휴게는 빼고 셉니다. dates 에 적은 날이 속한 주만 보므로, 손대지 않은 주는 건드리지 않습니다.
-// 키는 'w:그 주의 일요일'. 편성 전후를 같은 키로 견주어, 이미 넘어 있던 근무는 그대로 두고
+// 무급 휴게는 빼고 셉니다. dates 에 적은 날이 속한 급여 기간만 보므로, 손대지 않은 기간은 건드리지 않습니다.
+// 키는 'w:그 급여 기간의 첫 일요일'. 편성 전후를 같은 키로 견주어, 이미 넘어 있던 근무는 그대로 두고
 // 이번 편성이 더 넘긴 자리만 가려냅니다.
 export function overtimeOver(shifts:Shift[],employeeId:string,dates:string[]):Map<string,number>{
  const mine=shifts.filter(x=>x.employeeId===employeeId);
  const hours=(list:Shift[])=>list.reduce((n,x)=>n+duration(x.start,x.end,x.breakMinutes??0),0);
  const over=new Map<string,number>();
- for(const week of [...new Set(dates.map(d=>weekStart(d)))].sort()){
-  const end=addDays(week,7);
-  const total=hours(mine.filter(x=>x.date>=week&&x.date<end))-OT_WEEKLY_HOURS;
+ for(const week of [...new Set(dates.map(d=>payPeriodStart(d)))].sort()){
+  const end=addDays(week,PAY_PERIOD_DAYS);
+  const total=hours(mine.filter(x=>x.date>=week&&x.date<end))-OT_PERIOD_HOURS;
   if(total>0)over.set('w:'+week,total);
  }
  return over;
 }
-// 이번 주(일요일 시작) 실제로 일한 시간이 44시간을 넘은 사람. 관리자에게 알리는 데 씁니다.
+// 이번 급여 기간(2주) 실제로 일한 시간이 88시간을 넘은 사람. 관리자에게 알리는 데 씁니다.
 // 급여와 같은 눈금(paidRecords·payableHours)으로 재고, 아직 퇴근을 찍지 않은 근무는 지금까지를 더합니다 —
 // 근무 중에 선을 넘는 순간 알 수 있게 하려는 것입니다. 퇴근을 잊고 며칠 열려 있는 기록은 어제·오늘 것만 셉니다.
 export function overtimeWorked(state:State,now=new Date()){
- const today=localDate(now),week=weekStart(today),current=localTime(now);
+ const today=localDate(now),week=payPeriodStart(today),current=localTime(now);
  const open=livePunches(state).filter(p=>!p.out&&p.date>=week&&p.date>=addDays(today,-1)).map(p=>({id:p.id,employeeId:p.employeeId,date:p.date,start:p.in,end:current,breakMinutes:(p.breaks??[]).reduce((n,b)=>n+(!b.paid&&b.end?Math.round(duration(b.start,b.end)*60):0),0)}));
  const worked=new Map<string,number>();
  for(const a of [...paidRecords(state).filter(a=>a.date>=week&&a.date<=today),...open])worked.set(a.employeeId,(worked.get(a.employeeId)??0)+payableHours(state,a));
- return state.employees.filter(e=>!e.archived&&(worked.get(e.id)??0)>OT_WEEKLY_HOURS).map(e=>({employee:e,week,hours:worked.get(e.id)!}));
+ return state.employees.filter(e=>!e.archived&&(worked.get(e.id)??0)>OT_PERIOD_HOURS).map(e=>({employee:e,week,hours:worked.get(e.id)!}));
 }
-// 근무표를 고치기 전(before)과 뒤(after)를 견주어, 주 44시간을 새로 넘기거나 더 넘긴 자리를 사람·주마다 돌려줍니다.
+// 근무표를 고치기 전(before)과 뒤(after)를 견주어, 급여 기간 88시간을 새로 넘기거나 더 넘긴 자리를 사람·기간마다 돌려줍니다.
 // 편성 권한 검사(overtimeOver)와 같은 선을 봅니다. 줄어든 자리나 그대로인 자리는 빠집니다.
 export function overtimeAdded(before:Shift[],after:Shift[]){
  const out:{employeeId:string;week:string;hours:number}[]=[];
@@ -163,7 +164,7 @@ export function overtimeAdded(before:Shift[],after:Shift[]){
   const dates=after.filter(x=>x.employeeId===employeeId).map(x=>x.date);
   const was=overtimeOver(before,employeeId,dates);
   for(const [key,over] of overtimeOver(after,employeeId,dates))
-   if(over>(was.get(key)??0)+0.001)out.push({employeeId,week:key.slice(2),hours:OT_WEEKLY_HOURS+over});
+   if(over>(was.get(key)??0)+0.001)out.push({employeeId,week:key.slice(2),hours:OT_PERIOD_HOURS+over});
  }
  return out;
 }
@@ -190,8 +191,8 @@ export function earlyOut(shift:Shift|undefined,inAt:string,outAt:string){
 // 조퇴 분. 지각과 같은 예정 근무(scheduledFor)를 기준으로 삼습니다 —
 // 한 기록을 두 눈금이 서로 다른 근무로 재면, 지각은 있는데 조퇴는 '예정 없음'인 줄이 나옵니다.
 export function earlyBy(state:{shifts:Shift[]},a:Attendance){return earlyOut(scheduledFor(state,a),a.start,a.end)}
-// 조회 구간이 주(일요일 시작) 경계에 맞지 않으면 걸쳐 있는 주의 초과근무가 실제보다 적게 잡힙니다.
-export function wholeWeeks(from:string,to:string){return weekStart(from)===from&&weekStart(addDays(to,1))===addDays(to,1)}
+// 조회 구간이 급여 기간 경계에 맞지 않으면 걸쳐 있는 기간의 초과근무가 실제보다 적게 잡힙니다.
+export function wholePeriods(from:string,to:string){return payPeriodStart(from)===from&&payPeriodStart(addDays(to,1))===addDays(to,1)}
 // 실근무시간을 정규·초과로 나눠 시급을 곱한 뒤 지각·조퇴한 만큼 차감합니다. 대체 근무에 붙는 추가수당은 없습니다 —
 // 예전 대체 요청에 남아 있는 bonus 값도 급여에 더하지 않습니다.
 // 급여가 보는 근무 기록. 단말에서 찍힌 출퇴근(punches)이 기준입니다.
@@ -233,9 +234,9 @@ export function shownPunch(state:{shifts:Shift[]},p:Punch){
 // 지각한 출근·조퇴한 퇴근 시각을 적는 글자색. 직원·관리자 화면이 모두 이 한 색을 씁니다.
 export const OFF_TIME_COLOR='#d0302f';
 export function payroll(state:State,employeeId:string,from:string,to:string){const e=state.employees.find(e=>e.id===employeeId)!;const records=paidRecords(state).filter(a=>a.employeeId===employeeId&&a.date>=from&&a.date<=to);const worked=(a:Attendance)=>payableHours(state,a);const hours=records.reduce((s,a)=>s+worked(a),0);
- // 날짜별로 합친 뒤 주(일요일 시작)별로 묶어 가산 시간을 구합니다.
- const byDay=new Map<string,number>();for(const a of records)byDay.set(a.date,(byDay.get(a.date)??0)+worked(a));const byWeek=new Map<string,number[]>();for(const [day,h] of byDay){const w=weekStart(day);byWeek.set(w,[...(byWeek.get(w)??[]),h])}
- const otHours=[...byWeek.values()].reduce((s,days)=>s+Math.max(0,days.reduce((n,h)=>n+h,0)-OT_WEEKLY_HOURS),0);const regularHours=hours-otHours;
+ // 날짜별로 합친 뒤 급여 기간(2주)별로 묶어 가산 시간을 구합니다.
+ const byDay=new Map<string,number>();for(const a of records)byDay.set(a.date,(byDay.get(a.date)??0)+worked(a));const byPeriod=new Map<string,number[]>();for(const [day,h] of byDay){const w=payPeriodStart(day);byPeriod.set(w,[...(byPeriod.get(w)??[]),h])}
+ const otHours=[...byPeriod.values()].reduce((s,days)=>s+Math.max(0,days.reduce((n,h)=>n+h,0)-OT_PERIOD_HOURS),0);const regularHours=hours-otHours;
  // 지각과 조퇴는 체크인 하나하나 따로 셉니다. 둘은 겹치지 않습니다 — 지각은 예정 출근부터 찍은 출근까지,
  // 조퇴는 찍은 퇴근부터 예정 퇴근까지라, 합치면 예정 근무 중 일하지 않은 시간 그대로입니다. 한 시간을 두 번 물리지 않습니다.
  // 차감은 둘을 합쳐 그 체크인에서 번 금액까지만입니다. 한 번 빠진 날이 다른 날 번 돈까지 갉아먹지 않습니다.

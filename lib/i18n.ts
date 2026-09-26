@@ -414,15 +414,15 @@ const en: Record<string, string> = {
     'No payroll recipients have an email yet. Add an email for {names} under Staff first.',
   시작일: 'Start date',
   종료일: 'End date',
-  '지급액은 단말에서 찍힌 출퇴근을 기준으로 계산합니다. 유급 휴게는 근무로 치고 무급 휴게만 뺍니다. 예정 시작보다 일찍 찍어도 예정 시작 시각부터 세고, 퇴근은 찍힌 시각까지 셉니다. 그 사람 그 날짜에 찍힌 기록이 없을 때만 예전에 가져온 기록을 씁니다. 초과근무는 한 주(일요일 시작) {w}시간을 넘긴 시간만 {m}배로 가산하며, 하루 기준은 없습니다. 지각은 체크인 하나하나 따로 보아 예정 출근 시각을 넘긴 분만큼 그 체크인에서 번 금액까지만 차감하며, 예정 근무가 없는 출근기록은 지각으로 보지 않습니다. 조퇴도 같은 방법으로 예정 퇴근 시각보다 일찍 찍은 분만큼 차감하며, 지각과 조퇴를 합친 차감은 그 체크인에서 번 금액을 넘지 않습니다. 세금·유급휴가를 제외한 예상 금액이고, 시급 0인 직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급 대상이 아니며 실제 출근기록만 지급합니다.':
-    "Pay is worked out from the check-ins taken on the time clock. Paid breaks count as work; only unpaid breaks come off. Pay runs from the scheduled start to the check-out time: checking in early adds no pay, and staying past the scheduled end is paid. Imported time clock records are used only when that person has no check-in on that date. Overtime pays {m}× on hours over {w} in a week (weeks start Sunday); there is no daily limit. Lateness is worked out per check-in: every minute past that check-in’s scheduled start is deducted at the hourly rate, never more than that check-in earned; attendance with no scheduled shift is never counted late. Undertime is deducted the same way, for every minute checked out ahead of the scheduled end; late and undertime together never take more than that check-in earned. Estimates exclude taxes and paid leave, and pay needs checking for anyone whose hourly rate is 0. Only actual attendance is paid, not the original employee's scheduled hours.",
+  '지급액은 단말에서 찍힌 출퇴근을 기준으로 계산합니다. 유급 휴게는 근무로 치고 무급 휴게만 뺍니다. 예정 시작보다 일찍 찍어도 예정 시작 시각부터 세고, 퇴근은 찍힌 시각까지 셉니다. 그 사람 그 날짜에 찍힌 기록이 없을 때만 예전에 가져온 기록을 씁니다. 초과근무는 급여 기간(일요일 시작 2주) {w}시간을 넘긴 시간만 {m}배로 가산하며, 하루·한 주 기준은 없습니다. 지각은 체크인 하나하나 따로 보아 예정 출근 시각을 넘긴 분만큼 그 체크인에서 번 금액까지만 차감하며, 예정 근무가 없는 출근기록은 지각으로 보지 않습니다. 조퇴도 같은 방법으로 예정 퇴근 시각보다 일찍 찍은 분만큼 차감하며, 지각과 조퇴를 합친 차감은 그 체크인에서 번 금액을 넘지 않습니다. 세금·유급휴가를 제외한 예상 금액이고, 시급 0인 직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급 대상이 아니며 실제 출근기록만 지급합니다.':
+    "Pay is worked out from the check-ins taken on the time clock. Paid breaks count as work; only unpaid breaks come off. Pay runs from the scheduled start to the check-out time: checking in early adds no pay, and staying past the scheduled end is paid. Imported time clock records are used only when that person has no check-in on that date. Overtime pays {m}× on hours over {w} in a two-week pay period (starting Sunday); there is no daily or weekly limit. Lateness is worked out per check-in: every minute past that check-in’s scheduled start is deducted at the hourly rate, never more than that check-in earned; attendance with no scheduled shift is never counted late. Undertime is deducted the same way, for every minute checked out ahead of the scheduled end; late and undertime together never take more than that check-in earned. Estimates exclude taxes and paid leave, and pay needs checking for anyone whose hourly rate is 0. Only actual attendance is paid, not the original employee's scheduled hours.",
   '직원이 이의를 제기한 근무 {n}건이 이 금액에 들어 있습니다. ':
     'This total includes {n} shift(s) a staff member has disputed. ',
   '아직 아무도 확인하지 않은 근무 {n}건이 있습니다. ': '{n} shift(s) have not been reviewed yet. ',
   '지급 전에 출근 기록에서 확인하세요.': 'Check them under Attendance before paying.',
   '출근 기록 보기': 'Open attendance',
-  '조회 구간이 주(일요일~토요일) 단위가 아니어서 걸쳐 있는 주의 초과근무가 실제보다 적게 잡힐 수 있습니다.':
-    'This range is not a whole Sunday-to-Saturday week, so overtime in the weeks it cuts across may come out lower than it really is.',
+  '조회 구간이 급여 기간(2주) 단위가 아니어서 걸쳐 있는 기간의 초과근무가 실제보다 적게 잡힐 수 있습니다.':
+    'This range is not a whole two-week pay period, so overtime in the periods it cuts across may come out lower than it really is.',
   이름: 'Name',
   실근무시간: 'Hours worked',
   정규: 'Regular',
@@ -447,10 +447,10 @@ const en: Record<string, string> = {
   '예정 근무': 'Scheduled',
   출퇴근: 'In / Out',
   금액: 'Amount',
-  '{week} 시작 주 · 실근무 {worked}h · 주 {w}시간 초과분 {applied}h → {m}배 가산':
-    'Week of {week} · {worked}h worked · {applied}h over {w}h a week → paid at {m}x',
-  '날짜별 금액은 시급 × 실근무이고, 지각 차감은 그 체크인에서 번 금액까지만 그 줄에서 바로 뺍니다. 초과분에 붙는 0.5배 가산만 주 단위로 아래에서 더합니다. 조퇴 차감도 같은 줄에서 바로 빼며, 지각과 조퇴를 합쳐도 그 줄에서 번 금액을 넘지 않습니다.':
-    'Each day shows the hourly rate times hours worked, with that check-in’s late deduction taken off on the same row, never more than the row earned. Only the extra 0.5x on overtime is applied per week, below. The undertime deduction comes off the same row, and late plus undertime together never exceed what that row earned.',
+  '{week}~{end} 급여 기간 · 실근무 {worked}h · {w}시간 초과분 {applied}h → {m}배 가산':
+    'Pay period {week}–{end} · {worked}h worked · {applied}h over {w}h → paid at {m}x',
+  '날짜별 금액은 시급 × 실근무이고, 지각 차감은 그 체크인에서 번 금액까지만 그 줄에서 바로 뺍니다. 초과분에 붙는 0.5배 가산만 급여 기간 단위로 아래에서 더합니다. 조퇴 차감도 같은 줄에서 바로 빼며, 지각과 조퇴를 합쳐도 그 줄에서 번 금액을 넘지 않습니다.':
+    'Each day shows the hourly rate times hours worked, with that check-in’s late deduction taken off on the same row, never more than the row earned. Only the extra 0.5x on overtime is applied per pay period, below. The undertime deduction comes off the same row, and late plus undertime together never exceed what that row earned.',
   통화: 'Currency',
   예상급여_: 'estimated-pay_',
 
@@ -562,8 +562,8 @@ const en: Record<string, string> = {
   '기타': 'Other',
   '초과 근무 편성 권한': 'Overtime scheduling',
   '초과 근무': 'Overtime',
-  '끄면 이 직원이 짜는 근무는 한 주(일요일 시작) {w}시간까지만 들어갑니다. 켜면 그 선을 넘는 근무도 낼 수 있고, 넘긴 시간에는 급여에서 {m}배가 붙습니다. 관리자는 이 설정과 상관없이 넘겨 짤 수 있습니다.':
-    'With this off, shifts this person schedules stop at {w} hours a week (weeks start Sunday). With it on they can schedule past that line, and the hours over it are paid at {m}× . Administrators can always schedule past it.',
+  '끄면 이 직원이 짜는 근무는 급여 기간(일요일 시작 2주) {w}시간까지만 들어갑니다. 켜면 그 선을 넘는 근무도 낼 수 있고, 넘긴 시간에는 급여에서 {m}배가 붙습니다. 관리자는 이 설정과 상관없이 넘겨 짤 수 있습니다.':
+    'With this off, shifts this person schedules stop at {w} hours per two-week pay period (starting Sunday). With it on they can schedule past that line, and the hours over it are paid at {m}× . Administrators can always schedule past it.',
   '대체근무 신청': 'Request a swap',
   '대체근무 승인': 'Approve swap',
   '근무 상세': 'Shift details',
@@ -741,12 +741,12 @@ const en: Record<string, string> = {
   '출근 기록이 아직 없습니다': 'You have not checked in yet',
   '{start} · {area} 근무가 시작됐는데 출근이 찍히지 않았습니다. 출퇴근 화면에서 출근을 찍어 주세요.':
     '{start} · Your {area} shift has started but no check-in was recorded. Please check in on the clock screen.',
-  '주 {w}시간 초과': 'Over {w} hours this week',
-  '{name}: 이번 주 {hours}시간 일했습니다. 초과 근무 수당이 붙습니다. 눌러서 근무 시간을 확인하세요.':
-    '{name} has worked {hours} hours this week. Overtime pay applies. Tap to see their hours.',
-  '주 {w}시간 넘는 근무 편성': 'Shift scheduled over {w} hours',
-  '{who}님이 {name}의 {week} 시작 주 근무를 {hours}시간으로 짰습니다. 눌러서 출근 기록을 확인하세요.':
-    '{who} scheduled {name} for {hours} hours in the week of {week}. Tap to see their attendance.',
+  '급여 기간 {w}시간 초과': 'Over {w} hours this pay period',
+  '{name}: 이번 급여 기간 {hours}시간 일했습니다. 초과 근무 수당이 붙습니다. 눌러서 근무 시간을 확인하세요.':
+    '{name} has worked {hours} hours this pay period. Overtime pay applies. Tap to see their hours.',
+  '급여 기간 {w}시간 넘는 근무 편성': 'Shifts scheduled over {w} hours in a pay period',
+  '{who}님이 {name}의 {week} 시작 급여 기간 근무를 {hours}시간으로 짰습니다. 눌러서 출근 기록을 확인하세요.':
+    '{who} scheduled {name} for {hours} hours in the pay period starting {week}. Tap to see their attendance.',
   'Pelham Shift 테스트 알림': 'Pelham Shift test notification',
   '이 기기에서 푸시 알림을 받을 수 있습니다.': 'This device can receive push notifications.',
 

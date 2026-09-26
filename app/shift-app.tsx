@@ -89,8 +89,8 @@ import {
   earlyBy,
   lateBy,
   scheduledFor,
-  wholeWeeks,
-  OT_WEEKLY_HOURS,
+  wholePeriods,
+  OT_PERIOD_HOURS,
   OT_MULTIPLIER,
   canSwap,
   leadDate,
@@ -969,19 +969,19 @@ export default function ShiftApp() {
         earlyDeduction: deductions.get(a.id)?.early ?? 0,
       }));
   };
-  // 초과근무가 어떤 근거로 잡혔는지. 한 주 44시간을 넘긴 시간만 가산합니다.
-  const payWeeks = (employeeId: string) => {
+  // 초과근무가 어떤 근거로 잡혔는지. 급여 기간(2주) 88시간을 넘긴 시간만 가산합니다.
+  const payPeriodOT = (employeeId: string) => {
     const byDay = new Map<string, number>();
     for (const r of payDays(employeeId))
       byDay.set(r.a.date, (byDay.get(r.a.date) ?? 0) + r.worked);
     const weeks = new Map<string, number[]>();
     for (const [day, h] of byDay)
-      weeks.set(weekStart(day), [...(weeks.get(weekStart(day)) ?? []), h]);
+      weeks.set(payPeriodStart(day), [...(weeks.get(payPeriodStart(day)) ?? []), h]);
     return [...weeks.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([week, days]) => {
         const worked = days.reduce((n, h) => n + h, 0);
-        return { week, worked, applied: Math.max(0, worked - OT_WEEKLY_HOURS) };
+        return { week, worked, applied: Math.max(0, worked - OT_PERIOD_HOURS) };
       });
   };
   const totals = data.employees.map((e) => ({
@@ -2133,15 +2133,15 @@ export default function ShiftApp() {
               )}
               <div className="policy">
                 {t(
-                  '지급액은 단말에서 찍힌 출퇴근을 기준으로 계산합니다. 유급 휴게는 근무로 치고 무급 휴게만 뺍니다. 예정 시작보다 일찍 찍어도 예정 시작 시각부터 세고, 퇴근은 찍힌 시각까지 셉니다. 그 사람 그 날짜에 찍힌 기록이 없을 때만 예전에 가져온 기록을 씁니다. 초과근무는 한 주(일요일 시작) {w}시간을 넘긴 시간만 {m}배로 가산하며, 하루 기준은 없습니다. 지각은 체크인 하나하나 따로 보아 예정 출근 시각을 넘긴 분만큼 그 체크인에서 번 금액까지만 차감하며, 예정 근무가 없는 출근기록은 지각으로 보지 않습니다. 조퇴도 같은 방법으로 예정 퇴근 시각보다 일찍 찍은 분만큼 차감하며, 지각과 조퇴를 합친 차감은 그 체크인에서 번 금액을 넘지 않습니다. 세금·유급휴가를 제외한 예상 금액이고, 시급 0인 직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급 대상이 아니며 실제 출근기록만 지급합니다.',
-                  { w: OT_WEEKLY_HOURS, m: OT_MULTIPLIER },
+                  '지급액은 단말에서 찍힌 출퇴근을 기준으로 계산합니다. 유급 휴게는 근무로 치고 무급 휴게만 뺍니다. 예정 시작보다 일찍 찍어도 예정 시작 시각부터 세고, 퇴근은 찍힌 시각까지 셉니다. 그 사람 그 날짜에 찍힌 기록이 없을 때만 예전에 가져온 기록을 씁니다. 초과근무는 급여 기간(일요일 시작 2주) {w}시간을 넘긴 시간만 {m}배로 가산하며, 하루·한 주 기준은 없습니다. 지각은 체크인 하나하나 따로 보아 예정 출근 시각을 넘긴 분만큼 그 체크인에서 번 금액까지만 차감하며, 예정 근무가 없는 출근기록은 지각으로 보지 않습니다. 조퇴도 같은 방법으로 예정 퇴근 시각보다 일찍 찍은 분만큼 차감하며, 지각과 조퇴를 합친 차감은 그 체크인에서 번 금액을 넘지 않습니다. 세금·유급휴가를 제외한 예상 금액이고, 시급 0인 직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급 대상이 아니며 실제 출근기록만 지급합니다.',
+                  { w: OT_PERIOD_HOURS, m: OT_MULTIPLIER },
                 )}
-                {/* 주 단위로 끊기지 않은 구간은 걸쳐 있는 주의 초과근무가 적게 잡힙니다. */}
-                {!wholeWeeks(from, to) && (
+                {/* 급여 기간 단위로 끊기지 않은 구간은 걸쳐 있는 기간의 초과근무가 적게 잡힙니다. */}
+                {!wholePeriods(from, to) && (
                   <b className="red">
                     {' '}
                     {t(
-                      '조회 구간이 주(일요일~토요일) 단위가 아니어서 걸쳐 있는 주의 초과근무가 실제보다 적게 잡힐 수 있습니다.',
+                      '조회 구간이 급여 기간(2주) 단위가 아니어서 걸쳐 있는 기간의 초과근무가 실제보다 적게 잡힐 수 있습니다.',
                     )}
                   </b>
                 )}
@@ -2894,17 +2894,18 @@ export default function ShiftApp() {
                   </Table>
                 </div>
                 <p className="hint">
-                  {t('날짜별 금액은 시급 × 실근무이고, 지각 차감은 그 체크인에서 번 금액까지만 그 줄에서 바로 뺍니다. 초과분에 붙는 0.5배 가산만 주 단위로 아래에서 더합니다. 조퇴 차감도 같은 줄에서 바로 빼며, 지각과 조퇴를 합쳐도 그 줄에서 번 금액을 넘지 않습니다.')}
+                  {t('날짜별 금액은 시급 × 실근무이고, 지각 차감은 그 체크인에서 번 금액까지만 그 줄에서 바로 뺍니다. 초과분에 붙는 0.5배 가산만 급여 기간 단위로 아래에서 더합니다. 조퇴 차감도 같은 줄에서 바로 빼며, 지각과 조퇴를 합쳐도 그 줄에서 번 금액을 넘지 않습니다.')}
                 </p>
-                {payWeeks(payDetail).map((w) => (
+                {payPeriodOT(payDetail).map((w) => (
                   <p className="hint" key={w.week}>
                     {t(
-                      '{week} 시작 주 · 실근무 {worked}h · 주 {w}시간 초과분 {applied}h → {m}배 가산',
+                      '{week}~{end} 급여 기간 · 실근무 {worked}h · {w}시간 초과분 {applied}h → {m}배 가산',
                       {
                         week: monthDay(w.week),
+                        end: monthDay(payPeriodEnd(w.week)),
                         worked: w.worked.toFixed(2),
                         applied: w.applied.toFixed(2),
-                        w: OT_WEEKLY_HOURS,
+                        w: OT_PERIOD_HOURS,
                         m: OT_MULTIPLIER,
                       },
                     )}
@@ -3309,8 +3310,8 @@ export default function ShiftApp() {
                 </label>
                 <p className="hint">
                   {t(
-                    '끄면 이 직원이 짜는 근무는 한 주(일요일 시작) {w}시간까지만 들어갑니다. 켜면 그 선을 넘는 근무도 낼 수 있고, 넘긴 시간에는 급여에서 {m}배가 붙습니다. 관리자는 이 설정과 상관없이 넘겨 짤 수 있습니다.',
-                    { w: OT_WEEKLY_HOURS, m: OT_MULTIPLIER },
+                    '끄면 이 직원이 짜는 근무는 급여 기간(일요일 시작 2주) {w}시간까지만 들어갑니다. 켜면 그 선을 넘는 근무도 낼 수 있고, 넘긴 시간에는 급여에서 {m}배가 붙습니다. 관리자는 이 설정과 상관없이 넘겨 짤 수 있습니다.',
+                    { w: OT_PERIOD_HOURS, m: OT_MULTIPLIER },
                   )}
                 </p>
               </>
