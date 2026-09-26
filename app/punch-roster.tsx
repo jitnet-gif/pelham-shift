@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Employee, Punch, Shift, State } from '@/lib/domain';
 import { PunchTimesheet } from './punch-timesheet';
@@ -55,6 +55,8 @@ type RosterProps = {
   today: string;
   // 표에서 고르면 그 칸의 급여 기간을 함께 넘깁니다. 카드는 언제나 지금 기간입니다.
   onPick: (employeeId: string, from?: string) => void;
+  // 급여 상세에서 건너온 줄. 출근부 보기로 그 기간을 열고 그 줄을 형광색으로 짚습니다.
+  focus?: { id: string; from: string };
 };
 
 // 관리자가 고른 보기. 이 기기에서만 기억합니다 — 막혀 있어도 기본 보기로 그립니다.
@@ -85,6 +87,12 @@ export function PunchRoster(props: RosterProps) {
   );
   const [from, setFrom] = useState(() => payPeriodStart(props.today));
   const [cell, setCell] = useState(() => recall(CELL_KEY, ['clock', 'hours'] as const, 'clock'));
+  // 짚을 줄이 오면 출근부와 그 기간으로 맞춥니다. 저장된 보기는 건드리지 않습니다.
+  useEffect(() => {
+    if (!props.focus) return;
+    setView('ledger');
+    setFrom(props.focus.from);
+  }, [props.focus?.id, props.focus?.from]);
   const pick = <T extends string>(set: (v: T) => void, key: string) => (v: T) => {
     set(v);
     keep(key, v);
@@ -124,6 +132,7 @@ export function PunchRoster(props: RosterProps) {
           from={from}
           today={props.today}
           onPick={props.onPick}
+          focus={props.focus?.id}
         />
       ) : view === 'sheet' ? (
         <PunchSheet {...props} cell={cell} from={from} />

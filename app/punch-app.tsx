@@ -10,6 +10,7 @@ import { useLang } from './use-lang';
 import GpsGuard, { useGps } from './gps-guard';
 import StaffClock from './staff-clock';
 import { useBack } from './use-back';
+import { track } from './activity';
 import BirthLogin from './birth-login';
 import LoginQr from './login-qr';
 
@@ -88,6 +89,8 @@ export default function PunchApp() {
 
   useEffect(() => {
     if (auth === 'in') void pushOn().then(setPush);
+    // 앱 사용 기록. 출퇴근 앱을 연 것을 한 번 남깁니다.
+    if (auth === 'in') track('punch', 'clock');
   }, [auth]);
   // 알림 문구는 서버가 기기별로 고릅니다. 말을 바꾸면 이 기기를 다시 등록합니다.
   useEffect(() => {

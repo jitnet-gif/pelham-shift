@@ -1,5 +1,5 @@
 // admin: 직원이면서 관리자 권한을 가진 사람. archived: 삭제한 직원 — 지난 기록을 위해 데이터에는 남기고 화면 목록에서만 감춥니다.
-// 흔적까지 지우는 쪽은 employeePurge 입니다 — 그 사람의 근무·출퇴근·급여·작업·메시지가 함께 사라지고 되돌릴 수 없습니다.
+// 기록까지 지우는 삭제는 없습니다. 보관한 직원은 employeeRestore 로 되돌릴 수 있습니다.
 // roles: 그 사람이 맡은 직군 전부. Proshop 과 Workshop 을 함께 맡는 멀티 플레이어를 위해 둡니다.
 // role: 그중 첫째 직군. 근무와 출퇴근은 장소를 하나만 적기에, 비워 둔 자리를 이 값으로 채웁니다.
 // overtimeManager: 급여 기간(2주) 88시간을 넘는 근무를 짤 수 있는 사람. 근무 편성 권한과 따로 둡니다 —
@@ -9,9 +9,11 @@ export type Employee = {id:string;name:string;color:string;role:string;roles?:st
 export type Shift = {id:string;employeeId:string;date:string;start:string;end:string;area:string;note?:string;breakMinutes?:number;originalId?:string;draft?:boolean};
 export type Swap = {id:string;shiftId:string;from:string;to:string;status:'requested'|'accepted'|'approved'|'rejected';createdAt:string;bonus?:number};
 export type Attendance = {id:string;employeeId:string;date:string;start:string;end:string;breakMinutes:number};
-export type Message = {id:string;sender:string;to:string;body:string;createdAt:string;readBy:string[];kind:string;recipients?:string[]};
+// removedAt/removedBy: 지운 메시지. 화면에서만 사라지고 데이터와 엑셀 백업에는 그대로 남습니다.
+export type Message = {id:string;sender:string;to:string;body:string;createdAt:string;readBy:string[];kind:string;recipients?:string[];removedAt?:string;removedBy?:string};
 // time 은 마감 시각입니다. 적지 않고 보낼 수 있어 예전에 보낸 작업에는 없습니다.
-export type Task = {id:string;assignedTo:string;title:string;notes:string;date:string;time?:string;status:'sent'|'seen'|'completed';createdAt:string;completedAt?:string;createdBy?:string};
+// removedAt/removedBy: 지운 작업 지시. 메시지와 같이 화면에서만 감추고 기록은 지우지 않습니다.
+export type Task = {id:string;assignedTo:string;title:string;notes:string;date:string;time?:string;status:'sent'|'seen'|'completed';createdAt:string;completedAt?:string;createdBy?:string;removedAt?:string;removedBy?:string};
 export type Decision='pending'|'approved'|'declined';
 // Time off covers a date range; a partial day (allDay false) is a single date with start/end times.
 export type TimeOff = {id:string;employeeId:string;from:string;to:string;allDay:boolean;start?:string;end?:string;reason:string;status:Decision;createdAt:string;decidedAt?:string};
@@ -23,7 +25,7 @@ export type PunchBreak = {start:string;end?:string;paid:boolean};
 // 위치 권한을 막아 둔 기기도 있어 없을 수 있습니다 — 없으면 그냥 비워 둡니다.
 export type PunchSpot = {lat:number;lng:number;accuracy?:number};
 // 직원이 그 자리에서 찍은 실제 출퇴근. status 는 급여 기간이 닫히기 전 직원 본인이 확인한 결과입니다.
-// removedAt/removedBy: 관리자가 지운 출퇴근(잘못 누른 중복 등). 화면과 급여에서만 빠지고 데이터와 엑셀 백업에는 남습니다.
+// removedAt/removedBy: 관리자가 지운 출퇴근(잘못 누른 중복 등). 메시지와 같이 화면과 급여에서만 빠지고 데이터와 엑셀 백업에는 남습니다.
 export type Punch = {id:string;employeeId:string;date:string;in:string;out?:string;area?:string;breaks?:PunchBreak[];photoAt?:string;outPhotoAt?:string;spot?:PunchSpot;outSpot?:PunchSpot;status?:'pending'|'approved'|'disputed';disputeNote?:string;editedBy?:string;reviewedAt?:string;removedAt?:string;removedBy?:string};
 // 살아 있는 출퇴근. 지운 기록은 급여·알림·겹침 검사 어디에도 세지 않습니다.
 export const livePunches=(state:{punches?:Punch[]})=>(state.punches??[]).filter(p=>!p.removedAt);
@@ -118,7 +120,8 @@ export function pendingChanges(state:State){const shown=new Map(publicShifts(sta
 // '공개 중'은 작업본과 공개본이 같을 때로 다시 적습니다. 명령마다 스위치를 따로 켜고 끄지 않습니다.
 export function settlePublished(state:State){const shown=new Map(publicShifts(state).map(x=>[x.id,shiftKey(x)]));for(const x of state.shifts)if(x.draft&&shown.get(x.id)===shiftKey(x))delete x.draft;state.published=pendingChanges(state)===0}
 // 알림이 걸릴 만한 근무만 걸러 냅니다. 직원이 보는 공개본을 봅니다 — 공개하지 않은 변경은 직원에게 아직 없는 일정이라 알리지 않습니다.
-function nearShifts(state:State,now:Date,keep:(left:number)=>boolean){const today=localDate(now),current=clubMinutes(now);const days=new Set([addDays(today,-1),today,addDays(today,1)]);return publicShifts(state).filter(s=>days.has(s.date)&&keep(untilStart(s,today,current)))}
+// 삭제(보관)한 직원의 근무는 남아 있어도 알리지 않습니다.
+function nearShifts(state:State,now:Date,keep:(left:number)=>boolean){const today=localDate(now),current=clubMinutes(now);const days=new Set([addDays(today,-1),today,addDays(today,1)]);const gone=new Set(state.employees.filter(e=>e.archived).map(e=>e.id));return publicShifts(state).filter(s=>!gone.has(s.employeeId)&&days.has(s.date)&&keep(untilStart(s,today,current)))}
 // 곧 시작하는 근무. 이미 출근을 찍은 사람에게는 알릴 것이 없어 빠집니다.
 export const dueShifts=(state:State,now=new Date())=>nearShifts(state,now,left=>left>0&&left<=REMIND_WINDOW).filter(s=>!punchedIn(state,s));
 // 출근을 깜빡한 근무. 시작 시각을 지났는데도 출근이 찍히지 않은 사이입니다.
@@ -269,6 +272,44 @@ export function payroll(state:State,employeeId:string,from:string,to:string){con
  return {hours,regularHours,otHours,holidayHours,lateMinutes,lateDays,earlyMinutes,earlyDays,lates:lates.map(r=>({...r,deduction:cents(r.deduction),earlyDeduction:cents(r.earlyDeduction)})),base:cents(base),otPay:cents(otPay),holidayPay:cents(holidayPay),lateDeduction:cents(lateDeduction),earlyDeduction:cents(earlyDeduction),total:cents(earned-lateDeduction-earlyDeduction),...punchReviewCounts(state,employeeId,from,to)}}
 // 근무지 이름. 직원 화면과 출퇴근 단말이 같은 이름을 씁니다.
 export const LOCATION='Pelham Hills Golf Club';
+// 급여 명세(JSON). payroll() 과 같은 규칙을 근무 한 줄씩 나눠 적습니다 — 주(일요일 시작)로 묶고, 주 합계와 사람 합계를 붙입니다.
+// 초과근무는 급여 기간 안에서 시간 순으로 쌓아 88시간을 넘긴 근무부터 붙입니다. 공휴일 근무는 1.5배로 세고 88시간 합에 넣지 않습니다.
+// total_pay 는 그 근무의 지각·조퇴 차감까지 뺀 금액이라, 사람 합계가 급여 화면·CSV 의 예상 급여와 같습니다.
+// 주 합계는 반올림 전 값을 더한 뒤 한 번만 반올림하고, 사람 합계는 payroll() 의 값을 그대로 적어 CSV 와 센트까지 맞춥니다.
+// Week 번호는 조회 시작일이 든 주를 1로 셉니다 — 그 주에 근무가 없는 사람도 둘째 주는 Week 2 입니다.
+export function payrollSheet(state:State,from:string,to:string){
+ const r2=(n:number)=>Math.round(n*100)/100;
+ const md=(d:string)=>new Date(d+'T12:00:00Z').toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'});
+ const areaOf=new Map(livePunches(state).map(p=>[p.id,p.area]));
+ const employees=[];
+ for(const e of state.employees){
+  const pay=payroll(state,e.id,from,to);
+  if(!(pay.hours>0||pay.total!==0))continue;
+  const cut=new Map(pay.lates.map(l=>[l.id,l]));
+  const records=paidRecords(state).filter(a=>a.employeeId===e.id&&a.date>=from&&a.date<=to).sort((a,b)=>(a.date+paidStart(state,a)).localeCompare(b.date+paidStart(state,b)));
+  const cum=new Map<string,number>();
+  const shifts=records.map(a=>{
+   const h=payableHours(state,a),holiday=!!holidayOn(a.date),period=payPeriodStart(a.date);
+   let ot=0;if(!holiday){const before=cum.get(period)??0;ot=Math.max(0,Math.min(h,before+h-OT_PERIOD_HOURS));cum.set(period,before+h)}
+   const l=cut.get(a.id),late=(l?.minutes??0)>0,early=(l?.early??0)>0;
+   const earned=holiday?h*e.rate*HOLIDAY_MULTIPLIER:(h-ot)*e.rate+ot*e.rate*OT_MULTIPLIER;
+   const pay=earned-(l?.deduction??0)-(l?.earlyDeduction??0);
+   const flags=[...(late?['Late']:[]),...(early?['Early']:[]),...(holiday?['Holiday']:[]),...(ot>0?['Overtime']:[])];
+   return {week:weekStart(a.date),hours:h,pay,row:{date:a.date,start:paidStart(state,a),end:paidEnd(state,a),flags,location:LOCATION,
+    role:areaOf.get(a.id)||scheduledFor(state,a)?.area||roleLabel(e),wage:e.rate,
+    regular_hours:r2(h-ot),ot_hours:r2(ot),total_hours:r2(h),total_pay:r2(pay)}};
+  });
+  const sum=(list:{hours:number;pay:number}[])=>({total_hours:r2(list.reduce((n,x)=>n+x.hours,0)),total_pay:r2(list.reduce((n,x)=>n+x.pay,0))});
+  const weeks=[...new Set(shifts.map(x=>x.week))].sort().map(week=>{
+   const n=Math.round((dayNumber(week)-dayNumber(weekStart(from)))/7)+1;
+   const list=shifts.filter(x=>x.week===week);
+   const first=week<from?from:week,last=addDays(week,6)>to?to:addDays(week,6);
+   return {label:`Week ${n}: ${md(first)} - ${md(last)}`,shifts:list.map(x=>x.row),weekly_total:sum(list)};
+  });
+  employees.push({name:e.name,weeks,grand_total:{total_hours:r2(pay.hours),total_pay:pay.total}});
+ }
+ return {period:{start:from,end:to},employees};
+}
 // 날씨와 일출·일몰은 클럽이 서 있는 자리의 것입니다 — 출퇴근을 찍는 자리와 같은 좌표를 봅니다.
 // 관리자가 출퇴근 자리를 다시 잡아 두었으면 그 좌표(state.workplace)를 먼저 쓰고, 없을 때 이 값으로 떨어집니다.
 export const WEATHER_SPOT: {lat:number;lng:number} | null = CLUB_SPOT;

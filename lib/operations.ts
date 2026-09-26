@@ -56,22 +56,15 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
   if(!empty.length)fail('모든 직원에게 이미 직원 ID 가 있습니다.');
   for(const e of empty){while(used.has(String(next))){next++;if(next>99999999)fail('쓸 수 있는 번호가 없습니다.')}e.punchId=String(next);used.add(e.punchId)}break;}
  case 'employeeRemove': {admin();const e=employee(p.id);if(e.id===actor.id)fail('본인 계정은 삭제할 수 없습니다.');s.employees=s.employees.map(x=>x.id===e.id?{...x,archived:true,admin:false}:x);break;}
- // 완전 삭제. 위의 삭제가 이름을 남기는 삭제라면 이쪽은 흔적까지 지웁니다 — 근무·출퇴근·급여·작업·메시지가 함께 사라지고 되돌릴 수 없습니다.
- // 남의 줄에 이름만 얹혀 있던 자리(대체 원 근무자, 읽음 표시, 지시한 사람, 고친 사람)는 줄을 지우지 않고 그 이름만 떼어 냅니다.
- case 'employeePurge': {admin();const gone=employee(p.id).id;if(gone===actor.id)fail('본인 계정은 삭제할 수 없습니다.');
-  s.employees=s.employees.filter(x=>x.id!==gone);
-  // 공개본에서도 함께 치웁니다 — 흔적까지 지우는 삭제라 직원 화면에 남아서도 안 됩니다.
-  for(const list of [s.shifts,s.publishedShifts]){for(const x of list)if(x.originalId===gone)delete x.originalId}
-  s.shifts=s.shifts.filter(x=>x.employeeId!==gone);s.publishedShifts=s.publishedShifts.filter(x=>x.employeeId!==gone);
-  const alive=new Set(s.shifts.map(x=>x.id));s.swaps=s.swaps.filter(x=>x.from!==gone&&x.to!==gone&&alive.has(x.shiftId));
-  s.attendance=s.attendance.filter(x=>x.employeeId!==gone);
-  s.messages=s.messages.filter(x=>x.sender!==gone&&x.to!==gone).map(x=>({...x,readBy:(x.readBy??[]).filter(v=>v!==gone),...(x.recipients?{recipients:x.recipients.filter(v=>v!==gone)}:{})})).filter(x=>!x.recipients||x.recipients.length>0);
-  s.tasks=s.tasks.filter(x=>x.assignedTo!==gone);for(const x of s.tasks)if(x.createdBy===gone)delete x.createdBy;
-  s.timeOff=s.timeOff!.filter(x=>x.employeeId!==gone);
-  s.availability=s.availability!.filter(x=>x.employeeId!==gone);
-  s.punches=s.punches!.filter(x=>x.employeeId!==gone);for(const x of s.punches)if(x.editedBy===gone)delete x.editedBy;
-  s.clockNames=s.clockNames!.filter(x=>x.employeeId!==gone);
-  break;}
+ // 완전 삭제는 없앴습니다. 직원을 지워도 근무·출퇴근·급여·작업·메시지 기록은 데이터에 남고, 화면에서만 감춥니다.
+ // 예전 화면이 보내는 요청도 여기서 막습니다 — 지운 흔적은 activity_log 에만 남습니다.
+ case 'employeePurge': fail('완전 삭제는 지원하지 않습니다. 삭제한 직원의 기록은 그대로 보관됩니다.');break;
+ // 보관한(삭제한) 직원을 다시 목록으로 되돌립니다. 기록을 지우지 않았으므로 지난 근무·출퇴근이 그대로 이어집니다.
+ case 'employeeRestore': {admin();const e=employee(p.id);if(!e.archived)fail('보관된 직원이 아닙니다.');const live=s.employees.filter(x=>x.id!==e.id&&!x.archived);
+  if(e.punchId&&live.some(x=>x.punchId===e.punchId))fail('이 직원의 직원 ID 를 다른 직원이 쓰고 있습니다. 번호를 바꾼 뒤 되돌리세요.');
+  if(e.email&&live.some(x=>x.email===e.email))fail('이미 등록된 이메일입니다.');
+  if(e.birthDate&&live.some(x=>x.birthDate===e.birthDate))fail('같은 생년월일이 이미 등록되어 있습니다.');
+  s.employees=s.employees.map(x=>x.id===e.id?{...x,archived:undefined}:x);break;}
  case 'shift': {scheduler();const who=employee(p.employeeId);const shift:Shift={id:id(),employeeId:p.employeeId,date:date(p.date),start:time(p.start,true),end:time(p.end,true),area:text(p.area,60),note:p.note?text(p.note,250):undefined,breakMinutes:p.breakMinutes?number(p.breakMinutes,720):undefined,draft:true};if(!canWorkIn(who,shift.area))fail('Workshop 근무는 Workshop 업무를 맡은 직원에게만 넣을 수 있습니다.');if(!duration(shift.start,shift.end))fail('출근과 퇴근 시간이 같습니다.');if((shift.breakMinutes??0)>=duration(shift.start,shift.end)*60)fail('휴게시간이 근무시간보다 깁니다.');if(s.shifts.some(x=>x.employeeId===shift.employeeId&&overlap(x,shift)))fail('해당 직원의 근무시간이 겹칩니다.');const before=[...s.shifts];s.shifts.push(shift);withinOvertime(before,shift.employeeId,[shift.date]);break;}
  case 'shiftUpdate': {scheduler();const ids=[...new Set(String(p.ids||'').split(',').filter(Boolean))];if(!ids.length)fail('수정할 근무를 선택하세요.');if(ids.length>1000)fail('한 번에 최대 1,000개 근무를 수정할 수 있습니다.');const single=ids.length===1;const start=p.start?time(p.start,true):'',end=p.end?time(p.end,true):'',area=p.area?text(p.area,60):'',day=single&&p.date?date(p.date):'',note=single&&p.note!==undefined?String(p.note).trim().slice(0,250):null,rest=single&&p.breakMinutes!==undefined?number(p.breakMinutes,720):null;if(!start&&!end&&!area&&!day&&note===null&&rest===null)fail('변경할 내용을 입력하세요.');const targets=ids.map(v=>s.shifts.find(x=>x.id===v)??fail('근무를 찾을 수 없습니다. 새로고침 후 다시 시도하세요.'));
   // 고치기 전 모습. 아래에서 targets 를 제자리에서 손대므로, 견줄 값은 지금 떠 두어야 합니다.
@@ -154,7 +147,7 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
   if(s.attendance.some(x=>x.id!==key&&x.employeeId===a.employeeId&&overlap({...x,area:''},span(day,at,out))))fail('이 시간에 이미 찍힌 출퇴근이 있습니다.');
   Object.assign(a,{date:day,start:at,end:out,breakMinutes:rest});break;}
  // 잘못 찍힌 출퇴근(연달아 누른 0분 기록 등)을 관리자가 지웁니다. 겹침 검사에 걸려 고칠 수 없는 중복을 치우는 자리입니다.
- // 데이터에서 빼지 않고 지운 표시만 답니다 — 화면과 급여에서는 사라지고, 엑셀 백업에는 남습니다.
+ // 데이터에서 빼지 않고 지운 표시만 답니다 — 화면과 급여에서는 사라지고, 엑셀 백업과 활동 기록에는 남습니다.
  case 'punchRemove': {admin();const punch=livePunches(s).find(x=>x.id===text(p.id,120))??fail('근무 기록을 찾을 수 없습니다.');
   punch.removedAt=now.toISOString();punch.removedBy=actor.id;break;}
  // 출근기계 이름과 직원을 한 번 승인해 두면 다음 타임카드부터 자동으로 이어집니다. 비슷한 이름은 후보로만 제안하고, 확정은 관리자가 합니다.
@@ -170,15 +163,16 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
  // 직원이 관리자에게 보낸 메시지는 to 가 'admin' 이라 관리자 본인 id 와 같지 않습니다. 관리자라면 받는 사람으로 봅니다.
  // 대화 하나를 열면 그 안의 안 읽은 메시지를 한꺼번에 읽음으로 올립니다. ids 로 여러 개, id 로 하나를 받습니다.
  case 'read': {const ids:string[]=Array.isArray(p.ids)?p.ids.map(String):[String(p.id)];for(const one of ids){const m=s.messages.find(x=>x.id===one)??fail('메시지가 없습니다.');const mine=m.to==='all'?!m.recipients||m.recipients.includes(actor.id):m.to==='admin'?actor.admin:m.to===actor.id;if(!mine&&m.sender!==actor.id)fail('권한이 없습니다.');if(!m.readBy.includes(actor.id))m.readBy.push(actor.id);}break;}
- // 메시지 삭제는 관리자만 할 수 있습니다. 지우면 직원 화면에서도 함께 사라집니다.
- case 'messageRemove': {admin();const ids:string[]=Array.isArray(p.ids)?p.ids.map(String):[text(p.id,120)];for(const one of ids)if(!s.messages.some(x=>x.id===one))fail('메시지가 없습니다.');s.messages=s.messages.filter(x=>!ids.includes(x.id));break;}
+ // 메시지 삭제는 관리자만 할 수 있습니다. 지우면 직원 화면에서도 함께 사라지지만, 데이터에는 지운 표시만 달고 남깁니다.
+ case 'messageRemove': {admin();const ids:string[]=Array.isArray(p.ids)?p.ids.map(String):[text(p.id,120)];for(const one of ids)if(!s.messages.some(x=>x.id===one&&!x.removedAt))fail('메시지가 없습니다.');for(const x of s.messages)if(ids.includes(x.id)){x.removedAt=now.toISOString();x.removedBy=actor.id}break;}
  // 업무(직무)는 늘리기만 합니다 — 근무·출퇴근 기록이 이름을 그대로 들고 있어, 지우면 지난 기록이 가리킬 곳을 잃습니다.
  case 'areaAdd': {if(!taskManager)fail('작업 지시 권한이 필요합니다.');const area=text(p.name,60);const list=areaList(s);if(list.some(a=>nameKey(a)===nameKey(area)))fail('이미 있는 업무입니다.');if(list.length>=MAX_AREAS)fail('업무는 40개까지 만들 수 있습니다.');s.areas=[...list,area];break;}
  case 'taskCreate': {if(!taskManager)fail('작업 지시 권한이 필요합니다.');const assignedTo=text(p.assignedTo,80);employee(assignedTo);s.tasks.push({id:id(),assignedTo,title:text(p.title,160),notes:typeof p.notes==='string'?p.notes.trim().slice(0,2000):'',date:date(p.date),...(p.time?{time:tenMinute(p.time)}:{}),status:'sent',createdAt:now.toISOString(),createdBy:actor.id});break;}
  // 작업 지시는 낸 사람이 거두어 갑니다. 관리자는 누가 낸 것이든 지울 수 있고,
  // 지시한 사람이 적혀 있지 않은 옛 작업은 관리자만 지울 수 있습니다.
- case 'taskRemove': {const task=s.tasks.find(x=>x.id===text(p.id,120))??fail('작업을 찾을 수 없습니다.');if(!actor.admin&&task.createdBy!==actor.id)fail('본인이 지시한 작업만 삭제할 수 있습니다.');s.tasks=s.tasks.filter(x=>x.id!==task.id);break;}
- case 'taskUpdate': {const task=s.tasks.find(x=>x.id===text(p.id,120))??fail('작업을 찾을 수 없습니다.');if(!actor.admin&&task.assignedTo!==actor.id)fail('본인에게 배정된 작업만 처리할 수 있습니다.');if(p.action==='seen'){if(task.status==='sent')task.status='seen'}else if(p.action==='complete'){task.status='completed';task.completedAt=now.toISOString()}else fail('잘못된 작업 처리입니다.');break;}
+ // 지운 작업은 화면에서만 사라집니다. 데이터에는 지운 시각과 지운 사람을 달아 남겨 둡니다.
+ case 'taskRemove': {const task=s.tasks.find(x=>x.id===text(p.id,120)&&!x.removedAt)??fail('작업을 찾을 수 없습니다.');if(!actor.admin&&task.createdBy!==actor.id)fail('본인이 지시한 작업만 삭제할 수 있습니다.');task.removedAt=now.toISOString();task.removedBy=actor.id;break;}
+ case 'taskUpdate': {const task=s.tasks.find(x=>x.id===text(p.id,120)&&!x.removedAt)??fail('작업을 찾을 수 없습니다.');if(!actor.admin&&task.assignedTo!==actor.id)fail('본인에게 배정된 작업만 처리할 수 있습니다.');if(p.action==='seen'){if(task.status==='sent')task.status='seen'}else if(p.action==='complete'){task.status='completed';task.completedAt=now.toISOString()}else fail('잘못된 작업 처리입니다.');break;}
  // Staff request time off / unavailability for themselves (pending); a manager's entries are approved on creation.
  case 'timeOffRequest': {const who=actor.admin?employee(p.employeeId).id:employee(actor.id).id;const from=date(p.from),to=date(p.to||p.from);if(to<from)fail('종료일이 시작일보다 빠릅니다.');if(!actor.admin&&from<leadDate(localDate(now)))fail('휴무 신청은 시작일 7일 전까지 가능합니다.');if((Date.parse(to)-Date.parse(from))/86400000>61)fail('휴무는 한 번에 최대 62일까지 신청할 수 있습니다.');const allDay=p.allDay===true||p.allDay==='1';let start:string|undefined,end:string|undefined;if(!allDay){if(from!==to)fail('시간 단위 휴무는 하루만 신청할 수 있습니다.');start=time(p.start,true);end=time(p.end,true);if(!duration(start,end))fail('출근과 퇴근 시간이 같습니다.')}if(s.timeOff.some(r=>r.employeeId===who&&r.status!=='declined'&&r.from<=to&&from<=r.to))fail('이미 신청한 휴무와 날짜가 겹칩니다.');s.timeOff.push({id:id(),employeeId:who,from,to,allDay,start,end,reason:String(p.reason||'').trim().slice(0,500),status:actor.admin?'approved':'pending',createdAt:now.toISOString(),...(actor.admin?{decidedAt:now.toISOString()}:{})});break;}
  case 'timeOffDecision': {const r=s.timeOff.find(x=>x.id===p.id)??fail('휴무 요청을 찾을 수 없습니다.');if(p.action==='cancel'){if(!actor.admin&&r.employeeId!==actor.id)fail('권한이 없습니다.');if(!actor.admin&&r.status!=='pending')fail('승인된 휴무는 관리자에게 취소를 요청하세요.');s.timeOff=s.timeOff.filter(x=>x.id!==r.id)}else if(p.action==='approve'||p.action==='decline'){admin();if(r.status!=='pending')fail('처리된 요청입니다.');r.status=p.action==='approve'?'approved':'declined';r.decidedAt=now.toISOString()}else fail('잘못된 처리입니다.');break;}

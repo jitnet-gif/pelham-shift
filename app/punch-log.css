@@ -642,6 +642,9 @@
 .timesheet-line.pending td { background: #fffbea; }
 .timesheet-line.open td { background: #fdf1e3; color: #9a5b18; }
 .timesheet-line.holiday td:first-child { color: #b0321f; font-weight: 600; }
+/* 급여 상세에서 누른 줄. 형광펜처럼 칠해 여러 사람 표 사이에서도 바로 찾게 합니다. */
+.timesheet-line.focus td { background: #fff200; color: #1f2a26; font-weight: 700; }
+.timesheet-line.focus td:first-child { box-shadow: inset 4px 0 0 #e0c800; }
 .timesheet-flags { color: #b0321f; }
 .timesheet-table .timesheet-label { text-align: right; }
 .timesheet-weekly td { background: #eceeed; font-weight: 600; }

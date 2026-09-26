@@ -303,9 +303,16 @@
 .paydetail-scroll table{min-width:700px}
 .paydetail-scroll [data-slot=table-head]{font-size:12px;padding:10px 12px;white-space:nowrap}
 .paydetail-scroll [data-slot=table-cell]{font-size:13px;padding:11px 12px;white-space:nowrap}
+.paydetail-scroll .clickrow{cursor:pointer}
+.paydetail-scroll .clickrow:hover{background:var(--muted,rgba(0,0,0,.04))}
 .paytotals{display:flex;flex-wrap:wrap;gap:10px 22px;border-top:1px solid #e2e8e7;padding-top:14px;margin-top:6px;font-size:13px;color:#61736d}
 .paytotals span{display:inline-flex;gap:7px;align-items:baseline}
 .paytotals b{font-size:15px;color:#203332}
+.paysheet section{margin-top:22px}
+.paysheet h3{margin:0 0 8px;font-size:16px;color:#203332}
+.paysheet table{margin-bottom:10px}
+.paysheet-total{text-align:right;font-size:13px;color:#61736d;margin:4px 0 0}
+.paysheet-total b{font-size:15px;color:#203332}
 .paytotals .paytotals-sum{margin-left:auto}
 .paytotals .paytotals-sum b{font-size:18px;color:#087e6d}
 @media(max-width:600px){.paytotals .paytotals-sum{margin-left:0}}
@@ -325,5 +332,6 @@
 .gps-block .button{margin-top:6px;min-height:46px;padding:0 22px;border-radius:24px}
 .gps-note{display:flex;align-items:center;gap:9px;position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:60;max-width:calc(100vw - 32px);padding:11px 16px;border:1px solid #ebdcb6;border-radius:24px;background:#fff5df;color:#7a6326;font-size:13px;line-height:1.5}
 .paydetail-actions{display:flex;justify-content:flex-end;gap:8px}
+.payfocus-back{margin:0 0 10px}
 .paygroup [data-slot=table-cell]{font-weight:700;font-size:13px;padding-top:16px}
 .paygroup small{color:#8b9691;font-weight:500;margin-left:4px}

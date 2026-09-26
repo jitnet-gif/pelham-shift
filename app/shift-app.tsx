@@ -44,6 +44,9 @@ import {
   X,
   CheckCircle2,
   Megaphone,
+  Upload,
+  History,
+  ArchiveRestore,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
@@ -120,6 +123,7 @@ import {
   dueShifts,
   missedShifts,
   pendingChanges,
+  payrollSheet,
   type Employee,
   type Message,
   type Shift,
@@ -150,6 +154,7 @@ import TimePicker from './time-picker';
 import GpsGuard, { useGps } from './gps-guard';
 import { LAYOUT_KEY, readLayout, type Layout } from './layout-choice';
 import { appAt } from './apps';
+import { track } from './activity';
 import { pushOn, relangPush, subscribePush } from '@/lib/push-client';
 const minutesOf = (v: string) => Number(v.slice(0, 2)) * 60 + Number(v.slice(3, 5));
 // 폰 상단 바는 브랜드 대신 지금 보고 있는 화면 이름을 띄웁니다. 사이드바와 같은 말을 씁니다.
@@ -303,6 +308,8 @@ export default function ShiftApp() {
   const [birthOpen, setBirthOpen] = useState(false);
   const [birthMonth, setBirthMonth] = useState<Date | undefined>();
   const [filter, setFilter] = useState('all');
+  // 활동 로그를 내려받을 기간. 처음에는 최근 30일이고, 비워 두면 처음부터 지금까지입니다.
+  const [logRange, setLogRange] = useState(() => ({ from: addDays(localDate(new Date()), -30), to: '' }));
   const [day, setDay] = useState(localDate(new Date()));
   const [from, setFrom] = useState(week);
   const [to, setTo] = useState(addDays(week, 6));
@@ -323,6 +330,11 @@ export default function ShiftApp() {
   // 실패는 지금까지처럼 statusbar 에 남깁니다 — 성공과 실패가 같은 자리에 같은 모양으로 뜨면 구분이 되지 않습니다.
   const [saved, setSaved] = useState('');
   const [payDetail, setPayDetail] = useState('');
+  // 급여 상세에서 줄을 눌러 출근 기록의 출근부로 건너갔을 때의 표지. 그 줄을 형광색으로 짚고,
+  // 뒤로 가기나 돌아가기 단추로 떠나온 급여 화면과 급여 상세로 되돌아갑니다.
+  const [payFocus, setPayFocus] = useState<{ who: string; id: string; from: string; tab: string } | null>(null);
+  // 급여 탭을 근무 한 줄씩 적은 명세(JSON 과 같은 모양)로 볼지. 끄면 사람별 요약 표입니다.
+  const [paySheet, setPaySheet] = useState(false);
   // 관리자 출근 기록: 어느 이름의 출근부를 어느 2주 기간으로 보고 있는지.
   // 로그인한 사람(actor)을 함께 들고 있어, 사람이 바뀌면 앞사람 출근부에 서 있지 않고 이름 목록부터 다시 엽니다.
   const [att, setAtt] = useState({ actor: '', who: '', from: '' });
@@ -382,6 +394,12 @@ export default function ShiftApp() {
     if (modal) return setModal('');
     // 아래 화면이 열어 둔 창(날씨, 급여 기간 펼침 등)을 닫습니다.
     if (closeTop()) return;
+    // 급여 상세에서 건너온 출근부는 한 걸음에 급여 상세로 돌아갑니다.
+    if (payFocus && tab === 'attendance') {
+      state.trail.pop();
+      state.popping = true;
+      return backToPay();
+    }
     // 근무표 화면에 있을 때만 한 걸음으로 칩니다. 다른 화면에서는 보이지 않는 값을 소비해 헛걸음이 됩니다.
     if (tab === 'timesheets' && sheet) return setSheet('');
     // 팀 화면에 있을 때만 한 걸음으로 칩니다. 다른 화면에서는 헛걸음이 됩니다.
@@ -397,6 +415,16 @@ export default function ShiftApp() {
     }
     // 홈에서는 더 되돌릴 곳이 없습니다. 자리만 다시 채우고 그대로 머뭅니다.
   });
+  const backToPay = () => {
+    if (!payFocus) return;
+    setTab(payFocus.tab);
+    setPayDetail(payFocus.who);
+    setPayFocus(null);
+  };
+  // 메뉴로 다른 화면에 가면 짚어 둔 줄은 뜻이 없어 치웁니다.
+  useEffect(() => {
+    if (tab !== 'attendance') setPayFocus(null);
+  }, [tab]);
   const put = (key: string, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
   const query = () =>
@@ -465,6 +493,10 @@ export default function ShiftApp() {
     for (const key of ['open', 'who', 'from']) url.searchParams.delete(key);
     window.history.replaceState(window.history.state, '', url);
   }, [auth, actor.admin, actor.id]);
+  // 앱 사용 기록. 로그인한 뒤 한 번(open), 그다음은 탭을 옮길 때마다(tab) 서버에 알립니다.
+  useEffect(() => {
+    if (auth === 'in') track('schedule', tab);
+  }, [auth, tab]);
   async function command(type: string, payload: any = {}) {
     if (setup && type !== 'initialize') {
       setStatus(
@@ -491,6 +523,43 @@ export default function ShiftApp() {
       setSaved('');
       setStatus(notice(e, '저장하지 못했습니다.'));
       return null;
+    } finally {
+      setBusy(false);
+    }
+  }
+  // 엑셀 파일을 받아 내려 줍니다. 서버가 거절하면 그 말을 띠에 띄웁니다.
+  async function fetchFile(path: string, params: Record<string, string>, fallback: string) {
+    setBusy(true);
+    setStatus('');
+    try {
+      const url = new URL(path, window.location.origin);
+      new URLSearchParams(query()).forEach((v, k) => url.searchParams.set(k, v));
+      for (const [k, v] of Object.entries(params)) if (v) url.searchParams.set(k, v);
+      const r = await fetch(url);
+      if (!r.ok) throw Error(((await r.json().catch(() => ({}))) as { error?: string }).error || fallback);
+      const name = /filename="([^"]+)"/.exec(r.headers.get('content-disposition') || '')?.[1] || 'PelhamShift.xlsx';
+      download(await r.blob(), name);
+    } catch (e) {
+      setStatus(notice(e, fallback));
+    } finally {
+      setBusy(false);
+    }
+  }
+  // 백업 파일로 워크스페이스 전체를 바꿉니다. 바꾸기 전 모습은 서버가 활동 로그에 먼저 남깁니다.
+  async function restoreBackup(file: File) {
+    if (!confirm(t('{name} 파일로 지금 워크스페이스 전체를 바꿀까요? 지금 모습은 활동 로그에 보관됩니다.', { name: file.name }))) return;
+    setBusy(true);
+    setStatus('');
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      const r = await fetch('/api/backup' + query(), { method: 'POST', body });
+      const json = (await r.json()) as { error?: string };
+      if (!r.ok) throw Error(json.error);
+      await refresh();
+      setSaved('복구했습니다.');
+    } catch (e) {
+      setStatus(notice(e, '복구하지 못했습니다.'));
     } finally {
       setBusy(false);
     }
@@ -591,17 +660,12 @@ export default function ShiftApp() {
       void command('employeeRemove', { id: e.id });
     }
   };
-  // 지우는 삭제. 지난 근무·출퇴근·급여·작업·메시지 기록까지 함께 사라지고 되돌릴 수 없어 한 번 묻습니다.
-  const purgeEmployee = (e: Employee) => {
-    if (
-      confirm(
-        t('{name} 직원을 완전히 삭제할까요? 지난 근무·출퇴근·급여·작업·메시지 기록까지 모두 지워지고 되돌릴 수 없습니다.', {
-          name: e.name,
-        }),
-      )
-    ) {
+  // 보관한 직원을 목록으로 되돌립니다. 기록을 지우지 않았으므로 지난 근무·출퇴근·작업이 그대로 이어집니다.
+  // 기록까지 지우는 삭제는 없습니다 — 지운 흔적은 활동 로그에 남습니다.
+  const restoreEmployee = (e: Employee) => {
+    if (confirm(t('{name} 직원을 다시 목록으로 되돌릴까요?', { name: e.name }))) {
       setTeamPick('');
-      void command('employeePurge', { id: e.id });
+      void command('employeeRestore', { id: e.id });
     }
   };
   const options = staff.map((e) => ({
@@ -1431,6 +1495,15 @@ export default function ShiftApp() {
       t('예상급여_') + from + '.csv',
     );
   }
+  // 근무 한 줄씩 적은 급여 명세. 주별·사람별 합계가 붙고, 사람 합계는 CSV 의 예상 급여와 같습니다.
+  function exportPayrollJson() {
+    download(
+      new Blob([JSON.stringify(payrollSheet(data, from, to), null, 2)], {
+        type: 'application/json',
+      }),
+      t('예상급여_') + from + '.json',
+    );
+  }
   // 급여 담당자에게 보내는 메일. 메일 앱은 파일을 스스로 붙이지 못해, CSV 를 먼저 내려받고 초안을 띄웁니다.
   // 받는 사람은 PAYROLL_MAIL_TO 의 이름을 직원 명부에서 찾아 그 사람의 이메일로 채웁니다.
   function mailPayroll() {
@@ -1905,7 +1978,13 @@ export default function ShiftApp() {
               {actor.admin && !attWho ? (
                 <>
                   <h3 className="punchlog-head">{t('직원별 출근 기록')}</h3>
+                  {payFocus && (
+                    <button className="button payfocus-back" onClick={backToPay}>
+                      <ChevronLeft size={16} /> {t('급여 상세로 돌아가기')}
+                    </button>
+                  )}
                   <PunchRoster
+                    focus={payFocus ?? undefined}
                     state={data}
                     employees={attRoster}
                     punches={data.punches ?? []}
@@ -2086,6 +2165,19 @@ export default function ShiftApp() {
                     <Download size={16} /> {t('CSV 다운로드')}
                   </button>
                 )}
+                {actor.admin && (
+                  <button className="button" onClick={exportPayrollJson}>
+                    <Download size={16} /> {t('JSON 다운로드')}
+                  </button>
+                )}
+                {actor.admin && (
+                  <button
+                    className={paySheet ? 'button primary' : 'button'}
+                    onClick={() => setPaySheet((v) => !v)}
+                  >
+                    {paySheet ? t('요약 보기') : t('명세 보기')}
+                  </button>
+                )}
                 {/* 급여는 늘 같은 사람들에게 갑니다. 주소를 다시 적지 않도록 버튼 하나에 담아 둡니다. */}
                 {actor.admin && (
                   <button
@@ -2157,6 +2249,69 @@ export default function ShiftApp() {
                   </b>
                 )}
               </div>
+              {actor.admin && paySheet ? (
+                <div className="paysheet">
+                  {payrollSheet(data, from, to).employees.map((emp) => (
+                    <section key={emp.name}>
+                      <h3>{emp.name}</h3>
+                      {emp.weeks.map((w) => (
+                        <Table key={w.label}>
+                          <TableHeader>
+                            <TableRow className="paygroup">
+                              <TableCell colSpan={11}>{w.label}</TableCell>
+                            </TableRow>
+                            <TableRow>
+                              {['Date', 'Start', 'End', 'Flags', 'Location', 'Role', 'Wage', 'Regular', 'OT', 'Hours', 'Pay'].map(
+                                (h) => (
+                                  <TableHead key={h}>{h}</TableHead>
+                                ),
+                              )}
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {w.shifts.map((x, i) => (
+                              <TableRow key={x.date + x.start + i}>
+                                <TableCell>{x.date}</TableCell>
+                                <TableCell className={x.flags.includes('Late') ? 'red' : undefined}>
+                                  {x.start}
+                                </TableCell>
+                                <TableCell className={x.flags.includes('Early') ? 'red' : undefined}>
+                                  {x.end}
+                                </TableCell>
+                                <TableCell>{x.flags.join(', ')}</TableCell>
+                                <TableCell>{x.location}</TableCell>
+                                <TableCell>{x.role}</TableCell>
+                                <TableCell>{money(x.wage)}</TableCell>
+                                <TableCell>{x.regular_hours.toFixed(2)}h</TableCell>
+                                <TableCell className={x.ot_hours ? 'green' : undefined}>
+                                  {x.ot_hours.toFixed(2)}h
+                                </TableCell>
+                                <TableCell>{x.total_hours.toFixed(2)}h</TableCell>
+                                <TableCell>{money(x.total_pay)}</TableCell>
+                              </TableRow>
+                            ))}
+                            <TableRow>
+                              <TableCell colSpan={9}>
+                                <b>Weekly total</b>
+                              </TableCell>
+                              <TableCell>
+                                <b>{w.weekly_total.total_hours.toFixed(2)}h</b>
+                              </TableCell>
+                              <TableCell>
+                                <b>{money(w.weekly_total.total_pay)}</b>
+                              </TableCell>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      ))}
+                      <p className="paysheet-total">
+                        Grand total · {emp.grand_total.total_hours.toFixed(2)}h ·{' '}
+                        <b>{money(emp.grand_total.total_pay)}</b>
+                      </p>
+                    </section>
+                  ))}
+                </div>
+              ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -2252,6 +2407,7 @@ export default function ShiftApp() {
                   ])}
                 </TableBody>
               </Table>
+              )}
             </div>
           </TabsContent>
           <TabsContent value="swaps">
@@ -2550,7 +2706,7 @@ export default function ShiftApp() {
                 onEdit={editEmployee}
                 onMessage={(e) => open('message', { to: e.id, body: '' })}
                 onRemove={removeEmployee}
-                onPurge={purgeEmployee}
+                onRestore={restoreEmployee}
               />
             ) : (
             <div className="panel contentpanel">
@@ -2747,27 +2903,19 @@ export default function ShiftApp() {
                         >
                           {t('삭제')}
                         </button>
-                        {/* 감추는 삭제 옆의 지우는 삭제. 한 번 묻고 기록까지 지웁니다. */}
-                        <button
-                          className="button danger"
-                          disabled={busy || e.id === actor.id}
-                          onClick={() => purgeEmployee(e)}
-                        >
-                          {t('완전 삭제')}
-                        </button>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
               </div>
-              {/* 보관된 직원은 목록에서만 감춘 사람들입니다. 여기서만 흔적까지 지울 수 있습니다. */}
+              {/* 보관된 직원은 목록에서만 감춘 사람들입니다. 기록은 그대로 남아 있어 언제든 되돌릴 수 있습니다. */}
               {gone.length > 0 && (
                 <>
                   <div className="sectionhead">
                     <div>
                       <h2>{t('보관된 직원')}</h2>
-                      <p>{t('삭제해 목록에서 감춘 직원입니다. 지난 근무·급여 기록은 아직 남아 있습니다.')}</p>
+                      <p>{t('삭제해 목록에서 감춘 직원입니다. 근무·출퇴근·급여·작업 기록은 지우지 않고 보관합니다.')}</p>
                     </div>
                   </div>
                   <div className="stafftable">
@@ -2790,17 +2938,62 @@ export default function ShiftApp() {
                             <TableCell>{e.email || t('미등록')}</TableCell>
                             <TableCell>
                               <button
-                                className="button danger"
+                                className="button"
                                 disabled={busy}
-                                onClick={() => purgeEmployee(e)}
+                                onClick={() => restoreEmployee(e)}
                               >
-                                {t('완전 삭제')}
+                                <ArchiveRestore size={16} /> {t('되돌리기')}
                               </button>
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
+                  </div>
+                </>
+              )}
+              {/* 엑셀 백업·복구와 활동 로그. 복구는 활동 로그를 건드리지 않습니다. */}
+              {actor.admin && !setup && (
+                <>
+                  <div className="sectionhead">
+                    <div>
+                      <h2>{t('백업 · 복구 · 로그')}</h2>
+                      <p>
+                        {t('삭제한 직원·작업·메시지까지 모든 기록을 엑셀 한 파일로 받습니다. 같은 파일을 올리면 그 시점으로 복구됩니다. 활동 로그는 지울 수 없고 복구해도 바뀌지 않습니다.')}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="filterbar">
+                    <button className="button" disabled={busy} onClick={() => void fetchFile('/api/backup', {}, '백업 파일을 만들지 못했습니다.')}>
+                      <Download size={16} /> {t('엑셀 백업 받기')}
+                    </button>
+                    <label className="button" aria-disabled={busy}>
+                      <Upload size={16} /> {t('엑셀로 복구')}
+                      <input
+                        type="file"
+                        hidden
+                        disabled={busy}
+                        accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = '';
+                          if (file) void restoreBackup(file);
+                        }}
+                      />
+                    </label>
+                  </div>
+                  <div className="filterbar">
+                    <label className="field">
+                      {t('로그 시작일')}
+                      <input type="date" value={logRange.from} onChange={(e) => setLogRange((r) => ({ ...r, from: e.target.value }))} />
+                    </label>
+                    <label className="field">
+                      {t('로그 종료일')}
+                      <input type="date" value={logRange.to} onChange={(e) => setLogRange((r) => ({ ...r, to: e.target.value }))} />
+                    </label>
+                    <button className="button" disabled={busy} onClick={() => void fetchFile('/api/logs', logRange, '로그를 내려받지 못했습니다.')}>
+                      <History size={16} /> {t('활동 로그 내려받기')}
+                    </button>
                   </div>
                 </>
               )}
@@ -2844,7 +3037,7 @@ export default function ShiftApp() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        {['날짜', '예정 근무', '출퇴근', '휴게', '실근무', '지각', '조퇴', '지각 차감', '조퇴 차감', '금액', ...(actor.admin ? [''] : [])].map(
+                        {['날짜', '예정 근무', '출퇴근', '휴게', '실근무', '지각', '조퇴', '지각 차감', '조퇴 차감', '금액'].map(
                           (h) => (
                             <TableHead key={h}>{t(h)}</TableHead>
                           ),
@@ -2853,7 +3046,22 @@ export default function ShiftApp() {
                     </TableHeader>
                     <TableBody>
                       {payDays(payDetail).map(({ a, shift, worked, late, early, lateDeduction, earlyDeduction }) => (
-                        <TableRow key={a.id}>
+                        <TableRow
+                          key={a.id}
+                          className={actor.admin ? 'clickrow' : undefined}
+                          title={actor.admin ? t('출근부 열기') : undefined}
+                          onClick={
+                            actor.admin
+                              ? () => {
+                                  // 줄을 누르면 출근 기록의 출근부로 건너가 그 줄을 형광색으로 짚어 보여 줍니다.
+                                  setPayFocus({ who: payDetail, id: a.id, from: payPeriodStart(a.date), tab });
+                                  setPayDetail('');
+                                  setAtt({ actor: actor.id, who: '', from: '' });
+                                  setTab('attendance');
+                                }
+                              : undefined
+                          }
+                        >
                           <TableCell>
                             {monthDay(a.date)}
                             {holidayOn(a.date) && <small className="green"> · {holidayOn(a.date)}</small>}
@@ -2892,22 +3100,6 @@ export default function ShiftApp() {
                             {earlyDeduction ? '-' + money(earlyDeduction) : '—'}
                           </TableCell>
                           <TableCell>{money(worked * (emp(payDetail)?.rate ?? 0) * (holidayOn(a.date) ? HOLIDAY_MULTIPLIER : 1))}</TableCell>
-                          {actor.admin && (
-                            <TableCell>
-                              <button
-                                className="iconbutton"
-                                aria-label={t('출근 기록에서 고치기')}
-                                title={t('출근 기록에서 고치기')}
-                                onClick={() => {
-                                  setPayDetail('');
-                                  setTab('attendance');
-                                  setAtt({ actor: actor.id, who: a.employeeId, from: payPeriodStart(a.date) });
-                                }}
-                              >
-                                <ArrowRight size={15} />
-                              </button>
-                            </TableCell>
-                          )}
                         </TableRow>
                       ))}
                     </TableBody>

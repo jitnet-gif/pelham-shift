@@ -1,4 +1,5 @@
 'use client';
+import { useEffect, useRef } from 'react';
 import { Download } from 'lucide-react';
 import type { Employee, State } from '@/lib/domain';
 import {
@@ -213,14 +214,21 @@ export function PunchTimesheet({
   from,
   today,
   onPick,
+  focus,
 }: {
   state: State;
   employees: Employee[];
   from: string;
   today: string;
   onPick: (employeeId: string, from?: string) => void;
+  // 형광색으로 짚을 줄(급여 상세에서 누른 기록). 그려지면 화면 가운데로 끌어옵니다.
+  focus?: string;
 }) {
   const { t, locale } = useLang();
+  const focused = useRef<HTMLTableRowElement>(null);
+  useEffect(() => {
+    focused.current?.scrollIntoView({ block: 'center', inline: 'nearest' });
+  }, [focus, from]);
   // 퇴사한 사람은 이 기간에 기록이 있을 때만 세웁니다.
   const people = [...employees]
     .sort((a, b) => a.name.localeCompare(b.name, locale))
@@ -315,8 +323,10 @@ export function PunchTimesheet({
                           'timesheet-line' +
                           (x.pending ? ' pending' : '') +
                           (!x.end ? ' open' : '') +
-                          (holidayOn(x.date) ? ' holiday' : '')
+                          (holidayOn(x.date) ? ' holiday' : '') +
+                          (x.key === focus ? ' focus' : '')
                         }
+                        ref={x.key === focus ? focused : undefined}
                         onClick={() => onPick(e.id, from)}
                       >
                         <td>{md(x.date)}</td>

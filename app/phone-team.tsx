@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import {
+  ArchiveRestore,
   Cake,
   ChevronLeft,
   ChevronRight,
@@ -30,7 +31,7 @@ export default function PhoneTeam({
   onEdit,
   onMessage,
   onRemove,
-  onPurge,
+  onRestore,
 }: {
   employees: Employee[];
   archived: Employee[];
@@ -45,7 +46,7 @@ export default function PhoneTeam({
   onEdit: (employee: Employee) => void;
   onMessage: (employee: Employee) => void;
   onRemove: (employee: Employee) => void;
-  onPurge: (employee: Employee) => void;
+  onRestore: (employee: Employee) => void;
 }) {
   const { t, locale } = useLang();
   const [kept, setKept] = useState(true);
@@ -145,8 +146,8 @@ export default function PhoneTeam({
 
         {person.id !== meId && (
           <div className="pteam-danger">
-            {/* 삭제는 이름을 남기고 감추는 쪽, 완전 삭제는 지난 기록까지 지우는 쪽입니다. 보관된 사람에게는 완전 삭제만 남습니다. */}
-            {!person.archived && (
+            {/* 삭제는 기록을 남기고 목록에서만 감춥니다. 보관된 사람은 되돌리기만 남습니다. */}
+            {!person.archived ? (
               <button
                 className="pteam-remove"
                 disabled={busy}
@@ -155,15 +156,16 @@ export default function PhoneTeam({
                 <Trash2 size={16} />
                 {t('직원 삭제')}
               </button>
+            ) : (
+              <button
+                className="pteam-remove"
+                disabled={busy}
+                onClick={() => onRestore(person)}
+              >
+                <ArchiveRestore size={16} />
+                {t('되돌리기')}
+              </button>
             )}
-            <button
-              className="pteam-remove hard"
-              disabled={busy}
-              onClick={() => onPurge(person)}
-            >
-              <Trash2 size={16} />
-              {t('완전 삭제')}
-            </button>
           </div>
         )}
       </section>

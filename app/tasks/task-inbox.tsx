@@ -7,6 +7,7 @@ import {notice} from '@/lib/notice';
 import {useLang} from '../use-lang';
 import TimePicker from '../time-picker';
 import {useBack} from '../use-back';
+import {track} from '../activity';
 type Actor={id:string;admin:boolean};
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:TIME_ZONE,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 // 마감 시각은 10분 단위로만 섭니다 — 서버도 같은 눈금으로 받습니다.
@@ -26,6 +27,8 @@ export default function TaskInbox(){
  const receive=(data:any)=>{if(data.state){setState({...data.state,tasks:data.state.tasks??[]});setVersion(data.version);setSetup(false)}else setSetup(true);if(data.actor)setActor(data.actor)};
  async function refresh(){setSaved('');try{const r=await fetch('/api/workspace'+query());const data=await r.json();if(!r.ok)throw Error(data.error||'작업을 불러오지 못했습니다.');receive(data);setError('')}catch(e){setError(notice(e,'작업을 불러오지 못했습니다.'))}}
  useEffect(()=>{setRoot('/'+query());void refresh()},[]);
+ // 앱 사용 기록. 작업 화면을 연 것을 한 번 남깁니다.
+ useEffect(()=>{if(state)track('tasks','inbox')},[!!state]);
  // 저장 알림은 4초만 머뭅니다. 알림이 바뀌면 이전 타이머는 걷어 냅니다.
  useEffect(()=>{if(!saved)return;const timer=setTimeout(()=>setSaved(''),4000);return ()=>clearTimeout(timer)},[saved]);
  // 보낸 뒤 입력칸을 비울지는 성공했을 때만 정합니다 — 이름이 겹쳐 되돌아온 글자를 다시 치게 하지 않으려고요.

@@ -1,4 +1,5 @@
-import { createBirthSession, deleteBirthSession, findMembers, clearSessionCookie, sessionCookie } from '@/lib/birth-auth';
+import { createBirthSession, deleteBirthSession, findMembers, clearSessionCookie, getBirthSession, sessionCookie } from '@/lib/birth-auth';
+import { log } from '@/lib/audit';
 export const dynamic = 'force-dynamic';
 
 const sameOrigin = (request: Request) => {
@@ -43,7 +44,15 @@ export async function POST(request: Request) {
     if (found.length > 1) throw Error('이 번호를 쓰는 사람이 둘 이상입니다. 팀 주소로 열거나 관리자에게 문의하세요.');
     // 없는 번호도 틀린 비밀번호와 같은 말로 돌려보냅니다 — 번호를 넣어 보며 누가 있는지 세지 못하게.
     if (!found.length) throw Error('직원 ID 또는 비밀번호를 확인하세요.');
-    const session = await createBirthSession(found[0].team, found[0].actor, String(body.password || ''));
+    // 로그인 성공과 실패를 활동 로그에 남깁니다. 없는 번호는 어느 워크스페이스의 누구인지 모르므로 남길 자리가 없습니다.
+    const who = { workspace: found[0].team, name: found[0].name, kind: 'auth' as const };
+    const session = await createBirthSession(found[0].team, found[0].actor, String(body.password || '')).catch(
+      async (error: unknown) => {
+        await log(request, { ...who, actor: { id: found[0].actor, admin: false }, action: 'loginFailed' });
+        throw error;
+      },
+    );
+    await log(request, { ...who, actor: session.actor, action: 'login' });
     return Response.json(
       { team: session.team, actor: session.actor, passwordChanged: session.passwordChanged },
       { headers: { 'Set-Cookie': sessionCookie(session.token, session.expiresAt) } },
@@ -57,6 +66,8 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const session = await getBirthSession(request).catch(() => null);
+  if (session) await log(request, { workspace: session.team, actor: session.actor, state: session.state, kind: 'auth', action: 'logout' });
   await deleteBirthSession(request);
   return Response.json({ ok: true }, { headers: { 'Set-Cookie': clearSessionCookie() } });
 }
