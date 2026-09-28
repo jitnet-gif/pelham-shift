@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs';
 import type {State} from './domain';
-import type {LogRow} from './audit';
+import type {GpsRow,LogRow} from './audit';
 
 // 엑셀 백업과 복구. 워크스페이스 전체(state)를 목록마다 시트 하나로 풀어 적고, 같은 파일을 그대로 읽어 되돌립니다.
 // 시트 1행은 열 이름, 2행은 그 열의 값 종류(string·number·boolean·json)입니다. 3행부터가 기록입니다.
@@ -60,13 +60,21 @@ export async function buildBackup(state:State,info:{workspace:string;version:num
 }
 
 // 로그만 담은 파일. 백업의 로그 시트와 같은 모양입니다.
-export async function buildLogBook(logs:LogRow[]){
+export async function buildLogBook(logs:LogRow[],gps?:GpsRow[]){
  const book=new ExcelJS.Workbook();book.created=new Date();
  const log=book.addWorksheet(LOG);
  log.addRow(['at','actor','actor_name','admin','kind','action','target','detail','ip','user_agent']);
  for(const r of logs)log.addRow([r.at,r.actor,r.actor_name,r.admin?'Y':'',r.kind,r.action,r.target,r.detail==null?'':JSON.stringify(r.detail).slice(0,CELL_MAX),r.ip,r.user_agent]);
  log.getRow(1).font={bold:true};log.views=[{state:'frozen',ySplit:1}];
  [22,14,16,6,9,16,30,80,16,30].forEach((w,i)=>{log.getColumn(i+1).width=w});
+ // 근무 중 30분마다 남은 직원 자리. 지도 칸을 누르면 그 자리를 구글 지도로 엽니다.
+ if(gps){
+  const sheet=book.addWorksheet('GPS');
+  sheet.addRow(['at','actor','actor_name','lat','lng','accuracy_m','map']);
+  for(const r of gps){const at=`${Number(r.lat)},${Number(r.lng)}`;sheet.addRow([r.at,r.actor,r.actor_name,Number(r.lat),Number(r.lng),r.accuracy==null?'':Number(r.accuracy),{text:at,hyperlink:`https://www.google.com/maps?q=${at}`}])}
+  sheet.getRow(1).font={bold:true};sheet.views=[{state:'frozen',ySplit:1}];
+  [22,14,16,12,12,11,26].forEach((w,i)=>{sheet.getColumn(i+1).width=w});
+ }
  return Buffer.from(await book.xlsx.writeBuffer());
 }
 

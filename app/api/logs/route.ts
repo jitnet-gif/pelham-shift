@@ -1,5 +1,5 @@
 import {context,json} from '@/lib/workspace';
-import {log,readLogs} from '@/lib/audit';
+import {log,readGpsLog,readLogs} from '@/lib/audit';
 import {buildLogBook} from '@/lib/backup';
 export const dynamic='force-dynamic';
 
@@ -13,9 +13,9 @@ export async function GET(req:Request){
   const url=new URL(req.url),day=/^\d{4}-\d{2}-\d{2}$/;
   const from=url.searchParams.get('from')||'',to=url.searchParams.get('to')||'';
   if((from&&!day.test(from))||(to&&!day.test(to)))return json({error:'날짜를 확인하세요.'},400);
-  const logs=await readLogs(c.team,MAX_ROWS,from,to);
-  await log(req,{workspace:c.team,actor:c.actor,state:c.state,kind:'backup',action:'logDownload',detail:{from,to,rows:logs.length}});
-  const file=await buildLogBook(logs);
+  const [logs,gps]=await Promise.all([readLogs(c.team,MAX_ROWS,from,to),readGpsLog(c.team,MAX_ROWS,from,to)]);
+  await log(req,{workspace:c.team,actor:c.actor,state:c.state,kind:'backup',action:'logDownload',detail:{from,to,rows:logs.length,gps:gps.length}});
+  const file=await buildLogBook(logs,gps);
   const name=`PelhamShift_log_${from||'all'}_${to||'now'}.xlsx`;
   return new Response(new Uint8Array(file),{headers:{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':`attachment; filename="${name}"`,'Cache-Control':'no-store'}});
  }catch(e){return json({error:e instanceof Error?e.message:'로그를 내려받지 못했습니다.'},500)}

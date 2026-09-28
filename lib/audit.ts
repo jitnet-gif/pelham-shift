@@ -63,3 +63,14 @@ export function commandTarget(payload:Record<string,unknown>|undefined,state:Sta
  if(typeof p.title==='string')return p.title;
  return typeof p.id==='string'?p.id:undefined;
 }
+
+// 지나온 자리(staff_location_log). 30분마다 한 줄이 쌓입니다 — app/api/location 이 씁니다.
+export type GpsRow={at:string;actor:string;actor_name:string|null;lat:number;lng:number;accuracy:number|null};
+// 로그 엑셀의 GPS 시트가 읽습니다. 표를 아직 만들지 않았으면 빈 목록을 돌려, 활동 로그 내려받기는 막지 않습니다.
+export async function readGpsLog(workspace:string,limit:number,from='',to=''){
+ const where=['workspace = ?'],params:(string|number)[]=[workspace];
+ if(from){where.push('at >= ?::date');params.push(from)}
+ if(to){where.push("at < (?::date + interval '1 day')");params.push(to)}
+ const {results}=await env.DB.prepare(`SELECT at::text AS at, actor, actor_name, lat, lng, accuracy FROM staff_location_log WHERE ${where.join(' AND ')} ORDER BY at DESC, id DESC LIMIT ${Math.max(1,Math.floor(limit))}`).bind(...params).all<GpsRow>().catch(error=>{if((error as {code?:string})?.code==='42P01')return {results:[] as GpsRow[]};throw error});
+ return results;
+}

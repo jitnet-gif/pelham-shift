@@ -16,6 +16,28 @@ const missingTable = (error: unknown) => (error as { code?: string })?.code === 
 const MIGRATION_NOTE =
   '위치 표가 아직 없습니다. supabase/migrations/20260924120000_staff_locations.sql 을 Supabase SQL Editor 에서 실행하세요.';
 
+// 지나온 자리(staff_location_log)는 30분에 한 줄만 쌓습니다. 앱은 1분마다 보내므로 간격은 여기서 정합니다.
+// 이력 표를 아직 만들지 않았어도 지도는 계속 돌아가야 하므로, 여기서 난 오류는 삼킵니다.
+const LOG_EVERY = '30 minutes';
+const logSpot = (team: string, actor: string, name: string, lat: number, lng: number, accuracy: number) =>
+  env.DB.prepare(
+    `INSERT INTO staff_location_log (workspace, actor, actor_name, lat, lng, accuracy) SELECT ?::text, ?::text, ?::text, ?::double precision, ?::double precision, ?::double precision WHERE NOT EXISTS (SELECT 1 FROM staff_location_log WHERE workspace = ? AND actor = ? AND at > now() - interval '${LOG_EVERY}')`,
+  )
+    .bind(
+      team,
+      actor,
+      name.slice(0, 120),
+      lat,
+      lng,
+      Number.isFinite(accuracy) && accuracy >= 0 ? Math.round(accuracy) : null,
+      team,
+      actor,
+    )
+    .run()
+    .catch((error) => {
+      if (!missingTable(error)) console.error('staff_location_log 기록 실패', error);
+    });
+
 // 직원 앱이 보내는 지금 자리. 관리자 계정(직원이 아님)은 보내지 않습니다.
 export async function POST(req: Request) {
   try {
@@ -48,6 +70,7 @@ export async function POST(req: Request) {
         new Date().toISOString(),
       )
       .run();
+    await logSpot(c.team, employee.id, employee.name, lat, lng, accuracy);
     return json({ tracking: true });
   } catch (e) {
     if (missingTable(e)) return json({ tracking: false });
