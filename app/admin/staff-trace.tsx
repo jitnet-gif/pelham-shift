@@ -32,6 +32,19 @@ const STALE_MS = 10 * 60000;
 // 재생 속도: 화면 1초에 흐르는 실제 시간.
 const SPEEDS = [60, 300, 900, 1800];
 const STALE_FILL = '#9aa6a2';
+// 같은 직군이 여럿일 때 두 번째 사람부터 쓰는 색. 직군 색(파랑·갈색·보라)과 멀리 떨어진 색들입니다.
+const EXTRA_COLORS = [
+  '#d1343a',
+  '#0f9d58',
+  '#e08a00',
+  '#0097a7',
+  '#c2185b',
+  '#5d4037',
+  '#3949ab',
+  '#7cb342',
+  '#6d6d6d',
+  '#ff7043',
+];
 
 const clock = (ms: number) =>
   new Intl.DateTimeFormat('en-GB', {
@@ -142,14 +155,21 @@ export function useStaffTrace(
     if (active) void load(day);
   }, [active, day, load]);
 
-  const people = useMemo(
-    () =>
-      (trace?.people ?? []).map((p) => ({
+  const people = useMemo(() => {
+    // 선 색은 직군 색이라 같은 직군끼리 겹칩니다. 이미 누가 쓴 색이면 남은 색을 골라 사람마다 다르게 합니다.
+    const used = new Set<string>();
+    return (trace?.people ?? []).map((p) => {
+      const color = used.has(p.color)
+        ? (EXTRA_COLORS.find((c) => !used.has(c)) ?? p.color)
+        : p.color;
+      used.add(color);
+      return {
         ...p,
+        color,
         points: p.points.map((x) => ({ ...x, ms: Date.parse(x.at) })) as Pt[],
-      })),
-    [trace],
-  );
+      };
+    });
+  }, [trace]);
   const shown = useMemo(
     () => people.filter((p) => !hidden.has(p.id) && p.points.length),
     [people, hidden],
@@ -236,13 +256,23 @@ export function useStaffTrace(
       }).addTo(g);
     for (const p of shown) {
       const line = p.points.map((x) => [x.lat, x.lng] as [number, number]);
-      L.polyline(line, {
+      const route = L.polyline(line, {
         color: p.color,
         weight: 3,
         opacity: 0.3,
         dashArray: '4 6',
         interactive: false,
       }).addTo(g);
+      // 점선은 가늘어 마우스로 짚기 어렵습니다. 보이지 않는 굵은 선을 겹쳐 두고, 올리면 이름을 띄우고 그 점선을 진하게 합니다.
+      L.polyline(line, { color: p.color, weight: 16, opacity: 0 })
+        .bindTooltip(p.name, { sticky: true, className: 'staffmap-tag' })
+        .on('mouseover', () => route.setStyle({ opacity: 0.9, weight: 4 }))
+        .on('mouseout', () => route.setStyle({ opacity: 0.3, weight: 3 }))
+        .addTo(g);
+    }
+    // 점은 모든 선을 그린 뒤에 올려, 다른 사람의 굵은 짚기 선에 가려지지 않게 합니다.
+    for (const p of shown) {
+      const line = p.points.map((x) => [x.lat, x.lng] as [number, number]);
       for (const x of p.points) {
         const label =
           (x.kind === 'in'
