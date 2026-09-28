@@ -211,7 +211,7 @@ export function earlyOut(shift:Shift|undefined,inAt:string,outAt:string){
 export function earlyBy(state:{shifts:Shift[]},a:Attendance){return earlyOut(scheduledFor(state,a),a.start,a.end)}
 // 조회 구간이 급여 기간 경계에 맞지 않으면 걸쳐 있는 기간의 초과근무가 실제보다 적게 잡힙니다.
 export function wholePeriods(from:string,to:string){return payPeriodStart(from)===from&&payPeriodStart(addDays(to,1))===addDays(to,1)}
-// 실근무시간을 정규·초과로 나눠 시급을 곱한 뒤 지각·조퇴한 만큼 차감합니다. 대체 근무에 붙는 추가수당은 없습니다 —
+// 실근무시간을 정규·초과로 나눠 시급을 곱합니다. 지각·조퇴한 시간은 실근무에 들지 않을 뿐 따로 차감하지 않습니다. 대체 근무에 붙는 추가수당은 없습니다 —
 // 예전 대체 요청에 남아 있는 bonus 값도 급여에 더하지 않습니다.
 // 급여가 보는 근무 기록. 단말에서 찍힌 출퇴근(punches)이 기준입니다.
 // 그 사람 그 날짜에 찍힌 기록이 하나도 없을 때만, 예전에 엑셀로 가져온 기록을 씁니다.
@@ -255,26 +255,19 @@ export function payroll(state:State,employeeId:string,from:string,to:string){con
  // 날짜별로 합친 뒤 급여 기간(2주)별로 묶어 가산 시간을 구합니다. 공휴일에 일한 시간은 따로 1.5배로 세고 88시간 합에는 넣지 않습니다.
  const byDay=new Map<string,number>();for(const a of records)byDay.set(a.date,(byDay.get(a.date)??0)+worked(a));const byPeriod=new Map<string,number[]>();for(const [day,h] of byDay){if(holidayOn(day))continue;const w=payPeriodStart(day);byPeriod.set(w,[...(byPeriod.get(w)??[]),h])}
  const otHours=[...byPeriod.values()].reduce((s,days)=>s+Math.max(0,days.reduce((n,h)=>n+h,0)-OT_PERIOD_HOURS),0);const holidayHours=[...byDay].reduce((s,[day,h])=>s+(holidayOn(day)?h:0),0);const regularHours=hours-otHours-holidayHours;
- // 지각과 조퇴는 체크인 하나하나 따로 셉니다. 둘은 겹치지 않습니다 — 지각은 예정 출근부터 찍은 출근까지,
- // 조퇴는 찍은 퇴근부터 예정 퇴근까지라, 합치면 예정 근무 중 일하지 않은 시간 그대로입니다. 한 시간을 두 번 물리지 않습니다.
- // 차감은 둘을 합쳐 그 체크인에서 번 금액까지만입니다. 한 번 빠진 날이 다른 날 번 돈까지 갉아먹지 않습니다.
- // 한도에 걸리면 지각을 먼저 물리고 남은 만큼만 조퇴에서 뺍니다 — 합계는 어느 쪽을 먼저 물려도 같고,
- // 두 칸에 나눠 적는 자리만 갈립니다.
- const lates=records.map(a=>{const cap=worked(a)*e.rate;
-  const minutes=lateBy(state,a)??0,early=earlyBy(state,a)??0;
-  const deduction=Math.min(cap,(minutes/60)*e.rate);
-  return {id:a.id,date:a.date,minutes,deduction,early,earlyDeduction:Math.min(cap-deduction,(early/60)*e.rate)}});
+ // 지각과 조퇴는 체크인 하나하나 따로 세어 기록으로만 남깁니다. 돈에서는 따로 빼지 않습니다 —
+ // 늦게 찍은 출근은 찍힌 시각부터(payIn), 일찍 찍은 퇴근은 찍힌 시각까지(paidEnd) 세므로 그 시간은 이미 지급에서 빠져 있습니다.
+ // 여기서 분 × 시급을 또 빼면 같은 시간이 두 번 빠집니다(09:30 지각이면 7.5시간 일하고 7시간치).
+ const lates=records.map(a=>({id:a.id,date:a.date,minutes:lateBy(state,a)??0,early:earlyBy(state,a)??0}));
  const lateMinutes=lates.reduce((s,r)=>s+r.minutes,0);const lateDays=new Set(lates.filter(r=>r.minutes>0).map(r=>r.date)).size;
  const earlyMinutes=lates.reduce((s,r)=>s+r.early,0);const earlyDays=new Set(lates.filter(r=>r.early>0).map(r=>r.date)).size;
- const base=regularHours*e.rate,otPay=otHours*e.rate*OT_MULTIPLIER,holidayPay=holidayHours*e.rate*HOLIDAY_MULTIPLIER,earned=base+otPay+holidayPay,cents=(n:number)=>Math.round(n*100)/100;
- // 체크인마다 이미 그 체크인에서 번 금액으로 막아 두어, 엑셀 열을 잘못 연결해도 합계가 번 돈을 넘지 않습니다.
- const lateDeduction=lates.reduce((s,r)=>s+r.deduction,0),earlyDeduction=lates.reduce((s,r)=>s+r.earlyDeduction,0);
- return {hours,regularHours,otHours,holidayHours,lateMinutes,lateDays,earlyMinutes,earlyDays,lates:lates.map(r=>({...r,deduction:cents(r.deduction),earlyDeduction:cents(r.earlyDeduction)})),base:cents(base),otPay:cents(otPay),holidayPay:cents(holidayPay),lateDeduction:cents(lateDeduction),earlyDeduction:cents(earlyDeduction),total:cents(earned-lateDeduction-earlyDeduction),...punchReviewCounts(state,employeeId,from,to)}}
+ const base=regularHours*e.rate,otPay=otHours*e.rate*OT_MULTIPLIER,holidayPay=holidayHours*e.rate*HOLIDAY_MULTIPLIER,cents=(n:number)=>Math.round(n*100)/100;
+ return {hours,regularHours,otHours,holidayHours,lateMinutes,lateDays,earlyMinutes,earlyDays,lates,base:cents(base),otPay:cents(otPay),holidayPay:cents(holidayPay),total:cents(base+otPay+holidayPay),...punchReviewCounts(state,employeeId,from,to)}}
 // 근무지 이름. 직원 화면과 출퇴근 단말이 같은 이름을 씁니다.
 export const LOCATION='Pelham Hills Golf Club';
 // 급여 명세(JSON). payroll() 과 같은 규칙을 근무 한 줄씩 나눠 적습니다 — 주(일요일 시작)로 묶고, 주 합계와 사람 합계를 붙입니다.
 // 초과근무는 급여 기간 안에서 시간 순으로 쌓아 88시간을 넘긴 근무부터 붙입니다. 공휴일 근무는 1.5배로 세고 88시간 합에 넣지 않습니다.
-// total_pay 는 그 근무의 지각·조퇴 차감까지 뺀 금액이라, 사람 합계가 급여 화면·CSV 의 예상 급여와 같습니다.
+// 지각·조퇴는 Late/Early 딱지로만 적고 금액에서 빼지 않습니다. 사람 합계가 급여 화면·CSV 의 예상 급여와 같습니다.
 // 주 합계는 반올림 전 값을 더한 뒤 한 번만 반올림하고, 사람 합계는 payroll() 의 값을 그대로 적어 CSV 와 센트까지 맞춥니다.
 // Week 번호는 조회 시작일이 든 주를 1로 셉니다 — 그 주에 근무가 없는 사람도 둘째 주는 Week 2 입니다.
 export function payrollSheet(state:State,from:string,to:string){
@@ -292,8 +285,7 @@ export function payrollSheet(state:State,from:string,to:string){
    const h=payableHours(state,a),holiday=!!holidayOn(a.date),period=payPeriodStart(a.date);
    let ot=0;if(!holiday){const before=cum.get(period)??0;ot=Math.max(0,Math.min(h,before+h-OT_PERIOD_HOURS));cum.set(period,before+h)}
    const l=cut.get(a.id),late=(l?.minutes??0)>0,early=(l?.early??0)>0;
-   const earned=holiday?h*e.rate*HOLIDAY_MULTIPLIER:(h-ot)*e.rate+ot*e.rate*OT_MULTIPLIER;
-   const pay=earned-(l?.deduction??0)-(l?.earlyDeduction??0);
+   const pay=holiday?h*e.rate*HOLIDAY_MULTIPLIER:(h-ot)*e.rate+ot*e.rate*OT_MULTIPLIER;
    const flags=[...(late?['Late']:[]),...(early?['Early']:[]),...(holiday?['Holiday']:[]),...(ot>0?['Overtime']:[])];
    return {week:weekStart(a.date),hours:h,pay,row:{date:a.date,start:paidStart(state,a),end:paidEnd(state,a),flags,location:LOCATION,
     role:areaOf.get(a.id)||scheduledFor(state,a)?.area||roleLabel(e),wage:e.rate,

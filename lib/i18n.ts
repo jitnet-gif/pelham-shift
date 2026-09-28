@@ -428,8 +428,8 @@ const en: Record<string, string> = {
     'No payroll recipients have an email yet. Add an email for {names} under Staff first.',
   시작일: 'Start date',
   종료일: 'End date',
-  '지급액은 단말에서 찍힌 출퇴근을 기준으로 계산합니다. 유급 휴게는 근무로 치고 무급 휴게만 뺍니다. 예정 시작보다 일찍 찍어도 예정 시작 시각부터 세고, 퇴근은 찍힌 시각까지 셉니다. 그 사람 그 날짜에 찍힌 기록이 없을 때만 예전에 가져온 기록을 씁니다. 초과근무는 급여 기간(일요일 시작 2주) {w}시간을 넘긴 시간만 {m}배로 가산하며, 하루·한 주 기준은 없습니다. 지각은 체크인 하나하나 따로 보아 예정 출근 시각을 넘긴 분만큼 그 체크인에서 번 금액까지만 차감하며, 예정 근무가 없는 출근기록은 지각으로 보지 않습니다. 조퇴도 같은 방법으로 예정 퇴근 시각보다 일찍 찍은 분만큼 차감하며, 지각과 조퇴를 합친 차감은 그 체크인에서 번 금액을 넘지 않습니다. 세금·유급휴가를 제외한 예상 금액이고, 시급 0인 직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급 대상이 아니며 실제 출근기록만 지급합니다.':
-    "Pay is worked out from the check-ins taken on the time clock. Paid breaks count as work; only unpaid breaks come off. Pay runs from the scheduled start to the check-out time: checking in early adds no pay, and staying past the scheduled end is paid. Imported time clock records are used only when that person has no check-in on that date. Overtime pays {m}× on hours over {w} in a two-week pay period (starting Sunday); there is no daily or weekly limit. Lateness is worked out per check-in: every minute past that check-in’s scheduled start is deducted at the hourly rate, never more than that check-in earned; attendance with no scheduled shift is never counted late. Undertime is deducted the same way, for every minute checked out ahead of the scheduled end; late and undertime together never take more than that check-in earned. Estimates exclude taxes and paid leave, and pay needs checking for anyone whose hourly rate is 0. Only actual attendance is paid, not the original employee's scheduled hours.",
+  '지급액은 단말에서 찍힌 출퇴근을 기준으로 계산합니다. 유급 휴게는 근무로 치고 무급 휴게만 뺍니다. 예정 시작보다 일찍 찍어도 예정 시작 시각부터 세고, 늦게 찍으면 찍힌 시각부터 셉니다. 퇴근은 찍힌 시각까지 셉니다. 그 사람 그 날짜에 찍힌 기록이 없을 때만 예전에 가져온 기록을 씁니다. 초과근무는 급여 기간(일요일 시작 2주) {w}시간을 넘긴 시간만 {m}배로 가산하며, 하루·한 주 기준은 없습니다. 지각하면 찍힌 출근 시각부터, 조퇴하면 찍힌 퇴근 시각까지만 세므로 늦거나 일찍 간 시간은 지급하지 않을 뿐 따로 차감하지 않습니다. 지각·조퇴 분은 기록으로 남기며, 예정 근무가 없는 출근기록은 지각으로 보지 않습니다. 세금·유급휴가를 제외한 예상 금액이고, 시급 0인 직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급 대상이 아니며 실제 출근기록만 지급합니다.':
+    "Pay is worked out from the check-ins taken on the time clock. Paid breaks count as work; only unpaid breaks come off. Pay runs from the scheduled start, or from the check-in if it came later, to the check-out time: checking in early adds no pay, and staying past the scheduled end is paid. Imported time clock records are used only when that person has no check-in on that date. Overtime pays {m}× on hours over {w} in a two-week pay period (starting Sunday); there is no daily or weekly limit. Late and undertime minutes are simply not paid; nothing extra is deducted. They are kept on record, and attendance with no scheduled shift is never counted late. Estimates exclude taxes and paid leave, and pay needs checking for anyone whose hourly rate is 0. Only actual attendance is paid, not the original employee's scheduled hours.",
   '직원이 이의를 제기한 근무 {n}건이 이 금액에 들어 있습니다. ':
     'This total includes {n} shift(s) a staff member has disputed. ',
   '아직 아무도 확인하지 않은 근무 {n}건이 있습니다. ': '{n} shift(s) have not been reviewed yet. ',
@@ -446,13 +446,11 @@ const en: Record<string, string> = {
   시급: 'Hourly rate',
   기본급: 'Base pay',
   초과수당: 'Overtime pay',
-  '지각 차감': 'Late deduction',
-  '조퇴 차감': 'Undertime deduction',
   '지각(분)': 'Late (min)',
   지각일수: 'Late days',
   '조퇴(분)': 'Undertime (min)',
   조퇴일수: 'Undertime days',
-  '-{money} · {n}분 {d}일': '-{money} · {n} min over {d} day(s)',
+  '{n}분 · {d}일': '{n} min · {d} day(s)',
   '급여 상세': 'Pay detail',
   '급여 상세로 돌아가기': 'Back to pay detail',
   '날짜별 상세 보기': 'Open the day-by-day detail',
@@ -464,8 +462,8 @@ const en: Record<string, string> = {
   금액: 'Amount',
   '{week}~{end} 급여 기간 · 실근무 {worked}h · {w}시간 초과분 {applied}h → {m}배 가산':
     'Pay period {week}–{end} · {worked}h worked · {applied}h over {w}h → paid at {m}x',
-  '날짜별 금액은 시급 × 실근무이고, 지각 차감은 그 체크인에서 번 금액까지만 그 줄에서 바로 뺍니다. 초과분에 붙는 0.5배 가산만 급여 기간 단위로 아래에서 더합니다. 조퇴 차감도 같은 줄에서 바로 빼며, 지각과 조퇴를 합쳐도 그 줄에서 번 금액을 넘지 않습니다.':
-    'Each day shows the hourly rate times hours worked, with that check-in’s late deduction taken off on the same row, never more than the row earned. Only the extra 0.5x on overtime is applied per pay period, below. The undertime deduction comes off the same row, and late plus undertime together never exceed what that row earned.',
+  '날짜별 금액은 시급 × 실근무입니다. 늦게 찍은 출근은 찍힌 시각부터, 일찍 찍은 퇴근은 찍힌 시각까지 세므로 지각·조퇴한 시간은 이미 빠져 있고, 따로 더 빼지 않습니다. 초과분에 붙는 0.5배 가산만 급여 기간 단위로 아래에서 더합니다.':
+    'Each day shows the hourly rate times hours worked. A late check-in counts from the time it was punched and an early check-out counts to the time it was punched, so late and undertime minutes are already left out and nothing more is taken off. Only the extra 0.5x on overtime is applied per pay period, below.',
   통화: 'Currency',
   예상급여_: 'estimated-pay_',
 

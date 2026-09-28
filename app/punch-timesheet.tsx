@@ -30,7 +30,8 @@ import { useLang } from './use-lang';
 // 급여 명세 엑셀처럼 적은 출근부. 사람마다 급여 기간 두 주를 주별로 나눠 근무를 한 줄씩 적고,
 // 주 합계와 사람 합계를 붙입니다. 숫자는 급여 화면과 같은 payroll() 규칙을 따릅니다 —
 // 초과근무는 급여 기간 안에서 시간 순으로 쌓아 88시간을 넘긴 근무부터 붙고, 공휴일 근무는 1.5배로 따로 셉니다.
-// 지각·조퇴 차감은 Exception costs 칸에 빼는 금액으로 적어, Total pay 가 급여 화면의 예상 급여와 같습니다.
+// 지각·조퇴는 Late/Early 딱지로만 적습니다. 그 시간은 이미 실근무에서 빠져 있어 Exception costs 는 늘 0 입니다 —
+// 급여 명세 엑셀과 열을 맞추려고 칸만 둡니다. Total pay 는 급여 화면의 예상 급여와 같습니다.
 // 아직 퇴근을 찍지 않은 근무도 줄로 세우되 시간과 금액은 0 입니다(급여도 세지 않습니다).
 
 type Line = {
@@ -96,7 +97,7 @@ function sheetOf(state: State, e: Employee, from: string, today: string) {
     const regularPay = regular * e.rate;
     const otPay = ot * e.rate * OT_MULTIPLIER;
     const holidayPay = (holiday ? h : 0) * e.rate * HOLIDAY_MULTIPLIER;
-    const exception = -((l?.deduction ?? 0) + (l?.earlyDeduction ?? 0));
+    const exception = 0;
     const p = byId.get(a.id);
     return {
       key: a.id,

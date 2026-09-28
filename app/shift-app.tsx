@@ -1019,16 +1019,8 @@ export default function ShiftApp() {
     t(({ pending: '대기 중', approved: '승인됨', declined: '거절됨' } as Record<string, string>)[v] || v);
   // 급여 상세. 고른 구간의 출근기록을 날짜순으로 펼치고, 그 옆에 예정 근무·지각·그날 금액을 같이 둡니다.
   // 상세도 합계와 같은 기록을 봐야 합니다. 둘이 다른 데이터를 쓰면 숫자가 어긋납니다.
-  const payDays = (employeeId: string) => {
-    // 지각·조퇴 차감도 합계가 쓴 값을 그대로 가져옵니다. 화면에서 다시 계산하면 열을 더한 값이 아래 합계와 어긋납니다.
-    // 둘은 한 체크인에서 번 금액이라는 한도를 나눠 쓰므로 반드시 같은 계산에서 함께 받아 와야 합니다.
-    const deductions = new Map(
-      payroll(data, employeeId, from, to).lates.map((r) => [
-        r.id,
-        { late: r.deduction, early: r.earlyDeduction },
-      ]),
-    );
-    return paidRecords(data)
+  const payDays = (employeeId: string) =>
+    paidRecords(data)
       .filter((a) => a.employeeId === employeeId && a.date >= from && a.date <= to)
       .slice()
       .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start))
@@ -1038,10 +1030,7 @@ export default function ShiftApp() {
         worked: payableHours(data, a),
         late: lateBy(data, a),
         early: earlyBy(data, a),
-        lateDeduction: deductions.get(a.id)?.late ?? 0,
-        earlyDeduction: deductions.get(a.id)?.early ?? 0,
       }));
-  };
   // 초과근무가 어떤 근거로 잡혔는지. 급여 기간(2주) 88시간을 넘긴 시간만 가산합니다. 공휴일 근무는 따로 가산해 여기서 뺍니다.
   const payPeriodOT = (employeeId: string) => {
     const byDay = new Map<string, number>();
@@ -1461,10 +1450,8 @@ export default function ShiftApp() {
         '공휴일수당',
         '지각(분)',
         '지각일수',
-        '지각 차감',
         '조퇴(분)',
         '조퇴일수',
-        '조퇴 차감',
         '예상 급여',
         '통화',
         '시작일',
@@ -1484,11 +1471,8 @@ export default function ShiftApp() {
         r.holidayPay,
         r.lateMinutes,
         r.lateDays,
-        // 화면과 같은 부호로 내보내 시트에서 열을 합산해도 결과가 맞습니다.
-        -r.lateDeduction || 0,
         r.earlyMinutes,
         r.earlyDays,
-        -r.earlyDeduction || 0,
         r.total,
         data.currency,
         from,
@@ -2240,7 +2224,7 @@ export default function ShiftApp() {
               )}
               <div className="policy">
                 {t(
-                  '지급액은 단말에서 찍힌 출퇴근을 기준으로 계산합니다. 유급 휴게는 근무로 치고 무급 휴게만 뺍니다. 예정 시작보다 일찍 찍어도 예정 시작 시각부터 세고, 퇴근은 찍힌 시각까지 셉니다. 그 사람 그 날짜에 찍힌 기록이 없을 때만 예전에 가져온 기록을 씁니다. 초과근무는 급여 기간(일요일 시작 2주) {w}시간을 넘긴 시간만 {m}배로 가산하며, 하루·한 주 기준은 없습니다. 지각은 체크인 하나하나 따로 보아 예정 출근 시각을 넘긴 분만큼 그 체크인에서 번 금액까지만 차감하며, 예정 근무가 없는 출근기록은 지각으로 보지 않습니다. 조퇴도 같은 방법으로 예정 퇴근 시각보다 일찍 찍은 분만큼 차감하며, 지각과 조퇴를 합친 차감은 그 체크인에서 번 금액을 넘지 않습니다. 세금·유급휴가를 제외한 예상 금액이고, 시급 0인 직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급 대상이 아니며 실제 출근기록만 지급합니다.',
+                  '지급액은 단말에서 찍힌 출퇴근을 기준으로 계산합니다. 유급 휴게는 근무로 치고 무급 휴게만 뺍니다. 예정 시작보다 일찍 찍어도 예정 시작 시각부터 세고, 늦게 찍으면 찍힌 시각부터 셉니다. 퇴근은 찍힌 시각까지 셉니다. 그 사람 그 날짜에 찍힌 기록이 없을 때만 예전에 가져온 기록을 씁니다. 초과근무는 급여 기간(일요일 시작 2주) {w}시간을 넘긴 시간만 {m}배로 가산하며, 하루·한 주 기준은 없습니다. 지각하면 찍힌 출근 시각부터, 조퇴하면 찍힌 퇴근 시각까지만 세므로 늦거나 일찍 간 시간은 지급하지 않을 뿐 따로 차감하지 않습니다. 지각·조퇴 분은 기록으로 남기며, 예정 근무가 없는 출근기록은 지각으로 보지 않습니다. 세금·유급휴가를 제외한 예상 금액이고, 시급 0인 직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급 대상이 아니며 실제 출근기록만 지급합니다.',
                   { w: OT_PERIOD_HOURS, m: OT_MULTIPLIER },
                 )}{' '}
                 {t(
@@ -2333,8 +2317,8 @@ export default function ShiftApp() {
                       '기본급',
                       '초과수당',
                       '공휴일수당',
-                      '지각 차감',
-                      '조퇴 차감',
+                      '지각',
+                      '조퇴',
                       '예상 급여',
                     ].map((h) => (
                       <TableHead key={h}>{t(h)}</TableHead>
@@ -2385,27 +2369,16 @@ export default function ShiftApp() {
                         <TableCell className={r.holidayPay ? 'green' : undefined}>
                           {money(r.holidayPay)}
                         </TableCell>
-                        <TableCell
-                          className={r.lateDeduction ? 'red' : undefined}
-                        >
+                        {/* 지각·조퇴는 기록으로만 적습니다. 그 시간은 이미 실근무에서 빠져 있어 금액에서 또 빼지 않습니다. */}
+                        <TableCell className={r.lateMinutes ? 'red' : undefined}>
                           {r.lateMinutes
-                            ? t('-{money} · {n}분 {d}일', {
-                                money: money(r.lateDeduction),
-                                n: r.lateMinutes,
-                                d: r.lateDays,
-                              })
-                            : money(0)}
+                            ? t('{n}분 · {d}일', { n: r.lateMinutes, d: r.lateDays })
+                            : '—'}
                         </TableCell>
-                        <TableCell
-                          className={r.earlyDeduction ? 'red' : undefined}
-                        >
+                        <TableCell className={r.earlyMinutes ? 'red' : undefined}>
                           {r.earlyMinutes
-                            ? t('-{money} · {n}분 {d}일', {
-                                money: money(r.earlyDeduction),
-                                n: r.earlyMinutes,
-                                d: r.earlyDays,
-                              })
-                            : money(0)}
+                            ? t('{n}분 · {d}일', { n: r.earlyMinutes, d: r.earlyDays })
+                            : '—'}
                         </TableCell>
                         <TableCell>
                           <b>{money(r.total)}</b>
@@ -3045,7 +3018,7 @@ export default function ShiftApp() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        {['날짜', '예정 근무', '출퇴근', '휴게', '실근무', '지각', '조퇴', '지각 차감', '조퇴 차감', '금액'].map(
+                        {['날짜', '예정 근무', '출퇴근', '휴게', '실근무', '지각', '조퇴', '금액'].map(
                           (h) => (
                             <TableHead key={h}>{t(h)}</TableHead>
                           ),
@@ -3053,7 +3026,7 @@ export default function ShiftApp() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {payDays(payDetail).map(({ a, shift, worked, late, early, lateDeduction, earlyDeduction }) => (
+                      {payDays(payDetail).map(({ a, shift, worked, late, early }) => (
                         <TableRow
                           key={a.id}
                           className={actor.admin ? 'clickrow' : undefined}
@@ -3101,12 +3074,6 @@ export default function ShiftApp() {
                                 ? t('{n}분 조퇴', { n: early })
                                 : t('정시')}
                           </TableCell>
-                          <TableCell className={lateDeduction ? 'red' : undefined}>
-                            {lateDeduction ? '-' + money(lateDeduction) : '—'}
-                          </TableCell>
-                          <TableCell className={earlyDeduction ? 'red' : undefined}>
-                            {earlyDeduction ? '-' + money(earlyDeduction) : '—'}
-                          </TableCell>
                           <TableCell>{money(worked * (emp(payDetail)?.rate ?? 0) * (holidayOn(a.date) ? HOLIDAY_MULTIPLIER : 1))}</TableCell>
                         </TableRow>
                       ))}
@@ -3114,7 +3081,7 @@ export default function ShiftApp() {
                   </Table>
                 </div>
                 <p className="hint">
-                  {t('날짜별 금액은 시급 × 실근무이고, 지각 차감은 그 체크인에서 번 금액까지만 그 줄에서 바로 뺍니다. 초과분에 붙는 0.5배 가산만 급여 기간 단위로 아래에서 더합니다. 조퇴 차감도 같은 줄에서 바로 빼며, 지각과 조퇴를 합쳐도 그 줄에서 번 금액을 넘지 않습니다.')}
+                  {t('날짜별 금액은 시급 × 실근무입니다. 늦게 찍은 출근은 찍힌 시각부터, 일찍 찍은 퇴근은 찍힌 시각까지 세므로 지각·조퇴한 시간은 이미 빠져 있고, 따로 더 빼지 않습니다. 초과분에 붙는 0.5배 가산만 급여 기간 단위로 아래에서 더합니다.')}
                 </p>
                 {payPeriodOT(payDetail).map((w) => (
                   <p className="hint" key={w.week}>
@@ -3143,12 +3110,6 @@ export default function ShiftApp() {
                       </span>
                       <span className={sum.holidayPay ? 'green' : undefined}>
                         {t('공휴일수당')} <b>{money(sum.holidayPay)}</b>
-                      </span>
-                      <span className={sum.lateDeduction ? 'red' : undefined}>
-                        {t('지각 차감')} <b>-{money(sum.lateDeduction)}</b>
-                      </span>
-                      <span className={sum.earlyDeduction ? 'red' : undefined}>
-                        {t('조퇴 차감')} <b>-{money(sum.earlyDeduction)}</b>
                       </span>
                       <span className="paytotals-sum">
                         {t('예상 급여')} <b>{money(sum.total)}</b>
