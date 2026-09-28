@@ -2,8 +2,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type * as Leaflet from 'leaflet';
-import { Crosshair, MapPin, RefreshCw } from 'lucide-react';
+import { Crosshair, History, MapPin, Radio, RefreshCw } from 'lucide-react';
 import { useLang } from '../use-lang';
+import { TraceBar, TraceList, useStaffTrace } from './staff-trace';
 
 type StaffSpot = { lat: number; lng: number; accuracy: number | null; at: string };
 type StaffRow = { id: string; name: string; color: string; area: string; in: string; spot: StaffSpot | null };
@@ -29,6 +30,10 @@ export default function StaffMap() {
   const layer = useRef<Leaflet.LayerGroup | null>(null);
   // 처음 한 번만 모두가 보이게 맞춥니다. 읽을 때마다 맞추면 관리자가 옮겨 둔 화면이 30초마다 튑니다.
   const fitted = useRef(false);
+  // '지금' 은 출근해 있는 사람의 마지막 자리, '이동 기록' 은 고른 날 지나온 자리를 시간순으로 되짚습니다.
+  const [mode, setMode] = useState<'now' | 'trace'>('now');
+  const [leaf, setLeaf] = useState<{ L: typeof Leaflet; map: Leaflet.Map } | null>(null);
+  const trace = useStaffTrace(leaf?.L ?? null, leaf?.map ?? null, mode === 'trace');
 
   useEffect(() => {
     document.title = t('Pelham Admin · 직원 위치');
@@ -50,8 +55,9 @@ export default function StaffMap() {
     }
   }, [t]);
 
-  // 화면을 보고 있는 동안에만 다시 읽습니다. 돌아오면 바로 한 번 읽습니다.
+  // 화면을 보고 있는 동안에만 다시 읽습니다. 돌아오면 바로 한 번 읽습니다. 이동 기록을 보는 동안은 쉽니다.
   useEffect(() => {
+    if (mode !== 'now') return;
     void load();
     const tick = setInterval(() => {
       if (document.visibilityState === 'visible') void load();
@@ -63,7 +69,7 @@ export default function StaffMap() {
       clearInterval(tick);
       document.removeEventListener('visibilitychange', back);
     };
-  }, [load]);
+  }, [load, mode]);
 
   // Leaflet 은 window 를 곧바로 만지므로 서버에서는 불러오지 않고, 화면에 붙은 뒤에만 불러옵니다.
   useEffect(() => {
@@ -77,6 +83,7 @@ export default function StaffMap() {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       }).addTo(map.current);
       layer.current = L.layerGroup().addTo(map.current);
+      setLeaf({ L, map: map.current });
       setNow(Date.now());
     });
     return () => {
@@ -84,8 +91,17 @@ export default function StaffMap() {
       map.current?.remove();
       map.current = null;
       layer.current = null;
+      setLeaf(null);
     };
   }, []);
+
+  // 모드를 바꾸면 지금 자리 층을 떼거나 붙이고, 지도 아래 재생 막대만큼 달라진 크기를 다시 잽니다.
+  useEffect(() => {
+    if (!leaf || !layer.current) return;
+    if (mode === 'now') layer.current.addTo(leaf.map);
+    else layer.current.remove();
+    leaf.map.invalidateSize();
+  }, [leaf, mode]);
 
   const fitAll = useCallback(() => {
     const L = lib.current;
@@ -156,18 +172,30 @@ export default function StaffMap() {
         <div>
           <div className="eyebrow">ADMIN</div>
           <h1>{t('직원 위치')}</h1>
-          <p>{t('출근을 찍어 둔 직원만 보입니다. 직원 앱이 열려 있는 동안 1분마다 자리가 갱신됩니다.')}</p>
+          <p>
+            {mode === 'now'
+              ? t('출근을 찍어 둔 직원만 보입니다. 직원 앱이 열려 있는 동안 1분마다 자리가 갱신됩니다.')
+              : t('고른 날 직원들이 지나온 자리를 시간순으로 되짚습니다.')}
+          </p>
         </div>
         <div className="staffmap-actions">
-          <button className="button" onClick={fitAll} disabled={!feed}>
+          <div className="stafftrace-modes" role="tablist">
+            <button role="tab" aria-selected={mode === 'now'} onClick={() => setMode('now')}>
+              <Radio size={15} /> {t('지금')}
+            </button>
+            <button role="tab" aria-selected={mode === 'trace'} onClick={() => setMode('trace')}>
+              <History size={15} /> {t('이동 기록')}
+            </button>
+          </div>
+          <button className="button" onClick={mode === 'now' ? fitAll : () => trace.fit()} disabled={mode === 'now' && !feed}>
             <Crosshair size={16} /> {t('모두 보기')}
           </button>
-          <button className="button" onClick={() => void load()}>
+          <button className="button" onClick={() => (mode === 'now' ? void load() : trace.reload())}>
             <RefreshCw size={16} /> {t('다시 불러오기')}
           </button>
         </div>
       </header>
-      {error && (
+      {mode === 'now' && error && (
         <div className="staffmap-error" role="alert">
           {t(error.text)}
           {error.login && (
@@ -178,8 +206,14 @@ export default function StaffMap() {
         </div>
       )}
       <div className="staffmap-body">
-        <div className="staffmap-map" ref={box} />
-        <aside className="staffmap-list">
+        <div className="staffmap-main">
+          <div className="staffmap-map" ref={box} />
+          {mode === 'trace' && <TraceBar s={trace} />}
+        </div>
+        {mode === 'trace' ? (
+          <TraceList s={trace} />
+        ) : (
+          <aside className="staffmap-list">
           <h2>
             {t('근무 중')} <span>{feed ? t('{a}명 중 {b}명 위치 확인', { a: feed.staff.length, b: located }) : ''}</span>
           </h2>
@@ -216,7 +250,8 @@ export default function StaffMap() {
               );
             })}
           </ul>
-        </aside>
+          </aside>
+        )}
       </div>
     </div>
   );

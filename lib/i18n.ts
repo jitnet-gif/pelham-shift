@@ -1103,6 +1103,21 @@ const en: Record<string, string> = {
   '{n}분 전': '{n} min ago',
   '±{n}m': '±{n}m',
   '위치 없음 · 앱이 닫혀 있습니다': 'No location · app is closed',
+  // 관리자 지도의 이동 기록(하루 동안 지나온 자리를 시간순으로 되짚기)
+  '고른 날 직원들이 지나온 자리를 시간순으로 되짚습니다.': 'Replay where staff went on the chosen day, in time order.',
+  '지금': 'Now',
+  '이동 기록': 'Trace',
+  '전날': 'Previous day',
+  '다음날': 'Next day',
+  '멈춤': 'Pause',
+  '재생': 'Play',
+  '시각': 'Time',
+  '재생 속도': 'Playback speed',
+  '1초에 {n}분': '{n} min / sec',
+  '이 날 남은 위치 기록이 없습니다.': 'No location history for this day.',
+  '{n}곳': '{n} points',
+  '출퇴근을 찍은 자리와, 근무 중 앱이 열려 있을 때 30분마다 남긴 자리를 잇습니다. 점 사이의 선은 실제로 걸은 길이 아닙니다.':
+    'Joins the check-in/out spots with the spot saved every 30 minutes while the app was open on shift. Lines between dots are not the actual path walked.',
   '위치 표가 아직 없습니다. supabase/migrations/20260924120000_staff_locations.sql 을 Supabase SQL Editor 에서 실행하세요.':
     'The location table does not exist yet. Run supabase/migrations/20260924120000_staff_locations.sql in the Supabase SQL Editor.',
 };
