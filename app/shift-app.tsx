@@ -92,7 +92,6 @@ import {
   earlyBy,
   lateBy,
   scheduledFor,
-  wholePeriods,
   OT_PERIOD_HOURS,
   HOLIDAY_MULTIPLIER,
   holidayOn,
@@ -2222,25 +2221,6 @@ export default function ShiftApp() {
                   </button>
                 </div>
               )}
-              <div className="policy">
-                {t(
-                  '지급액은 단말에서 찍힌 출퇴근을 기준으로 계산합니다. 유급 휴게는 근무로 치고 무급 휴게만 뺍니다. 예정 시작보다 일찍 찍어도 예정 시작 시각부터 세고, 늦게 찍으면 찍힌 시각부터 셉니다. 퇴근은 찍힌 시각까지 셉니다. 그 사람 그 날짜에 찍힌 기록이 없을 때만 예전에 가져온 기록을 씁니다. 초과근무는 급여 기간(일요일 시작 2주) {w}시간을 넘긴 시간만 {m}배로 가산하며, 하루·한 주 기준은 없습니다. 지각하면 찍힌 출근 시각부터, 조퇴하면 찍힌 퇴근 시각까지만 세므로 늦거나 일찍 간 시간은 지급하지 않을 뿐 따로 차감하지 않습니다. 지각·조퇴 분은 기록으로 남기며, 예정 근무가 없는 출근기록은 지각으로 보지 않습니다. 세금·유급휴가를 제외한 예상 금액이고, 시급 0인 직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급 대상이 아니며 실제 출근기록만 지급합니다.',
-                  { w: OT_PERIOD_HOURS, m: OT_MULTIPLIER },
-                )}{' '}
-                {t(
-                  '온타리오 법정 공휴일 9일에 일한 시간은 {h}배로 지급하며, 이 시간은 초과근무 {w}시간 계산에서 뺍니다.',
-                  { h: HOLIDAY_MULTIPLIER, w: OT_PERIOD_HOURS },
-                )}
-                {/* 급여 기간 단위로 끊기지 않은 구간은 걸쳐 있는 기간의 초과근무가 적게 잡힙니다. */}
-                {!wholePeriods(from, to) && (
-                  <b className="red">
-                    {' '}
-                    {t(
-                      '조회 구간이 급여 기간(2주) 단위가 아니어서 걸쳐 있는 기간의 초과근무가 실제보다 적게 잡힐 수 있습니다.',
-                    )}
-                  </b>
-                )}
-              </div>
               {actor.admin && paySheet ? (
                 <div className="paysheet">
                   {payrollSheet(data, from, to).employees.map((emp) => (

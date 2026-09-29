@@ -427,15 +427,11 @@ const en: Record<string, string> = {
     'No payroll recipients have an email yet. Add an email for {names} under Staff first.',
   시작일: 'Start date',
   종료일: 'End date',
-  '지급액은 단말에서 찍힌 출퇴근을 기준으로 계산합니다. 유급 휴게는 근무로 치고 무급 휴게만 뺍니다. 예정 시작보다 일찍 찍어도 예정 시작 시각부터 세고, 늦게 찍으면 찍힌 시각부터 셉니다. 퇴근은 찍힌 시각까지 셉니다. 그 사람 그 날짜에 찍힌 기록이 없을 때만 예전에 가져온 기록을 씁니다. 초과근무는 급여 기간(일요일 시작 2주) {w}시간을 넘긴 시간만 {m}배로 가산하며, 하루·한 주 기준은 없습니다. 지각하면 찍힌 출근 시각부터, 조퇴하면 찍힌 퇴근 시각까지만 세므로 늦거나 일찍 간 시간은 지급하지 않을 뿐 따로 차감하지 않습니다. 지각·조퇴 분은 기록으로 남기며, 예정 근무가 없는 출근기록은 지각으로 보지 않습니다. 세금·유급휴가를 제외한 예상 금액이고, 시급 0인 직원은 지급액 확인이 필요합니다. 원근무자의 예정 시간은 지급 대상이 아니며 실제 출근기록만 지급합니다.':
-    "Pay is worked out from the check-ins taken on the time clock. Paid breaks count as work; only unpaid breaks come off. Pay runs from the scheduled start, or from the check-in if it came later, to the check-out time: checking in early adds no pay, and staying past the scheduled end is paid. Imported time clock records are used only when that person has no check-in on that date. Overtime pays {m}× on hours over {w} in a two-week pay period (starting Sunday); there is no daily or weekly limit. Late and undertime minutes are simply not paid; nothing extra is deducted. They are kept on record, and attendance with no scheduled shift is never counted late. Estimates exclude taxes and paid leave, and pay needs checking for anyone whose hourly rate is 0. Only actual attendance is paid, not the original employee's scheduled hours.",
   '직원이 이의를 제기한 근무 {n}건이 이 금액에 들어 있습니다. ':
     'This total includes {n} shift(s) a staff member has disputed. ',
   '아직 아무도 확인하지 않은 근무 {n}건이 있습니다. ': '{n} shift(s) have not been reviewed yet. ',
   '지급 전에 출근 기록에서 확인하세요.': 'Check them under Attendance before paying.',
   '출근 기록 보기': 'Open attendance',
-  '조회 구간이 급여 기간(2주) 단위가 아니어서 걸쳐 있는 기간의 초과근무가 실제보다 적게 잡힐 수 있습니다.':
-    'This range is not a whole two-week pay period, so overtime in the periods it cuts across may come out lower than it really is.',
   이름: 'Name',
   실근무시간: 'Hours worked',
   정규: 'Regular',
@@ -603,8 +599,6 @@ const en: Record<string, string> = {
   공휴일: 'Holiday',
   공휴일시간: 'Holiday hours',
   공휴일수당: 'Holiday pay',
-  '온타리오 법정 공휴일 9일에 일한 시간은 {h}배로 지급하며, 이 시간은 초과근무 {w}시간 계산에서 뺍니다.':
-    'Hours worked on the 9 Ontario public holidays are paid at {h}×, and they are left out of the {w}-hour overtime count.',
   '끄면 이 직원이 짜는 근무는 급여 기간(일요일 시작 2주) {w}시간까지만 들어갑니다. 켜면 그 선을 넘는 근무도 낼 수 있고, 넘긴 시간에는 급여에서 {m}배가 붙습니다. 관리자는 이 설정과 상관없이 넘겨 짤 수 있습니다.':
     'With this off, shifts this person schedules stop at {w} hours per two-week pay period (starting Sunday). With it on they can schedule past that line, and the hours over it are paid at {m}× . Administrators can always schedule past it.',
   '대체근무 신청': 'Request a swap',

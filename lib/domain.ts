@@ -209,8 +209,6 @@ export function earlyOut(shift:Shift|undefined,inAt:string,outAt:string){
 // 조퇴 분. 지각과 같은 예정 근무(scheduledFor)를 기준으로 삼습니다 —
 // 한 기록을 두 눈금이 서로 다른 근무로 재면, 지각은 있는데 조퇴는 '예정 없음'인 줄이 나옵니다.
 export function earlyBy(state:{shifts:Shift[]},a:Attendance){return earlyOut(scheduledFor(state,a),a.start,a.end)}
-// 조회 구간이 급여 기간 경계에 맞지 않으면 걸쳐 있는 기간의 초과근무가 실제보다 적게 잡힙니다.
-export function wholePeriods(from:string,to:string){return payPeriodStart(from)===from&&payPeriodStart(addDays(to,1))===addDays(to,1)}
 // 실근무시간을 정규·초과로 나눠 시급을 곱합니다. 지각·조퇴한 시간은 실근무에 들지 않을 뿐 따로 차감하지 않습니다. 대체 근무에 붙는 추가수당은 없습니다 —
 // 예전 대체 요청에 남아 있는 bonus 값도 급여에 더하지 않습니다.
 // 급여가 보는 근무 기록. 단말에서 찍힌 출퇴근(punches)이 기준입니다.
