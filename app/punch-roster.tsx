@@ -42,9 +42,6 @@ const tally = (rows: Punch[], shifts: Shift[], today: string) => {
     noOut: noOut.length,
   };
 };
-// 퇴근까지 찍혀 확인을 기다리는 근무. 지금 열린 기간에서만 뜻이 있어 그때만 셉니다.
-const waiting = (rows: Punch[]) =>
-  rows.filter((p) => p.out && (p.status ?? 'pending') === 'pending').length;
 
 type RosterProps = {
   // 출근부 보기는 급여와 같은 계산(payroll)을 써서 시급·근무 기록 전부가 필요합니다.
@@ -285,7 +282,6 @@ function PunchSheet({
                   (n, p) => n + (p.out && !holidayOn(p.date) ? shownPunch({ shifts }, p).hours : 0),
                   0,
                 );
-                const pending = waiting(mine);
                 return (
                   <tr key={e.id}>
                     <th className="punchsheet-name">
@@ -312,9 +308,6 @@ function PunchSheet({
                       <b style={otBase > OT_PERIOD_HOURS ? { color: OFF_TIME_COLOR } : undefined}>
                         {hours ? hours.toFixed(2) : '–'}
                       </b>
-                      {pending > 0 && (
-                        <em className="punchroster-flag">{t('확인 대기 {n}', { n: pending })}</em>
-                      )}
                     </td>
                   </tr>
                 );
@@ -415,7 +408,6 @@ function RosterCards({ employees, punches, shifts, today, onPick }: RosterProps)
           const seen = tally(now, shifts, today);
           // 가장 최근에 찍은 날. 이번 기간에 아무것도 없는 사람도 언제까지 일했는지 보입니다.
           const last = mine.reduce((v, p) => (p.date > v ? p.date : v), '');
-          const pending = waiting(now);
           return (
             <button className="punchroster-card" key={e.id} onClick={() => onPick(e.id)}>
               {/* 이름은 윗칸에만 서고, 맡은 자리와 건수·표지는 아랫칸으로 내려보냅니다.
@@ -443,9 +435,6 @@ function RosterCards({ employees, punches, shifts, today, onPick }: RosterProps)
                   {seen.live > 0 && <em className="punchroster-live">{t('근무 중')}</em>}
                   {seen.noOut > 0 && (
                     <em className="punchroster-flag">{t('퇴근 미기록 {n}', { n: seen.noOut })}</em>
-                  )}
-                  {pending > 0 && (
-                    <em className="punchroster-flag">{t('확인 대기 {n}', { n: pending })}</em>
                   )}
                 </span>
               </span>

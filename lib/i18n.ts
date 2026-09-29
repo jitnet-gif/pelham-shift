@@ -306,7 +306,6 @@ const en: Record<string, string> = {
   '마지막 기록 {date}': 'Last seen {date}',
   '찍힌 기록 없음': 'No check-ins',
   '퇴사': 'Left',
-  '확인 대기 {n}': '{n} awaiting review',
   '아직 끝난 근무가 없습니다': 'No finished shifts yet',
   // 출근 기록을 엑셀처럼 펼친 표 보기. 칸에는 출퇴근 시각이나 일한 시간을 적습니다.
   'ledger::출근부': 'Timesheet',
