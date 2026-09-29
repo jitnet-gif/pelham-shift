@@ -202,11 +202,15 @@ export function useStaffTrace(
   // 층은 모드가 켜져 있는 동안만 지도에 붙입니다.
   useEffect(() => {
     if (!L || !map || !active) return;
+    // 바탕 지도는 골프장 카트길·산책로를 갈색·빨간 점선으로 그려 직원 동선과 헷갈립니다.
+    // 이동 기록을 보는 동안은 바탕을 흑백으로 흐리게 해, 색 있는 선은 모두 직원 동선이 되게 합니다.
+    map.getContainer().classList.add('is-trace');
     const group = L.layerGroup().addTo(map),
       moving = L.layerGroup().addTo(map);
     layer.current = group;
     live.current = moving;
     return () => {
+      map.getContainer().classList.remove('is-trace');
       group.remove();
       moving.remove();
       layer.current = null;
@@ -259,7 +263,7 @@ export function useStaffTrace(
       const route = L.polyline(line, {
         color: p.color,
         weight: 3,
-        opacity: 0.3,
+        opacity: 0.6,
         dashArray: '4 6',
         interactive: false,
       }).addTo(g);
@@ -267,7 +271,7 @@ export function useStaffTrace(
       L.polyline(line, { color: p.color, weight: 16, opacity: 0 })
         .bindTooltip(p.name, { sticky: true, className: 'staffmap-tag' })
         .on('mouseover', () => route.setStyle({ opacity: 0.9, weight: 4 }))
-        .on('mouseout', () => route.setStyle({ opacity: 0.3, weight: 3 }))
+        .on('mouseout', () => route.setStyle({ opacity: 0.6, weight: 3 }))
         .addTo(g);
     }
     // 점은 모든 선을 그린 뒤에 올려, 다른 사람의 굵은 짚기 선에 가려지지 않게 합니다.

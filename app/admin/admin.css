@@ -262,3 +262,8 @@ span.staffmap-seen {
     flex-wrap: wrap;
   }
 }
+/* 이동 기록 중에는 바탕 지도를 흑백으로 흐리게. 바탕의 갈색 카트길 점선이 직원 동선처럼 보이지 않게. */
+.staffmap-map.is-trace .leaflet-tile-pane {
+  filter: grayscale(1) brightness(1.08);
+  opacity: 0.7;
+}
