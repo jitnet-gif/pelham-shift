@@ -44,7 +44,9 @@ export default function TimePicker({
   const pm = hour24 >= 12;
   // 분은 허용된 간격 위에만 섭니다. 10분 단위면 00, 10, 20, 30, 40, 50 만 고를 수 있습니다.
   const step = Math.max(1, Math.min(30, minuteStep));
-  const minutes = Array.from({ length: Math.ceil(60 / step) }, (_, i) => i * step);
+  // 판에 적는 숫자는 10분마다만 둡니다. 1분 간격이어도 숫자 60개가 겹치지 않고, 그 사이 분은 바늘을 끌어 고릅니다.
+  const markStep = Math.max(step, 10);
+  const minutes = Array.from({ length: Math.ceil(60 / markStep) }, (_, i) => i * markStep);
   const hours = Array.from({ length: 12 }, (_, i) => (i === 0 ? 12 : i));
   // 눈금마다 값·글자·반지름을 둡니다. 24시간이면 바깥은 1–12, 안쪽은 00·13–23 입니다.
   const marks =
