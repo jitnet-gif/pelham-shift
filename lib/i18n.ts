@@ -630,6 +630,15 @@ const en: Record<string, string> = {
   '로그인 이메일': 'Login email',
   '직원 색상': 'Color',
   '개인별 시급 ({currency})': 'Hourly rate ({currency})',
+  '처음 시급 (선택, {currency})': 'Starting rate (optional, {currency})',
+  '관리직 2주 급여 (선택, {currency})': 'Bi-weekly salary (optional, {currency})',
+  '처음 시급이 지금 시급과 다르면 Work hours 표에 인상 전후를 함께 적습니다. 2주 급여를 적으면 시급 명단 대신 Management 칸에 섭니다.':
+    'If the starting rate differs from the current rate, the Work hours sheet shows both as Beginning and Raised. Anyone with a bi-weekly salary is listed under Management instead of the hourly staff.',
+  '초과근무 {h}시간이 들어 있습니다 (1.5배).': 'Includes {h}h of overtime (1.5x).',
+  '고른 기간이 급여 기간(2주) 단위가 아니어서 관리직 급여는 G. Total 에 넣지 않았습니다.':
+    'The dates chosen are not whole pay periods, so management pay is left out of the G. Total.',
+  '관리직 급여는 급여 기간 {n}번 몫({amount})을 G. Total 에 넣었습니다.':
+    'The G. Total includes {n} pay periods of management pay ({amount}).',
   '대체할 근무': 'Shift to cover',
   '근무 선택': 'Choose a shift',
   '대체 직원': 'Covering employee',

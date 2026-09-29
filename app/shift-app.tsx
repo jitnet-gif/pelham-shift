@@ -146,6 +146,7 @@ import StaffSchedule from './staff-schedule';
 import StaffMessaging from './staff-messaging';
 import StaffTimesheets from './staff-timesheets';
 import { PunchRoster, PunchPeriodBar } from './punch-roster';
+import { PayrollHours } from './payroll-hours';
 import StaffClock from './staff-clock';
 import { say } from './say';
 import StaffMore, { type MoreItem } from './staff-more';
@@ -333,7 +334,9 @@ export default function ShiftApp() {
   // 뒤로 가기나 돌아가기 단추로 떠나온 급여 화면과 급여 상세로 되돌아갑니다.
   const [payFocus, setPayFocus] = useState<{ who: string; id: string; from: string; tab: string } | null>(null);
   // 급여 탭을 근무 한 줄씩 적은 명세(JSON 과 같은 모양)로 볼지. 끄면 사람별 요약 표입니다.
-  const [paySheet, setPaySheet] = useState(false);
+  // 급여 탭 보기: 요약 · 근무별 명세 · 급여 엑셀과 같은 Work hours 표.
+  const [payView, setPayView] = useState<'summary' | 'sheet' | 'hours'>('summary');
+  const paySheet = payView === 'sheet';
   // 관리자 출근 기록: 어느 이름의 출근부를 어느 2주 기간으로 보고 있는지.
   // 로그인한 사람(actor)을 함께 들고 있어, 사람이 바뀌면 앞사람 출근부에 서 있지 않고 이름 목록부터 다시 엽니다.
   // focus 는 출근부에서 누른 기록 — 그 사람 출퇴근 카드 중 그 카드를 짚습니다.
@@ -635,6 +638,8 @@ export default function ShiftApp() {
     open('employee', {
       ...e,
       rate: String(e.rate),
+      salary: e.salary ? String(e.salary) : '',
+      startRate: e.startRate !== undefined ? String(e.startRate) : '',
       roles: roleList(e).join(','),
       taskManager: e.taskManager ? '1' : '',
       overtimeManager: e.overtimeManager ? '1' : '',
@@ -2164,9 +2169,17 @@ export default function ShiftApp() {
                 {actor.admin && (
                   <button
                     className={paySheet ? 'button primary' : 'button'}
-                    onClick={() => setPaySheet((v) => !v)}
+                    onClick={() => setPayView(paySheet ? 'summary' : 'sheet')}
                   >
                     {paySheet ? t('요약 보기') : t('명세 보기')}
+                  </button>
+                )}
+                {actor.admin && (
+                  <button
+                    className={payView === 'hours' ? 'button primary' : 'button'}
+                    onClick={() => setPayView(payView === 'hours' ? 'summary' : 'hours')}
+                  >
+                    {payView === 'hours' ? t('요약 보기') : 'Work hours'}
                   </button>
                 )}
                 {/* 급여는 늘 같은 사람들에게 갑니다. 주소를 다시 적지 않도록 버튼 하나에 담아 둡니다. */}
@@ -2221,7 +2234,9 @@ export default function ShiftApp() {
                   </button>
                 </div>
               )}
-              {actor.admin && paySheet ? (
+              {actor.admin && payView === 'hours' ? (
+                <PayrollHours state={data} from={from} to={to} />
+              ) : actor.admin && paySheet ? (
                 <div className="paysheet">
                   {payrollSheet(data, from, to).employees.map((emp) => (
                     <section key={emp.name}>
@@ -3444,6 +3459,23 @@ export default function ShiftApp() {
                     'number',
                   )}
                 </div>
+                <div className="formgrid">
+                  {input(
+                    'startRate',
+                    t('처음 시급 (선택, {currency})', { currency: data.currency }),
+                    'number',
+                    false,
+                  )}
+                  {input(
+                    'salary',
+                    t('관리직 2주 급여 (선택, {currency})', { currency: data.currency }),
+                    'number',
+                    false,
+                  )}
+                </div>
+                <p className="hint">
+                  {t('처음 시급이 지금 시급과 다르면 Work hours 표에 인상 전후를 함께 적습니다. 2주 급여를 적으면 시급 명단 대신 Management 칸에 섭니다.')}
+                </p>
                 {rolePick()}
                 <label className="recipient all">
                   <Checkbox
