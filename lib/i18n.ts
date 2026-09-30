@@ -486,6 +486,7 @@ const en: Record<string, string> = {
   '확인 완료': 'Read',
   '직원은 관리자나 동료에게만 메시지를 보낼 수 있습니다.': 'Staff can only message the manager or a teammate.',
   '퇴사한 직원에게는 보낼 수 없습니다.': 'You cannot message a former employee.',
+  '본인에게는 메시지를 보낼 수 없습니다.': 'You cannot message yourself.',
   '관리자 메시지': 'Message from the manager',
   '관리자 공지': 'Announcement from the manager',
   '받는 사람 ({n}/{total}명)': 'To ({n}/{total})',

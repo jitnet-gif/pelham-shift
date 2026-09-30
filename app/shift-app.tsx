@@ -1266,10 +1266,14 @@ export default function ShiftApp() {
     );
   };
   // 메시지 받는 사람. 전체·구분(그룹)·한 사람씩 골라 한 번에 보냅니다.
-  // 직원은 관리자와 동료에게, 관리자는 직원에게 보냅니다. 공지는 관리자만 올리고 관리자 칸은 빠집니다.
+  // 직원은 관리자와 동료에게 보냅니다. 관리자 권한을 받은 직원도 관리자 칸으로 다른 관리자와 주고받습니다.
+  // 관리자 칸은 공지를 올릴 때와, 관리자 칸의 주인인 관리자 계정('admin') 본인에게서만 빠집니다.
   const msgNotice = actor.admin && form.notice === '1';
   const msgPeople = staff.filter((e) => e.id !== actor.id);
-  const msgPool = [...(actor.admin ? [] : ['admin']), ...msgPeople.map((e) => e.id)];
+  const msgPool = [
+    ...(msgNotice || actor.id === 'admin' ? [] : ['admin']),
+    ...msgPeople.map((e) => e.id),
+  ];
   const msgTargets = (form.to || '').split(',').filter((v) => msgPool.includes(v));
   const msgSet = (ids: string[]) => put('to', msgPool.filter((v) => ids.includes(v)).join(','));
   const msgToggle = (ids: string[], on: boolean) =>
@@ -1296,7 +1300,7 @@ export default function ShiftApp() {
           <Checkbox checked={msgAll} onCheckedChange={(on) => msgSet(on === true ? msgPool : [])} />
           {t('전체')}
         </label>
-        {!actor.admin && (
+        {msgPool.includes('admin') && (
           <label className="recipient">
             <Checkbox
               checked={msgTargets.includes('admin')}
@@ -1338,8 +1342,11 @@ export default function ShiftApp() {
   // 여럿에게 한 번에 보낸 메시지는 한 사람씩 따로 저장되지만, 목록에서는 한 장으로 묶어 보여 줍니다.
   // 묶음 안에 내가 받은 한 통이 있으면 그 통으로 확인 단추가 움직입니다.
   const mineTo = (x: Message) => (x.to === 'admin' ? actor.admin : x.to === actor.id);
+  // 관리자 칸으로 온 글은 보낸 사람이 아닌 관리자가 읽어야 확인입니다. 보낸 사람이 관리자일 수도 있습니다.
   const seen = (x: Message) =>
-    x.to === 'admin' ? x.readBy.some((id) => emp(id)?.admin) : x.readBy.includes(x.to);
+    x.to === 'admin'
+      ? x.readBy.some((id) => id !== x.sender && (id === 'admin' || emp(id)?.admin))
+      : x.readBy.includes(x.to);
   const sendBatches = (list: Message[]) => {
     const out: Message[][] = [];
     for (const x of list.slice().reverse()) {
@@ -2598,9 +2605,7 @@ export default function ShiftApp() {
                         </span>
                       ) : m.sender === actor.id ? (
                         <span>
-                          {(m.to === 'admin'
-                            ? m.readBy.some((id) => emp(id)?.admin)
-                            : m.readBy.includes(m.to))
+                          {seen(m)
                             ? t('상대방 확인')
                             : t('확인 대기')}
                         </span>
