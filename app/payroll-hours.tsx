@@ -1,5 +1,5 @@
 'use client';
-import type { ReactNode } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 import type { Employee, State } from '@/lib/domain';
 import {
   PAY_PERIOD_DAYS,
@@ -138,15 +138,18 @@ export function PayrollHours({
   state,
   from,
   to,
+  onOpen,
 }: {
   state: State;
   from: string;
   to: string;
+  onOpen?: (id: string) => void;
 }) {
   return (
     <WorkHoursSheet
       data={workHoursData(state, from, to)}
       currency={state.currency}
+      onOpen={onOpen}
     />
   );
 }
@@ -170,9 +173,12 @@ const blank = (n: number, cls = '') =>
 export function WorkHoursSheet({
   data,
   currency,
+  onOpen,
 }: {
   data: WorkHoursData;
   currency: string;
+  // 직원 줄을 누르면 요약 보기처럼 그 직원의 날짜별 상세를 엽니다.
+  onOpen?: (id: string) => void;
 }) {
   const { t } = useLang();
   const money = (n: number) =>
@@ -190,8 +196,9 @@ export function WorkHoursSheet({
   const managementPay = cents(salaryTotal * data.periods);
   const grandTotal = cents(wageTotal + holidayTotal + managementPay);
 
-  const rows: { key: string; cells: Cell[] }[] = [];
-  const push = (key: string, cells: Cell[]) => rows.push({ key, cells });
+  const rows: { key: string; cells: Cell[]; open?: string }[] = [];
+  const push = (key: string, cells: Cell[], open?: string) =>
+    rows.push({ key, cells, open });
   push('title', [C('Work hours', 'wh-title', { span: 3 }), ...blank(4)]);
   push('gap', blank(7));
   data.departments.forEach((d, i) => {
@@ -268,7 +275,7 @@ export function WorkHoursSheet({
           hol ? money(r.holidayPay) : '',
           'wh-num wh-br' + (hol ? '' : ' wh-grey') + edge(!hol, !nHol),
         ),
-      ]);
+      ], r.id);
     });
     push(d.title + '-total', [
       C('', 'wh-bl wh-br wh-bb'),
@@ -333,7 +340,24 @@ export function WorkHoursSheet({
         </colgroup>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.key}>
+            <tr
+              key={r.key}
+              {...(onOpen && r.open
+                ? {
+                    className: 'wh-link',
+                    role: 'button',
+                    tabIndex: 0,
+                    title: t('날짜별 상세 보기'),
+                    onClick: () => onOpen(r.open!),
+                    onKeyDown: (event: KeyboardEvent) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        onOpen(r.open!);
+                      }
+                    },
+                  }
+                : {})}
+            >
               {r.cells.map((c, i) => (
                 <td
                   key={i}
