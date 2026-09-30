@@ -47,6 +47,7 @@ import {
   Upload,
   History,
   ArchiveRestore,
+  Reply,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
@@ -2631,6 +2632,27 @@ export default function ShiftApp() {
                           <Check size={14} /> {t('확인했습니다')}
                         </button>
                       )}
+                      {/* 받은 글에는 누구나 보낸 사람에게 답장합니다. 관리자 계정이 보낸 글은 관리자 칸으로 갑니다.
+                          퇴사한 직원에게는 보낼 수 없으므로 그 글에는 버튼을 두지 않습니다. */}
+                      {m.sender !== actor.id &&
+                        (m.sender === 'admin' || staff.some((e) => e.id === m.sender)) && (
+                          <button
+                            disabled={busy}
+                            className="button"
+                            onClick={() =>
+                              open('message', {
+                                to: m.sender,
+                                notice: '',
+                                body:
+                                  m.to === 'all'
+                                    ? t('공지 답장: {title}', { title: m.body.slice(0, 60) }) + '\n'
+                                    : '',
+                              })
+                            }
+                          >
+                            <Reply size={14} /> {t('답장')}
+                          </button>
+                        )}
                       {/* 메시지 삭제는 관리자만 보입니다. 서버에서도 관리자만 통과시킵니다. */}
                       {actor.admin && (
                         <button
