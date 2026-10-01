@@ -147,7 +147,7 @@ import StaffSchedule from './staff-schedule';
 import StaffMessaging from './staff-messaging';
 import StaffTimesheets from './staff-timesheets';
 import { PunchRoster, PunchPeriodBar } from './punch-roster';
-import { PayrollHours } from './payroll-hours';
+import { PayrollHours, workHoursData } from './payroll-hours';
 import StaffClock from './staff-clock';
 import { say } from './say';
 import StaffMore, { type MoreItem } from './staff-more';
@@ -1498,6 +1498,19 @@ export default function ShiftApp() {
       t('예상급여_') + from + '.csv',
     );
   }
+  // 'Work hours' 표를 원래 엑셀 시트 모양 그대로 .xlsx 로 내려받습니다. 숫자는 화면 표와 같습니다.
+  async function exportWorkHours() {
+    setBusy(true);
+    setStatus('');
+    try {
+      const { workHoursXlsx } = await import('./work-hours-xlsx');
+      download(await workHoursXlsx(workHoursData(data, from, to)), `WorkHours_${from}_${to}.xlsx`);
+    } catch (e) {
+      setStatus(notice(e, t('엑셀 파일을 만들지 못했습니다.')));
+    } finally {
+      setBusy(false);
+    }
+  }
   // 근무 한 줄씩 적은 급여 명세. 주별·사람별 합계가 붙고, 사람 합계는 CSV 의 예상 급여와 같습니다.
   function exportPayrollJson() {
     download(
@@ -2188,6 +2201,11 @@ export default function ShiftApp() {
                     onClick={() => setPayView(payView === 'hours' ? 'summary' : 'hours')}
                   >
                     {payView === 'hours' ? t('요약 보기') : 'Work hours'}
+                  </button>
+                )}
+                {actor.admin && (
+                  <button className="button" disabled={busy} onClick={() => void exportWorkHours()}>
+                    <Download size={16} /> {t('Work hours 엑셀')}
                   </button>
                 )}
                 {/* 급여는 늘 같은 사람들에게 갑니다. 주소를 다시 적지 않도록 버튼 하나에 담아 둡니다. */}

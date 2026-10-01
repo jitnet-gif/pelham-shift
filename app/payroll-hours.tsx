@@ -17,7 +17,7 @@ import './payroll-hours.css';
 // 2주 급여(salary)가 적힌 사람은 시급 명단에서 빠지고 아래 Management 에 섭니다.
 // 모양도 엑셀을 따릅니다 — 7칸 한 장의 격자에 옅은 눈금선, 표마다 검은 테두리, 첫 부서 머리의 노란 칠까지.
 
-const HOLIDAY_PREMIUM = 0.5;
+export const HOLIDAY_PREMIUM = 0.5;
 const cents = (n: number) => Math.round(n * 100) / 100;
 const days = (from: string, to: string) =>
   Math.round(
@@ -42,7 +42,7 @@ const DEPARTMENTS = [
   },
 ];
 // 2주에 80시간을 넘긴 시간은 엑셀처럼 빨갛게 적어 눈에 띄게 합니다.
-const LONG_HOURS = 80;
+export const LONG_HOURS = 80;
 
 export type WorkHoursRow = {
   id: string;

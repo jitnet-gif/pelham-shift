@@ -411,6 +411,8 @@ const en: Record<string, string> = {
   'CSV 다운로드': 'Download CSV',
   'JSON 다운로드': 'Download JSON',
   '명세 보기': 'Detailed view',
+  'Work hours 엑셀': 'Work hours Excel',
+  '엑셀 파일을 만들지 못했습니다.': 'Could not create the Excel file.',
   '요약 보기': 'Summary view',
   '급여 이메일로 보내기': 'Email payroll',
   '받는 사람: {names}': 'Sends to {names}',
