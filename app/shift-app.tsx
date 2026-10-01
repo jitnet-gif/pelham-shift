@@ -2265,7 +2265,13 @@ export default function ShiftApp() {
                 </div>
               )}
               {actor.admin && payView === 'hours' ? (
-                <PayrollHours state={data} from={from} to={to} onOpen={setPayDetail} />
+                <PayrollHours
+                  state={data}
+                  from={from}
+                  to={to}
+                  onOpen={setPayDetail}
+                  onEdit={(edit) => void command('payHours', { ...edit, from, to })}
+                />
               ) : actor.admin && paySheet ? (
                 <div className="paysheet">
                   {payrollSheet(data, from, to).employees.map((emp) => (

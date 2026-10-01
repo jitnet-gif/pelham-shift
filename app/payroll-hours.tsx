@@ -1,5 +1,5 @@
 'use client';
-import type { KeyboardEvent, ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import type { Employee, State } from '@/lib/domain';
 import {
   PAY_PERIOD_DAYS,
@@ -54,6 +54,8 @@ export type WorkHoursRow = {
   wage: number;
   holidayHours: number;
   holidayPay: number;
+  // 관리자가 이 기간의 시간·금액을 손으로 적은 줄. hours·wage 가 출퇴근 대신 그 값입니다.
+  manual?: { hours: number; wage?: number };
 };
 export type WorkHoursData = {
   period: string;
@@ -87,23 +89,28 @@ export function workHoursData(
     const pay = payroll(state, e.id, from, to);
     const holidayPay = cents(pay.holidayHours * e.rate * HOLIDAY_PREMIUM);
     const raised = e.startRate !== undefined && e.startRate !== e.rate;
+    // 손으로 적은 시간이 있으면 Regular Hours·Wage 는 그 값입니다. 공휴일 가산분은 출퇴근 기록 그대로 둡니다.
+    const hand = (state.payHours ?? []).find(
+      (x) => x.employeeId === e.id && x.from === from && x.to === to,
+    );
     return {
       id: e.id,
       name: e.name,
       beginning: raised ? e.startRate! : e.rate,
       raised: raised ? e.rate : undefined,
-      hours: pay.hours,
-      otHours: pay.otHours,
-      wage: cents(pay.total - holidayPay),
+      hours: hand ? hand.hours : pay.hours,
+      otHours: hand ? 0 : pay.otHours,
+      wage: hand ? (hand.wage ?? cents(hand.hours * e.rate)) : cents(pay.total - holidayPay),
       holidayHours: pay.holidayHours,
       holidayPay,
+      ...(hand ? { manual: { hours: hand.hours, wage: hand.wage } } : {}),
     };
   };
   // 퇴사한 사람은 이 기간에 근무가 있을 때만 세웁니다. 순서는 직원을 등록한 순서입니다.
   const hourly = state.employees
     .filter((e) => !e.salary)
     .map((e) => ({ e, row: rowOf(e) }))
-    .filter((x) => !x.e.archived || x.row.hours > 0);
+    .filter((x) => !x.e.archived || x.row.hours > 0 || !!x.row.manual);
   const deptOf = (role: string) =>
     DEPARTMENTS.find((d) => d.areas.includes(role.trim().toLowerCase()))
       ?.title ??
@@ -134,22 +141,93 @@ export function workHoursData(
   };
 }
 
+// 손으로 고친 값. hours 를 비우면('') 손으로 적은 것을 지우고 출퇴근 기록으로 돌아갑니다. wage 를 비우면 시간 × 시급입니다.
+export type WorkHoursEdit = { employeeId: string; hours: string; wage: string };
+
 export function PayrollHours({
   state,
   from,
   to,
   onOpen,
+  onEdit,
 }: {
   state: State;
   from: string;
   to: string;
   onOpen?: (id: string) => void;
+  onEdit?: (edit: WorkHoursEdit) => void;
 }) {
   return (
     <WorkHoursSheet
       data={workHoursData(state, from, to)}
       currency={state.currency}
       onOpen={onOpen}
+      onEdit={onEdit}
+    />
+  );
+}
+
+// 엑셀 칸처럼 누르면 그 자리에서 고칩니다. Enter·칸 밖을 누르면 저장, Esc 는 그만둡니다.
+// 줄을 누르면 날짜별 상세가 열리므로, 이 칸을 누른 것은 줄까지 올라가지 않게 막습니다.
+function EditCell({
+  shown,
+  value,
+  label,
+  onSave,
+}: {
+  shown: ReactNode;
+  value: string;
+  label: string;
+  onSave: (value: string) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const editing = draft !== null;
+  useEffect(() => {
+    if (editing) {
+      input.current?.focus();
+      input.current?.select();
+    }
+  }, [editing]);
+  const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
+  if (draft === null)
+    return (
+      <button
+        type="button"
+        className="wh-edit"
+        title={label}
+        onClick={(e) => {
+          stop(e);
+          setDraft(value);
+        }}
+        onKeyDown={stop}
+      >
+        {shown || ' '}
+      </button>
+    );
+  const done = () => {
+    const next = draft.trim();
+    setDraft(null);
+    if (next !== value) onSave(next);
+  };
+  return (
+    <input
+      className="wh-input"
+      type="number"
+      min={0}
+      step="0.01"
+      inputMode="decimal"
+      ref={input}
+      aria-label={label}
+      value={draft}
+      onClick={stop}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={done}
+      onKeyDown={(e) => {
+        stop(e);
+        if (e.key === 'Enter') done();
+        if (e.key === 'Escape') setDraft(null);
+      }}
     />
   );
 }
@@ -174,11 +252,14 @@ export function WorkHoursSheet({
   data,
   currency,
   onOpen,
+  onEdit,
 }: {
   data: WorkHoursData;
   currency: string;
   // 직원 줄을 누르면 요약 보기처럼 그 직원의 날짜별 상세를 엽니다.
   onOpen?: (id: string) => void;
+  // 있으면 Regular Hours·Wage 칸을 그 자리에서 고칩니다. 엑셀로 내릴 때는 넘기지 않습니다.
+  onEdit?: (edit: WorkHoursEdit) => void;
 }) {
   const { t } = useLang();
   const money = (n: number) =>
@@ -242,6 +323,42 @@ export function WorkHoursSheet({
       const edge = (grey: boolean, nextGrey: boolean) =>
         last ? ' wh-bb' : grey && nextGrey ? ' wh-gb' : '';
       const bb = last ? ' wh-bb' : '';
+      const hand = r.manual ? ' wh-manual' : '';
+      const hoursText = r.hours ? r.hours.toFixed(2) : '';
+      const wageText = worked ? money(r.wage) : '';
+      // 시간 칸을 고치면 적어 둔 금액은 그대로, 금액 칸을 고치면 지금 보이는 시간을 함께 적습니다.
+      const hoursCell = onEdit ? (
+        <EditCell
+          shown={hoursText}
+          value={r.manual ? String(r.manual.hours) : ''}
+          label={t('이 기간 시간을 직접 적습니다. 비우면 출퇴근 기록으로 돌아갑니다.')}
+          onSave={(v) =>
+            onEdit({
+              employeeId: r.id,
+              hours: v,
+              wage: r.manual?.wage !== undefined ? String(r.manual.wage) : '',
+            })
+          }
+        />
+      ) : (
+        hoursText
+      );
+      const wageCell = onEdit ? (
+        <EditCell
+          shown={wageText}
+          value={r.manual?.wage !== undefined ? String(r.manual.wage) : ''}
+          label={t('이 기간 금액을 직접 적습니다. 비우면 시간 × 시급입니다.')}
+          onSave={(v) =>
+            onEdit({
+              employeeId: r.id,
+              hours: r.manual ? String(r.manual.hours) : v ? String(r.hours) : '',
+              wage: v,
+            })
+          }
+        />
+      ) : (
+        wageText
+      );
       push(r.id, [
         C(r.name, 'wh-center wh-bl wh-br' + bb),
         C(money(r.beginning), 'wh-num wh-br' + bb),
@@ -250,13 +367,16 @@ export function WorkHoursSheet({
           'wh-num wh-red wh-bold wh-br' + bb,
         ),
         C(
-          r.hours ? r.hours.toFixed(2) : '',
+          hoursCell,
           'wh-num wh-hours' +
+            hand +
             (worked ? '' : ' wh-grey wh-gr') +
             (r.hours > LONG_HOURS ? ' wh-red wh-bold' : '') +
             edge(!worked, !nWorked),
           {
-            title: r.otHours
+            title: r.manual
+              ? t('직접 적은 값입니다.')
+              : r.otHours
               ? t('초과근무 {h}시간이 들어 있습니다 (1.5배).', {
                   h: r.otHours.toFixed(2),
                 })
@@ -264,8 +384,9 @@ export function WorkHoursSheet({
           },
         ),
         C(
-          worked ? money(r.wage) : '',
-          'wh-num wh-br' + (worked ? '' : ' wh-grey') + edge(!worked, !nWorked),
+          wageCell,
+          'wh-num wh-br' + hand + (worked ? '' : ' wh-grey') + edge(!worked, !nWorked),
+          r.manual ? { title: t('직접 적은 값입니다.') } : {},
         ),
         C(
           hol ? r.holidayHours.toFixed(2) : '',

@@ -159,6 +159,11 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
  // 출근기계 이름과 직원을 한 번 승인해 두면 다음 타임카드부터 자동으로 이어집니다. 비슷한 이름은 후보로만 제안하고, 확정은 관리자가 합니다.
  case 'clockName': {admin();const who=employee(p.employeeId).id;const key=nameKey(text(p.name,80));if(!key)fail('출근기계에 찍힌 이름을 확인하세요.');const rest=s.clockNames!.filter(x=>x.name!==key);if(rest.length>=500)fail('이름 연결은 500개까지 저장할 수 있습니다.');s.clockNames=[...rest,{name:key,raw:text(p.name,80),employeeId:who}];break;}
  // 잘못 승인한 연결은 지워야 다시 후보로 올라옵니다.
+ // Work hours 표에서 손으로 적는 시간·금액. 시간을 비우면 지우고 출퇴근 기록으로 센 값으로 돌아갑니다.
+ case 'payHours': {admin();const who=employee(p.employeeId).id;const from=date(p.from),to=date(p.to);if(to<from)fail('날짜를 확인하세요.');const key=`${who}|${from}|${to}`;const rest=(s.payHours??[]).filter(x=>x.id!==key);const blank=(v:unknown)=>v===undefined||v===null||(typeof v==='string'&&!v.trim());
+  if(blank(p.hours)){s.payHours=rest;break}
+  const hours=Math.round(number(p.hours,1000)*100)/100,wage=blank(p.wage)?undefined:Math.round(number(p.wage)*100)/100;if(rest.length>=2000)fail('직접 입력한 시간은 2000개까지 저장할 수 있습니다.');
+  s.payHours=[...rest,{id:key,employeeId:who,from,to,hours,...(wage!==undefined?{wage}:{})}];break;}
  case 'clockNameRemove': {admin();const key=nameKey(text(p.name,80));const rest=s.clockNames!.filter(x=>x.name!==key);if(rest.length===s.clockNames!.length)fail('저장된 이름 연결이 아닙니다.');s.clockNames=rest;break;}
  case 'attendance': {admin();if(!Array.isArray(p.rows)||!p.rows.length||p.rows.length>3000)fail('1~3,000개 행을 가져올 수 있습니다.');for(const row of p.rows){employee(row.employeeId);const a:Attendance={id:id(),employeeId:row.employeeId,date:date(row.date),start:time(row.start),end:time(row.end),breakMinutes:number(row.breakMinutes,1440)};if(!duration(a.start,a.end)||a.breakMinutes>=duration(a.start,a.end)*60)fail('퇴근 시간과 휴게시간을 확인하세요.');const shift={...a,area:''};if(s.attendance.some(x=>x.employeeId===a.employeeId&&overlap({...x,area:''},shift)))fail(`${a.date} ${a.employeeId}: 중복 또는 겹치는 출근기록입니다.`);s.attendance.push(a)}break;}
  // 관리자가 받는 사람을 여럿 고르면 한 사람씩 따로 보냅니다. 직원은 한 번에 한 사람에게만 보냅니다. 받는 쪽에서는 보낸 사람과의 대화에 한 줄씩 쌓입니다.

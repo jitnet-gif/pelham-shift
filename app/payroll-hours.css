@@ -34,3 +34,9 @@
 .workhours tr.wh-link{cursor:pointer}
 .workhours tr.wh-link:hover>td:not(.wh-grey){background:#f4f8f6}
 .workhours tr.wh-link:focus-visible{outline:3px solid #22a991;outline-offset:-3px}
+/* 그 자리에서 고치는 칸. 손으로 적은 값은 파랑 기울임으로 출퇴근에서 센 값과 가릅니다. */
+.workhours .wh-edit{display:block;width:calc(100% + 4px);font:inherit;color:inherit;text-align:inherit;background:none;border:0;min-height:20px;line-height:20px;margin:0 -2px;padding:0 2px;cursor:text;border-radius:2px}
+.workhours .wh-edit:hover{outline:1px dashed #22a991;outline-offset:-1px}
+.workhours .wh-edit:focus-visible{outline:2px solid #22a991;outline-offset:-2px}
+.workhours td.wh-manual{color:#0645ad;font-style:italic;background:#eef4ff}
+.workhours .wh-input{width:100%;height:20px;box-sizing:border-box;font:inherit;text-align:right;border:1px solid #22a991;padding:0 2px;background:#fff;color:#000}
