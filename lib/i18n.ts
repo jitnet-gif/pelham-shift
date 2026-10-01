@@ -599,6 +599,9 @@ const en: Record<string, string> = {
   '기타': 'Other',
   '초과 근무 편성 권한': 'Overtime scheduling',
   '초과 근무': 'Overtime',
+  '출퇴근 수정 권한': 'Attendance editing',
+  '켜면 이 직원이 출근 기록 탭에서 모든 직원의 출근부를 열고 출퇴근을 넣고 고치고 지울 수 있습니다. 급여와 직원 정보는 계속 관리자만 봅니다.':
+    "When this is on, the employee can open every employee's time log on the Attendance tab and add, change or delete clock-ins and clock-outs. Payroll and staff records stay with the administrators.",
   공휴일: 'Holiday',
   공휴일시간: 'Holiday hours',
   공휴일수당: 'Holiday pay',
@@ -848,6 +851,7 @@ const en: Record<string, string> = {
   '시간 형식을 확인하세요.': 'Check the time format.',
   '0 이상의 유효한 금액/시간을 입력하세요.': 'Enter a valid amount or time of 0 or more.',
   '관리자 권한이 필요합니다.': 'Manager permission is required.',
+  '출퇴근 수정 권한이 필요합니다.': 'Clock-time editing permission is required.',
   '등록된 직원을 선택하세요.': 'Choose a registered employee.',
   '이 계정은 직원 명부에 없습니다': 'This account is not on the staff list',
   '출퇴근은 직원 명부에 있는 사람만 찍습니다.': 'Only people on the staff list check in and out.',

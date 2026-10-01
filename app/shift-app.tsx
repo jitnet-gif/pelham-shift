@@ -367,6 +367,9 @@ export default function ShiftApp() {
   const canSchedule =
     actor.admin || !!data.employees.find((e) => e.id === actor.id)?.taskManager;
   const staffReadOnly = !canSchedule;
+  // 출퇴근 수정 권한은 출근 기록 탭에서 관리자처럼 직원별 출근부를 열고 출퇴근을 넣고 고치고 지웁니다.
+  const canEditPunch =
+    actor.admin || !!data.employees.find((e) => e.id === actor.id)?.punchManager;
   // 시급은 관리자에게만 내려오므로, 다른 사람에게는 0 원이 아니라 아예 보이지 않게 합니다.
   const showCost = actor.admin;
   // 폰으로 보는 직원. 스케줄·메시지·출퇴근이 전용 화면으로 갈립니다.
@@ -644,6 +647,7 @@ export default function ShiftApp() {
       roles: roleList(e).join(','),
       taskManager: e.taskManager ? '1' : '',
       overtimeManager: e.overtimeManager ? '1' : '',
+      punchManager: e.punchManager ? '1' : '',
       admin: e.admin ? '1' : '',
       archived: e.archived ? '1' : '',
     });
@@ -1653,7 +1657,7 @@ export default function ShiftApp() {
   const attFrom = (attMine && att.from) || payPeriodStart(today);
   const attTo = payPeriodEnd(attFrom);
   const inAtt = (employeeId: string, date: string) =>
-    actor.admin
+    canEditPunch
       ? employeeId === attWho && date >= attFrom && date <= attTo
       : employeeId === actor.id;
   const attPunches = (data.punches ?? []).filter((p) => inAtt(p.employeeId, p.date));
@@ -1947,15 +1951,15 @@ export default function ShiftApp() {
             <div className="panel contentpanel">
               <div className="sectionhead">
                 <div>
-                  <h2>{actor.admin ? t('출근 기록') : t('내 출근 기록')}</h2>
+                  <h2>{canEditPunch ? t('출근 기록') : t('내 출근 기록')}</h2>
                   <p>
-                    {actor.admin
+                    {canEditPunch
                       ? t('이름을 고르면 그 사람 출근부를 2주 급여 기간씩 봅니다.')
                       : t('출근기계 기록을 읽기 전용으로 확인합니다.')}
                   </p>
                 </div>
               </div>
-              {!actor.admin && (
+              {!canEditPunch && (
                 <div className="punchcard">
                   <div>
                     <b>
@@ -1991,7 +1995,7 @@ export default function ShiftApp() {
                   </button>
                 </div>
               )}
-              {actor.admin && !attWho ? (
+              {canEditPunch && !attWho ? (
                 <>
                   <h3 className="punchlog-head">{t('직원별 출근 기록')}</h3>
                   {payFocus && (
@@ -2013,7 +2017,7 @@ export default function ShiftApp() {
                 </>
               ) : (
                 <>
-                  {actor.admin && (
+                  {canEditPunch && (
                     <PunchPeriodBar
                       employee={emp(attWho)}
                       rows={attPunches}
@@ -2027,7 +2031,7 @@ export default function ShiftApp() {
                   <div className="punchlog-headrow">
                     <h3 className="punchlog-head">{t('찍힌 출퇴근')}</h3>
                     {/* 찍지 못한 날은 관리자가 날짜를 골라 출근과 퇴근을 직접 넣습니다. */}
-                    {actor.admin && attWho && (
+                    {canEditPunch && attWho && (
                       <button
                         className="button"
                         onClick={() =>
@@ -2049,11 +2053,11 @@ export default function ShiftApp() {
                     punches={attPunches}
                     employees={data.employees}
                     shifts={data.shifts}
-                    actual={actor.admin}
-                    isAdmin={actor.admin && !attWho}
+                    actual={canEditPunch}
+                    isAdmin={canEditPunch && !attWho}
                     focus={attMine ? att.focus : undefined}
                     onEdit={
-                      actor.admin && attWho
+                      canEditPunch && attWho
                         ? (p) =>
                             open('punchEdit', {
                               id: p.id,
@@ -2066,7 +2070,7 @@ export default function ShiftApp() {
                         : undefined
                     }
                     onRemove={
-                      actor.admin && attWho
+                      canEditPunch && attWho
                         ? (p) => {
                             // 연달아 눌러 생긴 0분 기록처럼 고칠 수 없는 중복을 치웁니다. 데이터에는 지운 표시만 남습니다.
                             if (confirm(t('이 출퇴근 기록을 지울까요? 급여에서 빠지고 직원 화면에서도 사라집니다.')))
@@ -2090,7 +2094,7 @@ export default function ShiftApp() {
                           '실근무',
                           '지각',
                           '조퇴',
-                          ...(actor.admin && attWho ? [''] : []),
+                          ...(canEditPunch && attWho ? [''] : []),
                         ].map((h) => (
                           <TableHead key={h}>{t(h)}</TableHead>
                         ))}
@@ -2133,7 +2137,7 @@ export default function ShiftApp() {
                                     ? t('{n}분 조퇴', { n: early })
                                     : t('정시')}
                               </TableCell>
-                              {actor.admin && attWho && (
+                              {canEditPunch && attWho && (
                                 <TableCell>
                                   <button
                                     className="iconbutton"
@@ -2162,7 +2166,7 @@ export default function ShiftApp() {
                   </Table>
                   {!attClock.length && (
                     <div className="empty">
-                      {actor.admin
+                      {canEditPunch
                         ? t('이 기간에 출근기계 기록이 없습니다.')
                         : t('아직 저장된 출근기록이 없습니다.')}
                     </div>
@@ -2903,6 +2907,9 @@ export default function ShiftApp() {
                         {e.overtimeManager && (
                           <span className="badge taskbadge">{t('초과 근무')}</span>
                         )}
+                        {e.punchManager && (
+                          <span className="badge taskbadge">{t('출퇴근 수정')}</span>
+                        )}
                       </TableCell>
                       <TableCell>{e.birthDate || t('미등록')}</TableCell>
                       <TableCell>{e.phone || t('미등록')}</TableCell>
@@ -3554,6 +3561,16 @@ export default function ShiftApp() {
                     '끄면 이 직원이 짜는 근무는 급여 기간(일요일 시작 2주) {w}시간까지만 들어갑니다. 켜면 그 선을 넘는 근무도 낼 수 있고, 넘긴 시간에는 급여에서 {m}배가 붙습니다. 관리자는 이 설정과 상관없이 넘겨 짤 수 있습니다.',
                     { w: OT_PERIOD_HOURS, m: OT_MULTIPLIER },
                   )}
+                </p>
+                <label className="recipient all">
+                  <Checkbox
+                    checked={form.punchManager === '1'}
+                    onCheckedChange={(on) => put('punchManager', on ? '1' : '')}
+                  />
+                  {t('출퇴근 수정 권한')}
+                </label>
+                <p className="hint">
+                  {t('켜면 이 직원이 출근 기록 탭에서 모든 직원의 출근부를 열고 출퇴근을 넣고 고치고 지울 수 있습니다. 급여와 직원 정보는 계속 관리자만 봅니다.')}
                 </p>
               </>
             )}

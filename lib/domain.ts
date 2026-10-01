@@ -4,9 +4,10 @@
 // role: 그중 첫째 직군. 근무와 출퇴근은 장소를 하나만 적기에, 비워 둔 자리를 이 값으로 채웁니다.
 // overtimeManager: 급여 기간(2주) 88시간을 넘는 근무를 짤 수 있는 사람. 근무 편성 권한과 따로 둡니다 —
 // 근무표를 짜는 것과 초과근무 수당이 붙는 근무를 내는 것은 다른 결정이기 때문입니다.
+// punchManager: 다른 직원의 출퇴근 기록을 넣고 고치고 지울 수 있는 사람. 급여와 직원 정보는 계속 관리자 몫입니다.
 // salary: 관리직의 2주 급여. 적힌 사람은 시급 명단에서 빠지고 Work hours 표의 Management 칸에 섭니다.
 // startRate: 처음 받던 시급. 지금 시급(rate)과 다르면 Work hours 표가 Beginning·Raised 로 나눠 적습니다. 지급은 언제나 rate 로 합니다.
-export type Employee = {id:string;name:string;color:string;role:string;roles?:string[];rate:number;salary?:number;startRate?:number;email:string;birthDate:string;phone?:string;punchId?:string;taskManager?:boolean;overtimeManager?:boolean;admin?:boolean;archived?:boolean};
+export type Employee = {id:string;name:string;color:string;role:string;roles?:string[];rate:number;salary?:number;startRate?:number;email:string;birthDate:string;phone?:string;punchId?:string;taskManager?:boolean;overtimeManager?:boolean;punchManager?:boolean;admin?:boolean;archived?:boolean};
 // draft: 새로 넣거나 고친 근무는 직원에게 공개하기 전까지 Unpublished 딱지를 답니다. publish 하면 지워집니다.
 export type Shift = {id:string;employeeId:string;date:string;start:string;end:string;area:string;note?:string;breakMinutes?:number;originalId?:string;draft?:boolean};
 export type Swap = {id:string;shiftId:string;from:string;to:string;status:'requested'|'accepted'|'approved'|'rejected';createdAt:string;bonus?:number};
