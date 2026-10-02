@@ -107,7 +107,7 @@ export default function WhosWorking({
     <section className="working">
       <div className="working-blocks">
         {blocks.map(([key, label, n]) => (
-          <div className={'working-block ' + key} key={key}>
+          <div className={'working-block block-' + key} key={key}>
             <b>{n}</b>
             <span>{t(label)}</span>
           </div>
@@ -153,7 +153,7 @@ export default function WhosWorking({
                       <i className="working-now" style={{ left: at(cursor) + '%' }} />
                     )}
                     <button
-                      className={'working-bar ' + mark}
+                      className={'working-bar bar-' + mark}
                       style={{
                         left: at(minutes(s.start)) + '%',
                         width: ((endOf(s) - minutes(s.start)) / span) * 100 + '%',
