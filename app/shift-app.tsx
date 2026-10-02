@@ -2276,6 +2276,11 @@ export default function ShiftApp() {
                   to={to}
                   onOpen={setPayDetail}
                   onEdit={(edit) => void command('payHours', { ...edit, from, to })}
+                  onManager={(edit) =>
+                    void (edit.field === 'rate'
+                      ? command('managerRate', { id: edit.id, amount: edit.amount })
+                      : command('managerPay', { managerId: edit.id, from, to, amount: edit.amount }))
+                  }
                 />
               ) : actor.admin && paySheet ? (
                 <div className="paysheet">

@@ -164,6 +164,16 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
   if(blank(p.hours)){s.payHours=rest;break}
   const hours=Math.round(number(p.hours,1000)*100)/100,wage=blank(p.wage)?undefined:Math.round(number(p.wage)*100)/100;if(rest.length>=2000)fail('직접 입력한 시간은 2000개까지 저장할 수 있습니다.');
   s.payHours=[...rest,{id:key,employeeId:who,from,to,hours,...(wage!==undefined?{wage}:{})}];break;}
+ // Management 의 2주 급여(Rate). 대표(owner)는 직원 명단에 없어 따로 적고, 비우면 기본값으로 돌아갑니다.
+ // 직원은 이미 2주 급여가 있는 사람만 고칩니다 — 여기서 비우거나 새로 주면 그 사람이 시급 표와 Management 사이를 말없이 옮겨 다니게 됩니다.
+ case 'managerRate': {admin();const blank=p.amount===undefined||p.amount===null||(typeof p.amount==='string'&&!p.amount.trim());
+  if(p.id==='owner'){if(blank)delete s.ownerSalary;else s.ownerSalary=Math.round(number(p.amount)*100)/100;break}
+  const e=employee(p.id);if(!e.salary)fail('2주 급여가 있는 관리직만 고칠 수 있습니다.');if(blank)fail('금액을 적으세요. 관리직에서 빼려면 직원 정보에서 2주 급여를 지우세요.');
+  const amount=Math.round(number(p.amount)*100)/100;if(!amount)fail('0보다 큰 금액을 적으세요.');e.salary=amount;break;}
+ // Management 의 Revised 칸. 고른 기간에만 쓰이고, 비우면 지워 Rate 로 돌아갑니다.
+ case 'managerPay': {admin();const who=p.managerId==='owner'?'owner':employee(p.managerId).id;const from=date(p.from),to=date(p.to);if(to<from)fail('날짜를 확인하세요.');const key=`${who}|${from}|${to}`;const rest=(s.managerPay??[]).filter(x=>x.id!==key);
+  if(p.amount===undefined||p.amount===null||(typeof p.amount==='string'&&!p.amount.trim())){s.managerPay=rest;break}
+  if(rest.length>=2000)fail('Revised 금액은 2000개까지 저장할 수 있습니다.');s.managerPay=[...rest,{id:key,managerId:who,from,to,amount:Math.round(number(p.amount)*100)/100}];break;}
  case 'clockNameRemove': {admin();const key=nameKey(text(p.name,80));const rest=s.clockNames!.filter(x=>x.name!==key);if(rest.length===s.clockNames!.length)fail('저장된 이름 연결이 아닙니다.');s.clockNames=rest;break;}
  case 'attendance': {admin();if(!Array.isArray(p.rows)||!p.rows.length||p.rows.length>3000)fail('1~3,000개 행을 가져올 수 있습니다.');for(const row of p.rows){employee(row.employeeId);const a:Attendance={id:id(),employeeId:row.employeeId,date:date(row.date),start:time(row.start),end:time(row.end),breakMinutes:number(row.breakMinutes,1440)};if(!duration(a.start,a.end)||a.breakMinutes>=duration(a.start,a.end)*60)fail('퇴근 시간과 휴게시간을 확인하세요.');const shift={...a,area:''};if(s.attendance.some(x=>x.employeeId===a.employeeId&&overlap({...x,area:''},shift)))fail(`${a.date} ${a.employeeId}: 중복 또는 겹치는 출근기록입니다.`);s.attendance.push(a)}break;}
  // 관리자가 받는 사람을 여럿 고르면 한 사람씩 따로 보냅니다. 직원은 한 번에 한 사람에게만 보냅니다. 받는 쪽에서는 보낸 사람과의 대화에 한 줄씩 쌓입니다.

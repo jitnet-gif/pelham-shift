@@ -42,3 +42,16 @@
 .workhours .wh-input{width:100%;height:20px;box-sizing:border-box;font:inherit;text-align:right;border:1px solid #22a991;padding:0 2px;background:#fff;color:#000}
 .workhours .wh-pencil{display:block;margin-left:auto;color:#22a991;opacity:.75}
 .workhours .wh-edit:hover .wh-pencil{opacity:1}
+/* 합계 칸을 누르면 엑셀처럼 계산식을 띄우고, 더한 칸들을 파란 테두리와 주소로 짚어 줍니다. */
+.workhours td.wh-calc{cursor:pointer}
+.workhours td.wh-calc:hover{background:#f1f6ff}
+.workhours td.wh-calc:focus-visible{outline:2px solid #22a991;outline-offset:-2px}
+.workhours td.wh-pick{outline:2px solid #188038;outline-offset:-2px;background:#e6f4ea}
+.workhours td.wh-ref{position:relative;outline:2px dashed #1a73e8;outline-offset:-2px;background:#e8f0fe}
+.workhours td.wh-ref::before{content:attr(data-addr);position:absolute;left:2px;top:1px;font-size:9px;line-height:1;font-weight:700;color:#1a73e8;font-style:normal}
+.workhours td.wh-old{color:#999;text-decoration:line-through}
+.wh-fx{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:50;display:flex;align-items:center;gap:8px;max-width:calc(100vw - 32px);box-sizing:border-box;padding:8px 10px;background:#fff;color:#000;border:1px solid #c4c7c5;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.18);font:13px/1.3 Arial,Helvetica,sans-serif}
+.wh-fx-at{font-weight:700;min-width:32px;padding-right:8px;border-right:1px solid #ddd}
+.wh-fx-f{font-style:italic;color:#666}
+.wh-fx code{font:13px/1.3 Consolas,Menlo,monospace;overflow-x:auto;white-space:nowrap}
+.wh-fx button{border:0;background:none;font-size:18px;line-height:1;cursor:pointer;color:#555;padding:0 2px}

@@ -1,5 +1,5 @@
 import type * as ExcelJS from 'exceljs';
-import { HOLIDAY_PREMIUM, LONG_HOURS, type WorkHoursData } from './payroll-hours';
+import { HOLIDAY_PREMIUM, LONG_HOURS, managerTotalFormula, type WorkHoursData } from './payroll-hours';
 
 // 급여 탭의 'Work hours' 표를 원래 쓰던 엑셀 시트와 같은 모양의 .xlsx 로 만듭니다.
 // 숫자는 화면 표와 같은 workHoursData() 에서 옵니다. 합계 칸은 SUM 수식이라, 엑셀에서 고쳐도 합이 따라옵니다.
@@ -171,7 +171,7 @@ export async function workHoursXlsx(data: WorkHoursData): Promise<Blob> {
     next();
   });
 
-  const salaryTotal = cents(data.managers.reduce((n, m) => n + m.salary, 0));
+  const salaryTotal = cents(data.managers.reduce((n, m) => n + (m.revised ?? m.salary), 0));
   const managementPay = cents(salaryTotal * data.periods);
   const sTotal = next();
   const gTotal = next();
@@ -197,7 +197,8 @@ export async function workHoursXlsx(data: WorkHoursData): Promise<Blob> {
 
   sheet.mergeCells(`A${gTotal}:C${gTotal}`);
   put('A', gTotal, 'G. Total  (Incl. managing dept.):', { font: { bold: true }, align: right });
-  const withManagers = data.managers.length > 0 && data.periods > 0;
+  // 관리직 급여는 언제나 G. Total 에 들어갑니다. 고른 날짜가 2주 기간 여러 개면 그 수만큼 곱합니다.
+  const withManagers = data.managers.length > 0;
   put(
     'E',
     gTotal,
@@ -220,32 +221,25 @@ export async function workHoursXlsx(data: WorkHoursData): Promise<Blob> {
     put('B', mh, 'Rate (Bi-weekly)', { align: center });
     put('C', mh, 'Revised', { align: center });
     grid(mh, ['A', 'B', 'C']);
-    const first = r + 1;
+    // Revised 가 있으면 그 금액을 셉니다. 엑셀에서 Revised 칸을 고치거나 비워도 합계가 따라오게 IF 수식으로 둡니다.
+    const parts: { rate: string; revised: string }[] = [];
     for (const m of data.managers) {
       const row = next();
       put('A', row, m.name, { align: center });
       put('B', row, m.salary, { fmt: MONEY, align: right });
-      put('C', row, null);
+      put('C', row, m.revised ?? null, { fmt: MONEY, align: right });
       grid(row, ['A', 'B', 'C']);
+      parts.push({ rate: 'B' + row, revised: 'C' + row });
     }
     const total = next();
     put('A', total, 'Total', { font: { bold: true }, align: center });
-    put('B', total, sum('B', first, total - 1, salaryTotal), {
+    put('B', total, { formula: managerTotalFormula(parts), result: salaryTotal }, {
       fmt: MONEY,
       font: { bold: true },
       align: right,
     });
     put('C', total, null);
     grid(total, ['A', 'B', 'C']);
-    if (!withManagers) {
-      next();
-      put(
-        'A',
-        next(),
-        'Management pay is not in G. Total: the selected dates are not whole bi-weekly pay periods.',
-        { font: { italic: true, color: { argb: 'FF777777' } } },
-      );
-    }
   }
 
   const buffer = await book.xlsx.writeBuffer();

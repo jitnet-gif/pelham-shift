@@ -454,6 +454,13 @@ const en: Record<string, string> = {
   '이 기간 시간을 직접 적습니다. 비우면 출퇴근 기록으로 돌아갑니다.': 'Type the hours for this period. Leave it blank to go back to the punch records.',
   '이 기간 금액을 직접 적습니다. 비우면 시간 × 시급입니다.': 'Type the wage for this period. Leave it blank to use hours × rate.',
   '직접 적은 값입니다.': 'Entered by hand.',
+  '2주 급여를 고칩니다. 앞으로 모든 기간에 쓰입니다.': 'Edit the bi-weekly salary. It applies to every period from now on.',
+  '이 기간에만 쓸 금액을 적습니다. 비우면 Rate 로 돌아갑니다.': 'Type the amount for this period only. Leave it blank to use the Rate.',
+  '눌러서 계산식 보기': 'Click to see the formula',
+  '2주 급여가 있는 관리직만 고칠 수 있습니다.': 'Only managers with a bi-weekly salary can be edited here.',
+  '금액을 적으세요. 관리직에서 빼려면 직원 정보에서 2주 급여를 지우세요.': 'Enter an amount. To take someone out of Management, clear the bi-weekly salary in their staff record.',
+  '0보다 큰 금액을 적으세요.': 'Enter an amount greater than 0.',
+  'Revised 금액은 2000개까지 저장할 수 있습니다.': 'Up to 2,000 revised amounts can be saved.',
   '직접 입력한 시간은 2000개까지 저장할 수 있습니다.': 'Up to 2000 hand-entered hours can be saved.',
   '저장된 출근기록 기준입니다. 예정 시간이 아니라 실제로 찍힌 기록으로 계산합니다.':
     'Based on saved attendance: the check-ins on record, not what was scheduled.',

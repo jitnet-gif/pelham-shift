@@ -43,6 +43,7 @@ const DEPARTMENTS = [
   },
 ];
 // 대표(Owner)는 직원 명단에 없는 관리자 계정이라, Management 맨 윗줄에 고정으로 세웁니다.
+// 2주 급여는 표에서 고치면 state.ownerSalary 에 남고, 비우면 이 기본값입니다.
 const OWNER = { id: 'owner', name: 'Sunjae Hwang', salary: 2500 };
 // 이 직군은 시급 표에 세우지 않습니다 — 관리 쪽 급여는 위 Management 줄로 갑니다.
 const OFF_SHEET = ['admin & operation'];
@@ -66,8 +67,9 @@ export type WorkHoursData = {
   period: string;
   holiday: string;
   departments: { title: string; rows: WorkHoursRow[] }[];
-  managers: { id: string; name: string; salary: number }[];
-  // 관리직 급여를 G. Total 에 넣을 급여 기간 수. 고른 날짜가 2주 단위가 아니면 0 입니다.
+  // revised 는 이 기간에만 쓰는 금액(Revised 칸). 있으면 salary 대신 셉니다.
+  managers: { id: string; name: string; salary: number; revised?: number }[];
+  // 관리직 급여를 G. Total 에 넣을 급여 기간 수. 고른 날짜가 2주 단위가 아니어도 한 번(1)은 넣습니다.
   periods: number;
 };
 
@@ -133,6 +135,14 @@ export function workHoursData(
   const whole =
     payPeriodStart(from) === from &&
     payPeriodStart(addDays(to, 1)) === addDays(to, 1);
+  const revised = (id: string) =>
+    (state.managerPay ?? []).find(
+      (x) => x.managerId === id && x.from === from && x.to === to,
+    )?.amount;
+  const manager = (id: string, name: string, salary: number) => {
+    const r = revised(id);
+    return { id, name, salary, ...(r !== undefined ? { revised: r } : {}) };
+  };
   return {
     period: `${month(from, false)} ${day(from, true)}- ${month(to, true)} ${day(to, false)}, ${to.slice(0, 4)}`,
     holiday: holidays.length
@@ -140,17 +150,19 @@ export function workHoursData(
       : 'Holiday',
     departments,
     managers: [
-      OWNER,
+      manager(OWNER.id, OWNER.name, state.ownerSalary ?? OWNER.salary),
       ...state.employees
         .filter((e) => e.salary && !e.archived)
-        .map((e) => ({ id: e.id, name: e.name, salary: e.salary ?? 0 })),
+        .map((e) => manager(e.id, e.name, e.salary ?? 0)),
     ],
-    periods: whole ? days(from, to) / PAY_PERIOD_DAYS : 0,
+    periods: whole ? days(from, to) / PAY_PERIOD_DAYS : 1,
   };
 }
 
 // 손으로 고친 값. hours 를 비우면('') 손으로 적은 것을 지우고 출퇴근 기록으로 돌아갑니다. wage 를 비우면 시간 × 시급입니다.
 export type WorkHoursEdit = { employeeId: string; hours: string; wage: string };
+// Management 칸 고치기. rate 는 그 사람의 2주 급여 자체, revised 는 고른 기간에만 쓰는 금액입니다. 비우면('') 지웁니다.
+export type ManagerEdit = { id: string; field: 'rate' | 'revised'; amount: string };
 
 export function PayrollHours({
   state,
@@ -158,12 +170,14 @@ export function PayrollHours({
   to,
   onOpen,
   onEdit,
+  onManager,
 }: {
   state: State;
   from: string;
   to: string;
   onOpen?: (id: string) => void;
   onEdit?: (edit: WorkHoursEdit) => void;
+  onManager?: (edit: ManagerEdit) => void;
 }) {
   return (
     <WorkHoursSheet
@@ -171,6 +185,7 @@ export function PayrollHours({
       currency={state.currency}
       onOpen={onOpen}
       onEdit={onEdit}
+      onManager={onManager}
     />
   );
 }
@@ -256,7 +271,17 @@ type Cell = {
   rows?: number;
   cls?: string;
   title?: string;
+  // 다른 칸의 계산식이 가리킬 이름. 그리는 자리에서 엑셀 주소(E12 같은)로 바뀝니다.
+  id?: string;
+  // 합계 칸. 누르면 엑셀에 내린 파일과 같은 계산식을 보여 주고, 더한 칸들을 칠합니다.
+  calc?: Calc;
 };
+type Calc = { refs: string[]; formula: (at: (id: string) => string) => string };
+// 엑셀에 내린 파일과 같은 수식입니다 — work-hours-xlsx.ts 도 이 함수로 씁니다.
+// 줄마다 Revised 가 있으면 그것, 없으면 Rate. 엑셀에서 Revised 를 나중에 적어도 합계가 따라옵니다.
+export const managerTotalFormula = (rows: { rate: string; revised: string }[]) =>
+  rows.map((r) => `IF(${r.revised}<>"",${r.revised},${r.rate})`).join('+') || '0';
+const COLUMNS = 'ABCDEFG';
 const C = (text?: ReactNode, cls = '', more: Partial<Cell> = {}): Cell => ({
   text,
   cls,
@@ -270,6 +295,7 @@ export function WorkHoursSheet({
   currency,
   onOpen,
   onEdit,
+  onManager,
 }: {
   data: WorkHoursData;
   currency: string;
@@ -277,8 +303,18 @@ export function WorkHoursSheet({
   onOpen?: (id: string) => void;
   // 있으면 Regular Hours·Wage 칸을 그 자리에서 고칩니다. 엑셀로 내릴 때는 넘기지 않습니다.
   onEdit?: (edit: WorkHoursEdit) => void;
+  // 있으면 Management 의 Rate·Revised 칸을 그 자리에서 고칩니다.
+  onManager?: (edit: ManagerEdit) => void;
 }) {
   const { t } = useLang();
+  // 눌러 둔 합계 칸의 id. 다시 누르거나 Esc 로 닫습니다.
+  const [pick, setPick] = useState<string | null>(null);
+  useEffect(() => {
+    if (!pick) return;
+    const close = (e: globalThis.KeyboardEvent) => e.key === 'Escape' && setPick(null);
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
+  }, [pick]);
   const money = (n: number) =>
     new Intl.NumberFormat('en-CA', {
       style: 'currency',
@@ -290,10 +326,22 @@ export function WorkHoursSheet({
   const all = data.departments.flatMap((d) => d.rows);
   const wageTotal = sum(all, 'wage');
   const holidayTotal = sum(all, 'holidayPay');
-  const salaryTotal = cents(data.managers.reduce((n, m) => n + m.salary, 0));
+  const salaryTotal = cents(
+    data.managers.reduce((n, m) => n + (m.revised ?? m.salary), 0),
+  );
   const managementPay = cents(salaryTotal * data.periods);
   const grandTotal = cents(wageTotal + holidayTotal + managementPay);
 
+  // 한 열을 위아래로 더한 합계: SUM(E5:E9).
+  const range = (refs: string[]): Calc => ({
+    refs,
+    formula: (at) =>
+      refs.length ? `SUM(${at(refs[0])}:${at(refs[refs.length - 1])})` : '0',
+  });
+  const plus = (refs: string[]): Calc => ({
+    refs,
+    formula: (at) => refs.map(at).join('+') || '0',
+  });
   const rows: { key: string; cells: Cell[]; open?: string }[] = [];
   const push = (key: string, cells: Cell[], open?: string) =>
     rows.push({ key, cells, open });
@@ -403,7 +451,7 @@ export function WorkHoursSheet({
         C(
           wageCell,
           'wh-num wh-br' + hand + (worked ? '' : ' wh-grey') + edge(!worked, !nWorked),
-          r.manual ? { title: t('직접 적은 값입니다.') } : {},
+          { id: 'w-' + r.id, ...(r.manual ? { title: t('직접 적은 값입니다.') } : {}) },
         ),
         C(
           hol ? r.holidayHours.toFixed(2) : '',
@@ -412,6 +460,7 @@ export function WorkHoursSheet({
         C(
           hol ? money(r.holidayPay) : '',
           'wh-num wh-br' + (hol ? '' : ' wh-grey') + edge(!hol, !nHol),
+          { id: 'h-' + r.id },
         ),
       ], r.id);
     });
@@ -420,25 +469,46 @@ export function WorkHoursSheet({
       C('', 'wh-br wh-bb'),
       C('', 'wh-br wh-bb'),
       C('Total', 'wh-center wh-bold wh-bb'),
-      C(money(sum(d.rows, 'wage')), 'wh-num wh-bold wh-br wh-bb'),
+      C(money(sum(d.rows, 'wage')), 'wh-num wh-bold wh-br wh-bb', {
+        id: 'wt-' + d.title,
+        calc: range(d.rows.map((r) => 'w-' + r.id)),
+      }),
       C('Total', 'wh-center wh-bold wh-br wh-bb'),
-      C(money(sum(d.rows, 'holidayPay')), 'wh-num wh-bold wh-br wh-bb'),
+      C(money(sum(d.rows, 'holidayPay')), 'wh-num wh-bold wh-br wh-bb', {
+        id: 'ht-' + d.title,
+        calc: range(d.rows.map((r) => 'h-' + r.id)),
+      }),
     ]);
     push(d.title + '-gap', blank(7));
   });
   push('stotal', [
     C('S. Total:', 'wh-num wh-bold wh-label wh-thick', { span: 3 }),
     C('', 'wh-thick'),
-    C(money(wageTotal), 'wh-num wh-blue wh-thick'),
+    C(money(wageTotal), 'wh-num wh-blue wh-thick', {
+      id: 's-w',
+      calc: plus(data.departments.map((d) => 'wt-' + d.title)),
+    }),
     C('', 'wh-thick'),
-    C(money(holidayTotal), 'wh-num wh-blue wh-thick'),
+    C(money(holidayTotal), 'wh-num wh-blue wh-thick', {
+      id: 's-h',
+      calc: plus(data.departments.map((d) => 'ht-' + d.title)),
+    }),
   ]);
   push('gtotal', [
     C('G. Total  (Incl. managing dept.):', 'wh-num wh-bold wh-label', {
       span: 3,
     }),
     C(),
-    C(money(grandTotal), 'wh-num wh-red wh-bold'),
+    C(money(grandTotal), 'wh-num wh-red wh-bold', {
+      calc: {
+        refs: ['s-w', 's-h', ...(data.managers.length ? ['m-total'] : [])],
+        formula: (at) =>
+          `${at('s-w')}+${at('s-h')}` +
+          (data.managers.length
+            ? `+${at('m-total')}${data.periods > 1 ? '*' + data.periods : ''}`
+            : ''),
+      },
+    }),
     ...blank(2),
   ]);
   if (data.managers.length) {
@@ -456,17 +526,83 @@ export function WorkHoursSheet({
     for (const m of data.managers)
       push('m-' + m.id, [
         C(m.name, 'wh-center wh-bl'),
-        C(money(m.salary), 'wh-num'),
-        C('', 'wh-br'),
+        C(
+          onManager ? (
+            <EditCell
+              shown={money(m.salary)}
+              value={String(m.salary)}
+              label={t('2주 급여를 고칩니다. 앞으로 모든 기간에 쓰입니다.')}
+              onSave={(v) => onManager({ id: m.id, field: 'rate', amount: v })}
+            />
+          ) : (
+            money(m.salary)
+          ),
+          'wh-num' + (m.revised !== undefined ? ' wh-old' : ''),
+          { id: 'mr-' + m.id },
+        ),
+        C(
+          onManager ? (
+            <EditCell
+              shown={m.revised !== undefined ? money(m.revised) : ''}
+              value={m.revised !== undefined ? String(m.revised) : ''}
+              label={t('이 기간에만 쓸 금액을 적습니다. 비우면 Rate 로 돌아갑니다.')}
+              onSave={(v) => onManager({ id: m.id, field: 'revised', amount: v })}
+            />
+          ) : m.revised !== undefined ? (
+            money(m.revised)
+          ) : (
+            ''
+          ),
+          'wh-num wh-br' + (m.revised !== undefined ? ' wh-manual' : ''),
+          { id: 'mv-' + m.id },
+        ),
         ...blank(4),
       ]);
     push('m-total', [
       C('Total', 'wh-center wh-bold wh-bl wh-bb'),
-      C(money(salaryTotal), 'wh-num wh-bold wh-bb'),
+      C(money(salaryTotal), 'wh-num wh-bold wh-bb', {
+        id: 'm-total',
+        calc: {
+          refs: data.managers.map((m) =>
+            (m.revised !== undefined ? 'mv-' : 'mr-') + m.id,
+          ),
+          formula: (at) =>
+            managerTotalFormula(
+              data.managers.map((m) => ({
+                rate: at('mr-' + m.id),
+                revised: at('mv-' + m.id),
+              })),
+            ),
+        },
+      }),
       C('', 'wh-br wh-bb'),
       ...blank(4),
     ]);
   }
+
+  // 엑셀 주소. 줄 번호는 내린 파일과 같습니다(이 표와 work-hours-xlsx.ts 가 같은 순서로 줄을 쌓습니다).
+  // 열은 앞 칸들의 colSpan 을 더해 셉니다. 두 줄짜리 머리 아래 줄만 어긋나지만 그 줄을 가리키는 수식은 없습니다.
+  const address = new Map<string, string>();
+  rows.forEach((r, i) => {
+    let col = 0;
+    for (const c of r.cells) {
+      if (c.id) address.set(c.id, COLUMNS[col] + (i + 1));
+      col += c.span ?? 1;
+    }
+  });
+  const at = (id: string) => address.get(id) ?? '?';
+  const keyOf = (r: { key: string }, c: Cell, i: number) => c.id ?? `${r.key}:${i}`;
+  const picked = rows
+    .flatMap((r) => r.cells.map((c, i) => ({ key: keyOf(r, c, i), c, row: r })))
+    .find((x) => x.key === pick && x.c.calc);
+  const lit = new Set(picked?.c.calc?.refs ?? []);
+  const pickedAt = picked
+    ? COLUMNS[
+        picked.row.cells
+          .slice(0, picked.row.cells.indexOf(picked.c))
+          .reduce((n, c) => n + (c.span ?? 1), 0)
+      ] + (rows.indexOf(picked.row) + 1)
+    : '';
 
   return (
     <div className="workhours">
@@ -496,27 +632,59 @@ export function WorkHoursSheet({
                   }
                 : {})}
             >
-              {r.cells.map((c, i) => (
-                <td
-                  key={i}
-                  className={c.cls || undefined}
-                  colSpan={c.span}
-                  rowSpan={c.rows}
-                  title={c.title}
-                >
-                  {c.text}
-                </td>
-              ))}
+              {r.cells.map((c, i) => {
+                const key = keyOf(r, c, i);
+                const cls = [
+                  c.cls,
+                  c.calc ? 'wh-calc' : '',
+                  key === pick && c.calc ? 'wh-pick' : '',
+                  c.id && lit.has(c.id) ? 'wh-ref' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ');
+                const toggle = () => setPick(key === pick ? null : key);
+                return (
+                  <td
+                    key={i}
+                    className={cls || undefined}
+                    colSpan={c.span}
+                    rowSpan={c.rows}
+                    title={c.calc ? t('눌러서 계산식 보기') : c.title}
+                    data-addr={c.id && lit.has(c.id) ? at(c.id) : undefined}
+                    {...(c.calc
+                      ? {
+                          tabIndex: 0,
+                          onClick: (e: { stopPropagation: () => void }) => {
+                            e.stopPropagation();
+                            toggle();
+                          },
+                          onKeyDown: (e: KeyboardEvent) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              toggle();
+                            }
+                          },
+                        }
+                      : {})}
+                  >
+                    {c.text}
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>
       </table>
-      {data.managers.length > 0 && data.periods === 0 && (
-        <p className="hint">
-          {t(
-            '고른 기간이 급여 기간(2주) 단위가 아니어서 관리직 급여는 G. Total 에 넣지 않았습니다.',
-          )}
-        </p>
+      {picked?.c.calc && (
+        <div className="wh-fx" role="status">
+          <span className="wh-fx-at">{pickedAt}</span>
+          <span className="wh-fx-f">fx</span>
+          <code>={picked.c.calc.formula(at)}</code>
+          <button type="button" onClick={() => setPick(null)} aria-label={t('닫기')}>
+            ×
+          </button>
+        </div>
       )}
       {data.managers.length > 0 && data.periods > 1 && (
         <p className="hint">

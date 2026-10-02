@@ -37,6 +37,8 @@ export type ClockName = {name:string;raw:string;employeeId:string};
 // 급여 'Work hours' 표에 관리자가 손으로 적은 시간·금액. 출퇴근 기록이 없는 사람(대표·관리직 등) 몫입니다.
 // 그 급여 기간(from~to)에만 붙고, 적힌 동안은 출퇴근으로 센 Regular Hours·Wage 를 대신합니다. wage 가 없으면 시간 × 시급입니다.
 export type PayHours = {id:string;employeeId:string;from:string;to:string;hours:number;wage?:number};
+// Work hours 표 Management 의 Revised 칸. 고른 기간(from~to)에만 그 사람의 2주 급여 대신 이 금액을 셉니다. managerId 는 직원 id 또는 'owner'.
+export type ManagerPay = {id:string;managerId:string;from:string;to:string;amount:number};
 // name 은 비교용으로 다듬은 값, raw 는 출근기계에 찍힌 그대로의 표기입니다.
 // 출근기계가 내보내는 이름은 대소문자와 공백이 들쭉날쭉해, 비교할 때도 저장할 때도 이 형태로 맞춥니다.
 export const nameKey=(v:string)=>v.toLowerCase().replace(/\s+/g,' ').trim();
@@ -46,7 +48,7 @@ export type Workplace = {lat:number;lng:number;radius:number};
 // shifts 는 편성하는 사람이 고치는 작업본, publishedShifts 는 마지막으로 공개한 순간의 근무표(공개본)입니다.
 // 직원은 언제나 공개본만 봅니다 — 작업본을 아무리 고쳐도 직원 화면이 비는 일이 없습니다.
 // published 는 '작업본이 공개본과 같다'는 뜻으로, 저장할 때마다 두 근무표를 견주어 다시 적습니다.
-export type State = {workplace?:Workplace;employees:Employee[];shifts:Shift[];swaps:Swap[];attendance:Attendance[];messages:Message[];tasks:Task[];timeOff?:TimeOff[];availability?:Availability[];punches?:Punch[];clockNames?:ClockName[];payHours?:PayHours[];areas?:string[];currency:string;published:boolean;publishedShifts?:Shift[]};
+export type State = {workplace?:Workplace;employees:Employee[];shifts:Shift[];swaps:Swap[];attendance:Attendance[];messages:Message[];tasks:Task[];timeOff?:TimeOff[];availability?:Availability[];punches?:Punch[];clockNames?:ClockName[];payHours?:PayHours[];managerPay?:ManagerPay[];ownerSalary?:number;areas?:string[];currency:string;published:boolean;publishedShifts?:Shift[]};
 // 클럽이 서 있는 자리의 시간대. 화면·서버·알림이 모두 이 한 줄을 봅니다.
 // 온타리오는 뉴욕과 시각이 같아 예전 기록과 어긋나지 않고, 이름만 자리에 맞게 돌아옵니다.
 export const TIME_ZONE='America/Toronto';
