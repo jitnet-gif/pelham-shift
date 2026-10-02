@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { Pencil } from 'lucide-react';
 import type { Employee, State } from '@/lib/domain';
 import {
   PAY_PERIOD_DAYS,
@@ -182,9 +183,11 @@ function EditCell({
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  const closed = useRef(false);
   const editing = draft !== null;
   useEffect(() => {
     if (editing) {
+      closed.current = false;
       input.current?.focus();
       input.current?.select();
     }
@@ -202,11 +205,15 @@ function EditCell({
         }}
         onKeyDown={stop}
       >
-        {shown || ' '}
+        {/* 빈 칸도 누를 수 있다는 것이 보이게 연필을 그립니다. 출퇴근이 없는 사람의 회색 칸이 그렇습니다. */}
+        {shown || <Pencil size={12} className="wh-pencil" aria-hidden />}
       </button>
     );
+  // Enter 로 닫으면 칸이 사라지며 blur 가 한 번 더 올 수 있습니다. 같은 값을 두 번 보내 버전이 엇갈리지 않게 한 번만 저장합니다.
   const done = () => {
-    const next = draft.trim();
+    if (closed.current) return;
+    closed.current = true;
+    const next = (draft ?? '').trim();
     setDraft(null);
     if (next !== value) onSave(next);
   };
@@ -226,7 +233,10 @@ function EditCell({
       onKeyDown={(e) => {
         stop(e);
         if (e.key === 'Enter') done();
-        if (e.key === 'Escape') setDraft(null);
+        if (e.key === 'Escape') {
+          closed.current = true;
+          setDraft(null);
+        }
       }}
     />
   );
