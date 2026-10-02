@@ -44,6 +44,8 @@ const DEPARTMENTS = [
 ];
 // 대표(Owner)는 직원 명단에 없는 관리자 계정이라, Management 맨 윗줄에 고정으로 세웁니다.
 const OWNER = { id: 'owner', name: 'Sunjae Hwang', salary: 2500 };
+// 이 직군은 시급 표에 세우지 않습니다 — 관리 쪽 급여는 위 Management 줄로 갑니다.
+const OFF_SHEET = ['admin & operation'];
 // 2주에 80시간을 넘긴 시간은 엑셀처럼 빨갛게 적어 눈에 띄게 합니다.
 export const LONG_HOURS = 80;
 
@@ -111,7 +113,7 @@ export function workHoursData(
   };
   // 퇴사한 사람은 이 기간에 근무가 있을 때만 세웁니다. 순서는 직원을 등록한 순서입니다.
   const hourly = state.employees
-    .filter((e) => !e.salary)
+    .filter((e) => !e.salary && !OFF_SHEET.includes(e.role.trim().toLowerCase()))
     .map((e) => ({ e, row: rowOf(e) }))
     .filter((x) => !x.e.archived || x.row.hours > 0 || !!x.row.manual);
   const deptOf = (role: string) =>
