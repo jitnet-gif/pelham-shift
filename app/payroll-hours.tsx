@@ -319,7 +319,7 @@ export function WorkHoursSheet({
     push(d.title + '-h2', [
       C('Beginning', 'wh-center wh-br wh-bb' + y),
       C('Raised', 'wh-center wh-br wh-bb' + y),
-      C(<div className="wh-clip">Regular Hours (Decimal)</div>, 'wh-bb'),
+      C(<div className="wh-clip">Regular Hours</div>, 'wh-bb'),
       C('Wage', 'wh-center wh-br wh-bb'),
     ]);
     d.rows.forEach((r, j) => {

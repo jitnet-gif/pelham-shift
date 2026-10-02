@@ -106,7 +106,7 @@ export async function workHoursXlsx(data: WorkHoursData): Promise<Blob> {
     put('G', h1, 'Holiday Pay Total', { align: { ...center, wrapText: true } });
     put('B', h2, 'Beginning', { align: center, fill: y });
     put('C', h2, 'Raised', { align: center, fill: y });
-    put('D', h2, 'Regular Hours (Decimal)', { align: { ...center, shrinkToFit: true } });
+    put('D', h2, 'Regular Hours', { align: { ...center, shrinkToFit: true } });
     put('E', h2, 'Wage', { align: center });
     // 노란 칠은 병합된 칸 전체에 들어가도록 가려진 칸에도 줍니다.
     if (y) for (const a of [`C${h1}`, `A${h2}`, `B${head}`, `C${head}`]) sheet.getCell(a).fill = y;
