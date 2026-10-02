@@ -51,7 +51,11 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   background: #fff;
-  padding: 6px 20px 18px;
+  /* 직원이 많아도 화면 안에서 위아래로 굴립니다. 시간 눈금은 맨 위에 붙어 있습니다. */
+  max-height: calc(100dvh - 300px);
+  min-height: 320px;
+  /* 위 여백을 눈금 안으로 옮겨, 붙은 눈금 위로 막대가 비쳐 보이지 않게 합니다. */
+  padding: 0 20px 18px;
 }
 .working-chart {
   min-width: calc(var(--wk-name) + 620px);
@@ -62,7 +66,7 @@
   top: 0;
   z-index: 3;
   background: #fff;
-  height: 34px;
+  height: 40px;
 }
 .working-ruler > span {
   width: var(--wk-name);
@@ -74,7 +78,7 @@
 }
 .working-ruler i {
   position: absolute;
-  top: 8px;
+  top: 14px;
   transform: translateX(-50%);
   font-size: 12px;
   font-style: normal;
@@ -244,7 +248,8 @@
     font-size: 20px;
   }
   .working-scroll {
-    padding: 6px 12px 14px;
+    max-height: calc(100dvh - 260px);
+    padding: 0 12px 14px;
   }
   .working-chart {
     min-width: calc(var(--wk-name) + 520px);
