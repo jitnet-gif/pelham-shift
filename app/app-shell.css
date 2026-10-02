@@ -335,3 +335,8 @@
 .payfocus-back{margin:0 0 10px}
 .paygroup [data-slot=table-cell]{font-weight:700;font-size:13px;padding-top:16px}
 .paygroup small{color:#8b9691;font-weight:500;margin-left:4px}
+/* 데스크톱 스케줄 머리줄의 날씨 버튼과, 그 아래 펼쳐지는 날씨 칸 */
+.sched-top>.button.sched-sky{min-width:42px;padding-inline:10px;justify-content:center}
+.sched-top>.button.sched-sky.on{background:#e8f2ef;border-color:#c4daca;color:#087e6d}
+.sched-weather{max-width:560px}
+.sched-weather .weather{border:1px solid var(--line);border-radius:10px}

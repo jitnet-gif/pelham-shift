@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef, type CSSProperties } from 'react';
-import { useBack, closeTop } from './use-back';
+import { useBack, useBackClose, closeTop } from './use-back';
 import {
   CalendarDays,
   Clock3,
@@ -48,6 +48,7 @@ import {
   History,
   ArchiveRestore,
   Reply,
+  CloudSun,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
@@ -140,6 +141,7 @@ import LoginQr from './login-qr';
 import { useLang } from './use-lang';
 import { useIsMobile } from '@/hooks/use-mobile';
 import PhoneSchedule from './phone-schedule';
+import WeatherPanel from './weather-panel';
 import PhoneTeam from './phone-team';
 import PunchLog from './punch-log';
 import { savePunchPhoto } from './punch-photo-store';
@@ -320,6 +322,9 @@ export default function ShiftApp() {
   const [search, setSearch] = useState('');
   const [navCollapsed, setNavCollapsed] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  // 데스크톱 스케줄 머리줄의 날씨 칸. 폰처럼 눌러야 열리고, 닫혀 있는 동안에는 예보를 부르지 않습니다.
+  const [weatherOpen, setWeatherOpen] = useState(false);
+  useBackClose(weatherOpen, () => setWeatherOpen(false));
   const [ui, setUi] = useState<Layout>('seven');
   const [offFilter, setOffFilter] = useState('pending');
   // 폰에서는 주간 표 대신 날짜별 목록을 그립니다. 첫 렌더는 서버와 같게 데스크톱으로 두고 마운트 뒤 바뀝니다.
@@ -4460,6 +4465,17 @@ export default function ShiftApp() {
   };
   // 날씨를 물어볼 자리. 출퇴근이 찍히는 자리와 같은 좌표를 봅니다.
   const weatherSpot: { lat: number; lng: number } = workplaceOf(data);
+  // 데스크톱 날씨 칸이 보는 날. 주간은 오늘이 걸려 있으면 오늘, 아니면 그 두 주의 첫날입니다.
+  const weatherDate =
+    staffReadOnly
+      ? today
+      : view === 'week'
+        ? today >= week && today <= addDays(week, SCHEDULE_DAYS - 1)
+          ? today
+          : week
+        : view === 'month'
+          ? day
+          : timelineDate;
   // 우천 근무 종료 공지. 데스크톱 머리줄과 폰 날씨 칸이 같은 내용을 엽니다.
   const rainNotice = () =>
     open('rain', {
@@ -4743,8 +4759,27 @@ export default function ShiftApp() {
                       {longDate(timelineDate)}
                     </span>
                   )}
+                  <button
+                    className={'button sched-sky' + (weatherOpen ? ' on' : '')}
+                    aria-label={t('날씨와 일출·일몰')}
+                    aria-expanded={weatherOpen}
+                    title={t('날씨와 일출·일몰')}
+                    onClick={() => setWeatherOpen((v) => !v)}
+                  >
+                    <CloudSun size={18} />
+                  </button>
                 {!phone && schedActionsNode}
                 </div>
+                )}
+                {!phone && weatherOpen && (
+                  <div className="sched-weather">
+                    <WeatherPanel
+                      key={weatherDate}
+                      date={weatherDate}
+                      today={today}
+                      spot={weatherSpot}
+                    />
+                  </div>
                 )}
                 {!phone && schedFiltersNode}
                 {staffPhone ? (
