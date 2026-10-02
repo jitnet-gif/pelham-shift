@@ -42,6 +42,8 @@ const DEPARTMENTS = [
     areas: ['f&b', 'pub', 'snackbar', 'snack bar'],
   },
 ];
+// 대표(Owner)는 직원 명단에 없는 관리자 계정이라, Management 맨 윗줄에 고정으로 세웁니다.
+const OWNER = { id: 'owner', name: 'Sunjae Hwang', salary: 2500 };
 // 2주에 80시간을 넘긴 시간은 엑셀처럼 빨갛게 적어 눈에 띄게 합니다.
 export const LONG_HOURS = 80;
 
@@ -135,9 +137,12 @@ export function workHoursData(
       ? `${holidays.map((d) => `${month(d, true)} ${day(d, false)}`).join(', ')} (Holiday)`
       : 'Holiday',
     departments,
-    managers: state.employees
-      .filter((e) => e.salary && !e.archived)
-      .map((e) => ({ id: e.id, name: e.name, salary: e.salary ?? 0 })),
+    managers: [
+      OWNER,
+      ...state.employees
+        .filter((e) => e.salary && !e.archived)
+        .map((e) => ({ id: e.id, name: e.name, salary: e.salary ?? 0 })),
+    ],
     periods: whole ? days(from, to) / PAY_PERIOD_DAYS : 0,
   };
 }
