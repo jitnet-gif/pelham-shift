@@ -135,8 +135,8 @@ export default function PunchLog({
               )}
               {(onEdit || onRemove) && (
                 <span className="punchlog-tools">
-                  {/* 퇴근 전 기록은 끝 시각이 없어 고칠 수 없습니다(서버 규칙과 같음). 잘못 찍은 출근은 지울 수 있습니다. */}
-                  {onEdit && p.out && (
+                  {/* 오늘 근무 중인 기록은 고칠 수 없습니다(서버 규칙과 같음). 퇴근 미기록은 여기서 퇴근을 적어 닫습니다. */}
+                  {onEdit && (p.out || missingOut(p, today)) && (
                     <button
                       className="iconbutton"
                       aria-label={t('출퇴근 수정')}
