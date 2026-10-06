@@ -159,7 +159,9 @@ function sheetOf(state: State, e: Employee, from: string, today: string) {
   });
   // 사람 합계의 시간과 금액은 payroll() 값을 그대로 적어 급여 화면과 센트까지 맞춥니다.
   const grand = { ...add(lines), hours: pay.hours, total: pay.total };
-  return { weeks, grand, hasAny: lines.length > 0 };
+  // 사람 줄 세우기에 쓰는 이 기간 첫 출근(날짜+시각).
+  const first = lines.length ? lines[0].date + lines[0].start : undefined;
+  return { weeks, grand, hasAny: lines.length > 0, first };
 }
 
 const clock = (v: string) => {
@@ -232,10 +234,20 @@ export function PunchTimesheet({
     focused.current?.scrollIntoView({ block: 'center', inline: 'nearest' });
   }, [focus, from]);
   // 퇴사한 사람은 이 기간에 기록이 있을 때만 세웁니다.
+  // 이 기간에 먼저 출근한 사람부터(첫 출근 날짜·시각 순) 세우고, 근무가 없는 사람은 뒤에 이름순으로 둡니다.
   const people = [...employees]
     .sort((a, b) => a.name.localeCompare(b.name, locale))
     .map((e) => ({ e, sheet: sheetOf(state, e, from, today) }))
-    .filter((x) => !x.e.archived || x.sheet.hasAny);
+    .filter((x) => !x.e.archived || x.sheet.hasAny)
+    .sort((a, b) =>
+      a.sheet.first && b.sheet.first
+        ? a.sheet.first.localeCompare(b.sheet.first)
+        : a.sheet.first
+          ? -1
+          : b.sheet.first
+            ? 1
+            : 0,
+    );
   const groups = groupByRole(people, (x) => roleGroup(x.e));
 
   const download = () => {
