@@ -47,8 +47,6 @@ const DEPARTMENTS = [
 const OWNER = { id: 'owner', name: 'Sunjae Hwang', salary: 2500 };
 // 이 직군은 시급 표에 세우지 않습니다 — 관리 쪽 급여는 위 Management 줄로 갑니다.
 const OFF_SHEET = ['admin & operation'];
-// 2주에 80시간을 넘긴 시간은 엑셀처럼 빨갛게 적어 눈에 띄게 합니다.
-export const LONG_HOURS = 80;
 
 export type WorkHoursRow = {
   id: string;
@@ -436,7 +434,6 @@ export function WorkHoursSheet({
           'wh-num wh-hours' +
             hand +
             (worked ? '' : ' wh-grey wh-gr') +
-            (r.hours > LONG_HOURS ? ' wh-red wh-bold' : '') +
             edge(!worked, !nWorked),
           {
             title: r.manual

@@ -1,5 +1,5 @@
 import type * as ExcelJS from 'exceljs';
-import { HOLIDAY_PREMIUM, LONG_HOURS, managerTotalFormula, type WorkHoursData } from './payroll-hours';
+import { HOLIDAY_PREMIUM, managerTotalFormula, type WorkHoursData } from './payroll-hours';
 
 // 급여 탭의 'Work hours' 표를 원래 쓰던 엑셀 시트와 같은 모양의 .xlsx 로 만듭니다.
 // 숫자는 화면 표와 같은 workHoursData() 에서 옵니다. 합계 칸은 SUM 수식이라, 엑셀에서 고쳐도 합이 따라옵니다.
@@ -132,7 +132,6 @@ export async function workHoursXlsx(data: WorkHoursData): Promise<Blob> {
         fmt: HOURS,
         align: right,
         fill: worked ? undefined : GREY,
-        font: w.hours > LONG_HOURS ? { bold: true, color: RED } : undefined,
       });
       put('E', row, worked ? w.wage : null, {
         fmt: MONEY,
