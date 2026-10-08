@@ -3,12 +3,13 @@ import './punch-app.css';
 import { savePunchPhoto } from './punch-photo-store';
 import { useEffect, useState } from 'react';
 import { Bell, BellRing, CalendarDays, LogOut } from 'lucide-react';
-import { LOCATION, localDate, seed, workplaceOf, type State } from '@/lib/domain';
+import { LOCATION, localDate, seed, shiftTodos, workplaceOf, type State } from '@/lib/domain';
 import { pushOn, relangPush, subscribePush } from '@/lib/push-client';
 import { notice } from '@/lib/notice';
 import { useLang } from './use-lang';
 import GpsGuard, { useGps } from './gps-guard';
 import StaffClock from './staff-clock';
+import ShiftTodos from './shift-todos';
 import { useBack } from './use-back';
 import { track } from './activity';
 import BirthLogin from './birth-login';
@@ -206,6 +207,10 @@ export default function PunchApp() {
           Math.abs(minutesOf(b.start) - minutesOf(myPunch.in))
         : a.start.localeCompare(b.start),
     )[0];
+  // 오늘 근무의 할 일. 출근해 있는 동안은 남은 개수를 제목에 올려, 퇴근을 찍기 전에 보이게 합니다.
+  const myTodos = myShiftToday ? shiftTodos(data, myShiftToday.id) : [];
+  const left = myTodos.filter((x) => !x.doneAt).length;
+  const onShift = !!myPunch && !myPunch.out;
 
   return (
     <div className="punchapp">
@@ -256,6 +261,27 @@ export default function PunchApp() {
           return !!next;
         }}
         onBreak={(action) => void command('punchBreak', { employeeId: me.id, action, paid: '1' })}
+        todos={
+          myShiftToday && myTodos.length ? (
+            <ShiftTodos
+              shiftId={myShiftToday.id}
+              todos={myTodos}
+              canManage={false}
+              canCheck
+              busy={busy}
+              name={(id) => data.employees.find((e) => e.id === id)?.name || t('관리자')}
+              heading={
+                onShift
+                  ? left
+                    ? t('퇴근 전 남은 할 일 {n}개', { n: left })
+                    : t('오늘 할 일을 모두 마쳤습니다')
+                  : t('오늘 할 일')
+              }
+              className={onShift && left ? 'left' : ''}
+              onCommand={command}
+            />
+          ) : null
+        }
       />
       {status && (
         <div role="status" className="statusbar punchstatus">

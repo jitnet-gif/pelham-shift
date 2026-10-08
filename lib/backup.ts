@@ -7,7 +7,7 @@ import type {GpsRow,LogRow} from './audit';
 // 종류 줄이 있어 '1001' 같은 번호가 숫자로, 휴게·위치 같은 묶음 값이 글자로 바뀌지 않고 그대로 돌아옵니다.
 // 활동 로그 시트는 보는 용도입니다. 복구는 로그를 읽지도 고치지도 않습니다.
 export const BACKUP_FORMAT='pelham-shift-backup/1';
-export const LISTS=['employees','shifts','publishedShifts','swaps','attendance','messages','tasks','timeOff','availability','punches','clockNames','payHours'] as const;
+export const LISTS=['employees','shifts','publishedShifts','swaps','attendance','messages','tasks','todos','todoTemplates','timeOff','availability','punches','clockNames','payHours'] as const;
 const INFO='Info',SETTINGS='Settings',LOG='Log (read-only)';
 // 백업 파일에 싣는 로그는 최근 것부터 이만큼이고, detail 은 앞부분만 싣습니다 — 백업이 복구 한도(4MB)를 넘지 않게.
 // 전체 로그와 detail 전문은 '활동 로그 내려받기'로 기간을 골라 받습니다. 복구는 로그 시트를 읽지 않습니다.

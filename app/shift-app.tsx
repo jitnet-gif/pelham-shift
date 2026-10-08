@@ -49,6 +49,7 @@ import {
   ArchiveRestore,
   Reply,
   CloudSun,
+  MessageSquareText,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
@@ -129,6 +130,7 @@ import {
   type Message,
   type Shift,
   type State,
+  shiftTodos,
 } from '@/lib/domain';
 import { download } from '@/lib/importer';
 import { notice } from '@/lib/notice';
@@ -151,6 +153,7 @@ import StaffTimesheets from './staff-timesheets';
 import { PunchRoster, PunchPeriodBar } from './punch-roster';
 import { PayrollHours, workHoursData } from './payroll-hours';
 import StaffClock from './staff-clock';
+import ShiftTodos from './shift-todos';
 import { say } from './say';
 import StaffMore, { type MoreItem } from './staff-more';
 import TimePicker from './time-picker';
@@ -515,7 +518,8 @@ export default function ShiftApp() {
   useEffect(() => {
     if (auth === 'in') track('schedule', tab);
   }, [auth, tab]);
-  async function command(type: string, payload: any = {}) {
+  // stay: 할 일 체크·메모처럼 열린 창 안에서 이어 하는 저장. 창을 닫지 않고 저장 상자도 띄우지 않습니다.
+  async function command(type: string, payload: any = {}, stay = false) {
     if (setup && type !== 'initialize') {
       setStatus(
         '먼저 워크스페이스를 생성하세요. 샘플 데이터는 저장되지 않습니다.',
@@ -533,8 +537,10 @@ export default function ShiftApp() {
       const json = (await r.json()) as { error?: string; state?: State };
       if (!r.ok) throw Error(json.error);
       ingest(json);
-      setModal('');
-      setSaved('저장했습니다.');
+      if (!stay) {
+        setModal('');
+        setSaved('저장했습니다.');
+      }
       return json.state ?? null;
     } catch (e) {
       // 실패했을 때 직전 저장 상자가 남아 있으면 무엇이 들어갔는지 헷갈립니다. 상자를 걷고 띠만 남깁니다.
@@ -820,6 +826,45 @@ export default function ShiftApp() {
           Math.abs(minutesOf(b.start) - minutesOf(myPunch.in))
         : a.start.localeCompare(b.start),
     )[0];
+  // 근무 칸에 붙는 할 일 진행 딱지. 할 일이 없는 근무에는 붙이지 않고, 메모가 있으면 말풍선을 함께 답니다.
+  const todoPill = (shiftId: string) => {
+    const list = shiftTodos(data, shiftId);
+    if (!list.length) return null;
+    const done = list.filter((x) => x.doneAt).length;
+    return (
+      <em
+        className={'todo-pill' + (done === list.length ? ' all' : '')}
+        title={t('할 일 {done}/{total}', { done, total: list.length })}
+      >
+        {done}/{list.length}
+        {list.some((x) => x.memo) && <MessageSquareText size={10} />}
+      </em>
+    );
+  };
+  // 출퇴근 화면의 오늘 할 일. 출근해 있는 동안은 남은 개수를 제목에 올려, 퇴근을 찍기 전에 보이게 합니다.
+  const myTodos = myShiftToday ? shiftTodos(data, myShiftToday.id) : [];
+  const myTodosLeft = myTodos.filter((x) => !x.doneAt).length;
+  const onShift = !!myPunch && !myPunch.out;
+  const clockTodos =
+    myShiftToday && myTodos.length ? (
+      <ShiftTodos
+        shiftId={myShiftToday.id}
+        todos={myTodos}
+        canManage={false}
+        canCheck
+        busy={busy}
+        name={name}
+        heading={
+          onShift
+            ? myTodosLeft
+              ? t('퇴근 전 남은 할 일 {n}개', { n: myTodosLeft })
+              : t('오늘 할 일을 모두 마쳤습니다')
+            : t('오늘 할 일')
+        }
+        className={onShift && myTodosLeft ? 'left' : ''}
+        onCommand={(type, payload) => command(type, payload, true)}
+      />
+    ) : null;
   // 대체근무 요청이 오가는 중인 근무. 이때는 시간도 못 고치고 지우지도 못합니다.
   const swapBusy = (shiftId: string) =>
     data.swaps.some(
@@ -3720,6 +3765,16 @@ export default function ShiftApp() {
                         })}
                       </p>
                     )}
+                    <ShiftTodos
+                      shiftId={s.id}
+                      todos={shiftTodos(data, s.id)}
+                      templates={data.todoTemplates ?? []}
+                      canManage={canSchedule}
+                      canCheck={canSchedule || s.employeeId === actor.id}
+                      busy={busy}
+                      name={name}
+                      onCommand={(type, payload) => command(type, payload, true)}
+                    />
                     {/* 관리자에게는 막히는 경우에만 한 줄을 띄웁니다. 할 수 있는 일은 설명 줄이 이미 말합니다. */}
                     {staffReadOnly ? (
                       <p className="hint">
@@ -4219,6 +4274,7 @@ export default function ShiftApp() {
                                     {s.draft && (
                                       <em className="shift-flag">Unpublished</em>
                                     )}
+                                    {todoPill(s.id)}
                                     <small>{duration(s.start, s.end)}h</small>
                                   </button>
                                 ))
@@ -5012,6 +5068,7 @@ export default function ShiftApp() {
                                                       {blocked && <TriangleAlert size={11} />}
                                                       {s.originalId ? t('대체 · ') : ''}
                                                       {s.area}
+                                                      {todoPill(s.id)}
                                                     </small>
                                                   </span>
                                                 </button>
@@ -5233,6 +5290,7 @@ export default function ShiftApp() {
                   return !!next;
                 }}
                 onBreak={(action) => void command('punchBreak', { action, paid: '1' })}
+                todos={clockTodos}
               />
               )}
             </TabsContent>

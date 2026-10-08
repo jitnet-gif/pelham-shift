@@ -1,6 +1,6 @@
 import {env} from '@/lib/db';
 import {buildPushPayload} from '@block65/webcrypto-web-push';
-import {type Shift,type State,OT_PERIOD_HOURS,PAY_PERIOD_DAYS,dueShifts,missedShifts,overtimeWorked,overtimeAdded,payPeriodStart} from './domain';
+import {type Shift,type State,OT_PERIOD_HOURS,PAY_PERIOD_DAYS,dueShifts,missedShifts,overtimeWorked,overtimeAdded,payPeriodStart,publicShifts} from './domain';
 import {rosterAdminIds} from './birth-auth';
 import {translate,isLang,SCREEN_LANG,type Vars} from './i18n';
 // link: 알림을 눌렀을 때 앱 주소 뒤에 붙일 값. 누르면 곧장 그 화면이 열립니다.
@@ -43,3 +43,15 @@ export async function overtimeScheduled(workspace:string,before:State,after:Stat
  return sent}
 // 완전히 삭제한 직원에게는 알림이 갈 곳이 없습니다. 기기 등록을 함께 지웁니다.
 export async function forgetPush(workspace:string,member:string){await env.DB.prepare('DELETE FROM push_subscriptions WHERE workspace = ? AND member = ?').bind(workspace,member).run()}
+// 근무에 할 일이 생기면 그 근무의 직원에게 알립니다. 아직 공개하지 않은 근무는 직원이 볼 수 없어 알리지 않습니다.
+// 템플릿으로 여러 개를 한 번에 넣어도 알림은 한 번입니다.
+export async function todosAdded(workspace:string,state:State,shiftId:string,count:number,actor:string,origin:string){
+ const shift=publicShifts(state).find(x=>x.id===shiftId);if(!shift||!count||shift.employeeId===actor)return 0;
+ return notify(workspace,[shift.employeeId],{title:'새 할 일',body:'{date} {start} · {area} 근무에 할 일 {n}개가 생겼습니다. 근무를 눌러 확인하세요.',vars:{date:shift.date.slice(5).replace('-','/'),start:shift.start,area:shift.area,n:count},tag:'todos-'+shift.id},origin)}
+// 직원이 할 일에 메모를 남기면 관리자와 그 할 일을 넣은 사람에게 알립니다. 남긴 사람 본인에게는 보내지 않습니다.
+export async function todoMemoLeft(workspace:string,state:State,todoId:string,actor:string,origin:string){
+ const todo=state.todos?.find(x=>x.id===todoId);if(!todo?.memo)return 0;
+ const to=[...new Set([...adminsOf(state),todo.createdBy])].filter(id=>id&&id!==actor);if(!to.length)return 0;
+ const shift=[...state.shifts,...(state.publishedShifts??[])].find(x=>x.id===todo.shiftId);
+ const who=state.employees.find(e=>e.id===actor)?.name||'Admin';
+ return notify(workspace,to,{title:'할 일 메모',body:'{name} · {date} · {item}: {memo}',vars:{name:who,date:shift?shift.date.slice(5).replace('-','/'):'',item:todo.text,memo:todo.memo},tag:'todo-memo-'+todo.id},origin)}

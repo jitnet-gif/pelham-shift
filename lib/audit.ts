@@ -37,7 +37,7 @@ export async function readLogs(workspace:string,limit:number,from='',to=''){
 // 명령 한 번이 워크스페이스에서 무엇을 늘리고, 지우고, 바꿨는지 목록마다 적습니다.
 // 지운 기록은 지우기 전 모습 그대로 남으므로, 데이터에서 빠진 것도 로그에서는 찾을 수 있습니다.
 // publishedShifts 는 공개할 때마다 근무표 전체가 바뀌어 적지 않습니다 — 공개 자체는 action 으로 남습니다.
-const TRACKED=['employees','shifts','swaps','attendance','messages','tasks','timeOff','availability','punches','clockNames','payHours','managerPay'] as const;
+const TRACKED=['employees','shifts','swaps','attendance','messages','tasks','todos','todoTemplates','timeOff','availability','punches','clockNames','payHours','managerPay'] as const;
 const keyOf=(x:Record<string,unknown>)=>typeof x.id==="string"?x.id:typeof x.name==="string"?x.name:JSON.stringify(x);
 export function commandDetail(payload:unknown,before:State,after:State){
  const clean=payload&&typeof payload==='object'?{...(payload as Record<string,unknown>)}:payload;

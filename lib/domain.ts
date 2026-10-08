@@ -17,6 +17,14 @@ export type Message = {id:string;sender:string;to:string;body:string;createdAt:s
 // time 은 마감 시각입니다. 적지 않고 보낼 수 있어 예전에 보낸 작업에는 없습니다.
 // removedAt/removedBy: 지운 작업 지시. 메시지와 같이 화면에서만 감추고 기록은 지우지 않습니다.
 export type Task = {id:string;assignedTo:string;title:string;notes:string;date:string;time?:string;status:'sent'|'seen'|'completed';createdAt:string;completedAt?:string;createdBy?:string;removedAt?:string;removedBy?:string};
+// 근무 하나에 붙는 할 일. 근무와 따로 두어, 할 일을 넣고 체크해도 근무표가 Unpublished 로 돌아가지 않습니다.
+// shiftId 로 근무를 가리키므로 대체근무가 승인되어 근무자가 바뀌면 할 일도 새 근무자에게 그대로 넘어갑니다.
+// doneAt/doneBy: 체크한 시각과 사람. 체크를 풀면 둘 다 지웁니다. memo 는 직원이 그 항목에 남기는 한 줄입니다.
+export type ShiftTodo = {id:string;shiftId:string;text:string;createdAt:string;createdBy:string;doneAt?:string;doneBy?:string;memo?:string;memoAt?:string;memoBy?:string};
+// 자주 쓰는 할 일 묶음. 근무에 한 번에 넣는 데에만 쓰고, 넣은 뒤에는 근무의 할 일과 이어지지 않습니다.
+export type TodoTemplate = {id:string;name:string;items:string[];createdAt:string;createdBy:string};
+export const MAX_SHIFT_TODOS=30,MAX_TODO_TEMPLATES=50;
+export const shiftTodos=(state:{todos?:ShiftTodo[]},shiftId:string)=>(state.todos??[]).filter(x=>x.shiftId===shiftId);
 export type Decision='pending'|'approved'|'declined';
 // Time off covers a date range; a partial day (allDay false) is a single date with start/end times.
 export type TimeOff = {id:string;employeeId:string;from:string;to:string;allDay:boolean;start?:string;end?:string;reason:string;status:Decision;createdAt:string;decidedAt?:string};
@@ -48,7 +56,7 @@ export type Workplace = {lat:number;lng:number;radius:number};
 // shifts 는 편성하는 사람이 고치는 작업본, publishedShifts 는 마지막으로 공개한 순간의 근무표(공개본)입니다.
 // 직원은 언제나 공개본만 봅니다 — 작업본을 아무리 고쳐도 직원 화면이 비는 일이 없습니다.
 // published 는 '작업본이 공개본과 같다'는 뜻으로, 저장할 때마다 두 근무표를 견주어 다시 적습니다.
-export type State = {workplace?:Workplace;employees:Employee[];shifts:Shift[];swaps:Swap[];attendance:Attendance[];messages:Message[];tasks:Task[];timeOff?:TimeOff[];availability?:Availability[];punches?:Punch[];clockNames?:ClockName[];payHours?:PayHours[];managerPay?:ManagerPay[];ownerSalary?:number;areas?:string[];currency:string;published:boolean;publishedShifts?:Shift[]};
+export type State = {workplace?:Workplace;employees:Employee[];shifts:Shift[];swaps:Swap[];attendance:Attendance[];messages:Message[];tasks:Task[];todos?:ShiftTodo[];todoTemplates?:TodoTemplate[];timeOff?:TimeOff[];availability?:Availability[];punches?:Punch[];clockNames?:ClockName[];payHours?:PayHours[];managerPay?:ManagerPay[];ownerSalary?:number;areas?:string[];currency:string;published:boolean;publishedShifts?:Shift[]};
 // 클럽이 서 있는 자리의 시간대. 화면·서버·알림이 모두 이 한 줄을 봅니다.
 // 온타리오는 뉴욕과 시각이 같아 예전 기록과 어긋나지 않고, 이름만 자리에 맞게 돌아옵니다.
 export const TIME_ZONE='America/Toronto';

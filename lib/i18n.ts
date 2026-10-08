@@ -1140,10 +1140,47 @@ const en: Record<string, string> = {
     'Joins the check-in/out spots with the spot saved every 30 minutes while the app was open on shift. Lines between dots are not the actual path walked.',
   '위치 표가 아직 없습니다. supabase/migrations/20260924120000_staff_locations.sql 을 Supabase SQL Editor 에서 실행하세요.':
     'The location table does not exist yet. Run supabase/migrations/20260924120000_staff_locations.sql in the Supabase SQL Editor.',
+  // 근무의 할 일(체크리스트)
+  '할 일': 'To-dos',
+  추가: 'Add',
+  '메모 고치기': 'Edit note',
+  '메모 남기기': 'Add note',
+  '할 일 빼기': 'Remove to-do',
+  '{time} 체크 · {name}': 'Checked {time} · {name}',
+  '예: 재고가 2박스만 남았습니다.': 'e.g. Only 2 boxes left in stock.',
+  '메모 저장': 'Save note',
+  '비워서 저장하면 메모를 지웁니다. 관리자에게 알림이 갑니다.':
+    'Save it empty to delete the note. Managers get a notification.',
+  '할 일은 {n}개까지 넣을 수 있습니다.': 'A shift can have up to {n} to-dos.',
+  '할 일 적기': 'Add a to-do',
+  '템플릿 넣기': 'Add from template',
+  '{name} 템플릿 지우기': 'Delete template {name}',
+  '{name} 템플릿을 지울까요? 이미 근무에 넣은 할 일은 그대로 남습니다.':
+    'Delete the {name} template? To-dos already added to shifts stay.',
+  '템플릿 이름 (예: Proshop 오픈)': 'Template name (e.g. Proshop opening)',
+  '템플릿 이름': 'Template name',
+  '이 목록을 템플릿으로 저장': 'Save this list as a template',
+  '할 일 {done}/{total}': 'To-dos {done}/{total}',
+  '퇴근 전 남은 할 일 {n}개': '{n} to-dos left before you clock out',
+  '오늘 할 일을 모두 마쳤습니다': "All of today's to-dos are done",
+  '오늘 할 일': "Today's to-dos",
+  '할 일을 찾을 수 없습니다. 새로고침 후 다시 시도하세요.': 'To-do not found. Refresh and try again.',
+  '본인 근무의 할 일만 체크할 수 있습니다.': 'You can only check to-dos on your own shifts.',
+  '할 일을 적으세요.': 'Write a to-do first.',
+  '할 일은 160자까지 적을 수 있습니다.': 'A to-do can be up to 160 characters.',
+  '메모는 500자까지 적을 수 있습니다.': 'A note can be up to 500 characters.',
+  '템플릿을 찾을 수 없습니다.': 'Template not found.',
+  '새 할 일': 'New to-dos',
+  '{date} {start} · {area} 근무에 할 일 {n}개가 생겼습니다. 근무를 눌러 확인하세요.':
+    '{n} to-dos were added to your {date} {start} · {area} shift. Open the shift to see them.',
+  '할 일 메모': 'To-do note',
 };
 
 // Messages built from data (a date, a row number, a list of names) can't be dictionary keys.
 const patterns: [RegExp, (match: RegExpMatchArray) => string][] = [
+  [/^할 일은 한 번에 (\d+)개까지 넣을 수 있습니다\.$/, ([, n]) => `You can add up to ${n} to-dos at once.`],
+  [/^근무 하나에 할 일은 (\d+)개까지 넣을 수 있습니다\.$/, ([, n]) => `A shift can have up to ${n} to-dos.`],
+  [/^템플릿은 (\d+)개까지 저장할 수 있습니다\.$/, ([, n]) => `You can save up to ${n} templates.`],
   [
     /^근무지에서 약 (\d+)m 떨어져 있어 출퇴근을 기록하지 않았습니다\. 근무지에서 다시 눌러주세요\.$/,
     ([, away]) =>

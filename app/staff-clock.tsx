@@ -1,7 +1,7 @@
 'use client';
 // next/image 를 쓰지 않습니다. 방금 찍은 사진은 data URL 이라 서버에 보낼 것도 캐시할 것도 없습니다.
 // oxlint-disable next/no-img-element
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AlarmClock, Camera, Check, Coffee, Hourglass, LogOut } from 'lucide-react';
 import type { Employee, Punch, Shift, Workplace } from '@/lib/domain';
 import { say } from './say';
@@ -47,6 +47,7 @@ export default function StaffClock({
   onLocate,
   onPunch,
   onBreak,
+  todos,
 }: {
   employee?: Employee;
   punch?: Punch;
@@ -68,6 +69,8 @@ export default function StaffClock({
     // 서버가 받아 주었는지 돌려줍니다. 받아 준 것만 '기록했습니다' 라고 말합니다.
   ) => void | Promise<boolean | void>;
   onBreak: (action: 'start' | 'end') => void;
+  // 오늘 근무의 할 일. 퇴근 단추 바로 위에 놓여, 퇴근을 찍기 전에 남은 항목이 눈에 들어옵니다.
+  todos?: ReactNode;
 }) {
   const { t, locale } = useLang();
   // 헤더 시계와 '근무한 시간'은 분이 바뀌면 같이 움직입니다.
@@ -564,6 +567,7 @@ export default function StaffClock({
         )}
         {/* 찍힌 사진이 떠 있는 동안에는 버튼을 잠급니다.
             앞사람 화면이 아직 남아 있는 3초 사이에 뒷사람이 눌러 버리는 일을 막습니다. */}
+        {todos}
         <div className="stclock-actions">
         {working ? (
           <>

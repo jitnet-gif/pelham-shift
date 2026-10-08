@@ -1,0 +1,43 @@
+.todos{display:flex;flex-direction:column;gap:10px;margin:18px 0 6px;padding:14px 14px 12px;border:1px solid var(--border);border-radius:10px;background:#fbfdfc;text-align:left}
+.todos-head{display:flex;align-items:center;gap:8px;color:#2f4744}
+.todos-head b{font-size:15px;font-weight:650}
+.todos-count{margin-left:auto;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;padding:2px 9px;border-radius:999px;background:#fbf0de;color:#9a5c0c}
+.todos-count.all{background:#e1f2ea;color:#1f7a4d}
+.todos-bar{height:5px;border-radius:99px;background:#e6eeec;overflow:hidden}
+.todos-bar i{display:block;height:100%;border-radius:99px;background:#2f8f5b;transition:width .2s}
+.todos-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.todos-list li{display:grid;grid-template-columns:1fr auto auto;align-items:center;column-gap:2px;padding:8px 0;border-top:1px solid #edf2f0}
+.todos-list li:first-child{border-top:0}
+.todos-item{display:flex;align-items:flex-start;gap:10px;font-size:14px;line-height:1.45;color:#203332;cursor:pointer;min-width:0}
+.todos-item [data-slot=checkbox]{margin-top:1px;flex-shrink:0}
+.todos-item span{overflow-wrap:anywhere}
+.todos-list li.done .todos-item span{color:#7b8b87;text-decoration:line-through;text-decoration-color:#b3c0bc}
+.todos-icon{background:none;border:0;padding:5px;border-radius:6px;color:#7b8b87;display:inline-flex}
+.todos-icon:hover{background:#eef5f2;color:#087e6d}
+.todos-meta,.todos-memo,.todos-memoedit{grid-column:1/-1;margin-left:26px}
+.todos-meta{font-size:11px;color:#8b9a96;font-variant-numeric:tabular-nums}
+.todos-memo{margin-top:6px;margin-bottom:0;padding:7px 10px;border-radius:7px;background:#fff7d6;border:1px solid #ead98f;font-size:13px;line-height:1.5;color:#3d3a1e;white-space:pre-wrap;overflow-wrap:anywhere}
+.todos-memo small{color:#8a7d3a;font-size:11px}
+.todos-memoedit{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.todos-memoedit textarea{min-height:70px;resize:vertical;border:1px solid #d3dfd9;border-radius:6px;padding:8px 10px;font:inherit;font-size:14px}
+.todos-memoedit>div{display:flex;justify-content:flex-end;gap:8px}
+.todos-memoedit .button{padding:7px 12px;font-size:13px}
+.todos-memoedit small{font-size:11px;color:#8b9a96}
+.todos-manage{display:flex;flex-direction:column;gap:10px;padding-top:6px;border-top:1px dashed #d8e3df}
+.todos-add{display:flex;gap:8px}
+.todos-add input{flex:1;min-width:0;border:1px solid #d3dfd9;border-radius:6px;padding:8px 10px;font-size:14px;background:#fff}
+.todos-add .button{padding:8px 12px;font-size:13px}
+.todos-templates{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;color:#7b8b87}
+.todos-chip{display:inline-flex;align-items:center;border-radius:999px;background:#e1f2ed;color:#087e6d;overflow:hidden}
+.todos-chip button{background:none;border:0;color:inherit;font-size:12px;font-weight:600;padding:4px 4px 4px 10px;display:inline-flex;align-items:center;gap:4px}
+.todos-chip button:last-child{padding:4px 8px 4px 2px;opacity:.6}
+.todos-chip button:last-child:hover{opacity:1}
+.todos-chip em{font-style:normal;font-weight:500;opacity:.7}
+.todos-save{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;padding:0}
+/* 스케줄 표의 근무 칸에 붙는 진행 딱지 */
+.todo-pill{display:inline-flex;align-items:center;gap:2px;font-size:10px;font-weight:700;font-style:normal;font-variant-numeric:tabular-nums;line-height:1;padding:2px 6px;border-radius:999px;background:#fbf0de;color:#9a5c0c;white-space:nowrap;flex-shrink:0}
+.todo-pill.all{background:#e1f2ea;color:#1f7a4d}
+/* 출퇴근 화면: 퇴근 단추 위에 놓입니다 */
+.stclock .todos{margin:4px 0 0;background:#fff}
+.stclock .todos.left{border-color:#ecc98d;background:#fffaf1}
+.shift .todo-pill{align-self:flex-start}
