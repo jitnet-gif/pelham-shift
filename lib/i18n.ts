@@ -1174,10 +1174,61 @@ const en: Record<string, string> = {
   '{date} {start} · {area} 근무에 할 일 {n}개가 생겼습니다. 근무를 눌러 확인하세요.':
     '{n} to-dos were added to your {date} {start} · {area} shift. Open the shift to see them.',
   '할 일 메모': 'To-do note',
+  // 카트 충전 보드
+  카트: 'Carts',
+  '카트 충전': 'Cart charging',
+  '두 번 나간 카트는 충전합니다. 완충이 안 된 카트는 게이지가 붙고 한 번만 나갑니다.':
+    'A cart goes on charge after two rounds. A cart that is not fully charged shows a gauge and goes out once.',
+  '{no}번 카트': 'Cart {no}',
+  '{no}번': '#{no}',
+  '라인업 {n}번': 'lineup #{n}',
+  '충전 완료': 'Charged',
+  '1회 사용': 'Used once',
+  '충전 필요': 'Needs charge',
+  충전중: 'Charging',
+  '완충 안 됨': 'Not full',
+  라인업: 'Lineup',
+  '다음 손님': 'Next guest',
+  '라인업에 세운 카트가 없습니다. “라인업 세우기”를 켜고 카트를 누르세요.':
+    'No carts in the lineup. Turn on “Line up carts” and tap a cart.',
+  '라인업 세우기': 'Line up carts',
+  '라인업 세우기 끝': 'Done lining up',
+  '라인업이 가득 찼습니다({n}대). 줄에서 빼려면 카트를 누르세요.':
+    'The lineup is full ({n} carts). Tap a cart in line to take it out.',
+  '나갈 수 있는 카트를 누르면 줄 끝에 섭니다. 줄에 선 카트를 누르면 뺍니다.':
+    'Tap a cart that can go out to add it to the end of the line. Tap a cart in line to take it out.',
+  '이 상태의 카트가 없습니다.': 'No carts in this state.',
+  '충전 시작': 'Start charging',
+  '최근 기록': 'Recent',
+  '{no}번 · 1회 기록 · 한 번 더 나갈 수 있습니다': 'Cart {no} out · it can go out once more',
+  '{no}번 · 다 썼습니다 · 충전해야 합니다': 'Cart {no} out · charge it when it comes back',
+  'cart::되돌리기': 'Undo',
+  '{no}번 카트 충전 시작': 'Start charging cart {no}',
+  '충전기에 꽂았으면 충전 시작을 누르세요. 충전이 끝날 때까지 이 카트는 잠깁니다.':
+    'Plug the cart in, then tap Start charging. The cart stays locked until charging is done.',
+  '{no}번 카트 충전 완료': 'Cart {no} charged',
+  '얼마나 찼는지 고르세요. 완충이 아니면 게이지가 표시되고 한 번만 나갑니다.':
+    'Pick how full it is. If it is not full, the cart shows a gauge and goes out only once.',
+  게이지: 'Gauge',
+  '완충 안 됨 · 한 번만 나갑니다': 'Not full · goes out once',
+  '완충 · 두 번 나갑니다': 'Full · goes out twice',
+  '예: 충전기 불량으로 3칸까지만': 'e.g. Charger fault, only reached 3 bars',
+  '충전 완료 저장': 'Save as charged',
+  '카트를 찾을 수 없습니다.': 'Cart not found.',
+  '게이지를 고르세요.': 'Pick the gauge level.',
+  '메모는 200자까지 적을 수 있습니다.': 'A note can be up to 200 characters.',
+  '되돌릴 수 있는 시간이 지났습니다.': 'It is too late to undo this.',
 };
 
 // Messages built from data (a date, a row number, a list of names) can't be dictionary keys.
 const patterns: [RegExp, (match: RegExpMatchArray) => string][] = [
+  [/^(\d+)번 카트는 방금 다른 직원이 바꿨습니다\. 화면을 새로 불러온 뒤 다시 누르세요\.$/, ([, no]) => `Someone just changed cart ${no}. Reload and tap again.`],
+  [/^(\d+)번 카트는 충전중입니다\.$/, ([, no]) => `Cart ${no} is charging.`],
+  [/^(\d+)번 카트는 충전해야 합니다\.$/, ([, no]) => `Cart ${no} needs to be charged.`],
+  [/^(\d+)번 카트는 아직 충전할 차례가 아닙니다\.$/, ([, no]) => `Cart ${no} does not need charging yet.`],
+  [/^(\d+)번 카트는 충전중이 아닙니다\.$/, ([, no]) => `Cart ${no} is not charging.`],
+  [/^(\d+)번 카트는 나갈 수 없어 라인업에 세울 수 없습니다\.$/, ([, no]) => `Cart ${no} can't go out, so it can't join the lineup.`],
+  [/^라인업은 (\d+)대까지 세울 수 있습니다\.$/, ([, n]) => `The lineup holds up to ${n} carts.`],
   [/^할 일은 한 번에 (\d+)개까지 넣을 수 있습니다\.$/, ([, n]) => `You can add up to ${n} to-dos at once.`],
   [/^근무 하나에 할 일은 (\d+)개까지 넣을 수 있습니다\.$/, ([, n]) => `A shift can have up to ${n} to-dos.`],
   [/^템플릿은 (\d+)개까지 저장할 수 있습니다\.$/, ([, n]) => `You can save up to ${n} templates.`],

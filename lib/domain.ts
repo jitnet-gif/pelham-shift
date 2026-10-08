@@ -25,6 +25,19 @@ export type ShiftTodo = {id:string;shiftId:string;text:string;createdAt:string;c
 export type TodoTemplate = {id:string;name:string;items:string[];createdAt:string;createdBy:string};
 export const MAX_SHIFT_TODOS=30,MAX_TODO_TEMPLATES=50;
 export const shiftTodos=(state:{todos?:ShiftTodo[]},shiftId:string)=>(state.todos??[]).filter(x=>x.shiftId===shiftId);
+// 골프 카트. 두 번 나가면 충전해야 하고, 완충이 안 된 채 빼면 한 번만 나갑니다.
+// uses: 지난 충전 뒤 나간 횟수. max: 이번 충전으로 나갈 수 있는 횟수(완충 2, 덜 참 1).
+// level: 덜 찬 충전의 게이지(1–4칸). 완충이면 두지 않습니다. memo: 충전 완료 때 남긴 한 줄(선택).
+// charging: 충전기에 꽂은 시각. lineup: 손님에게 내줄 줄에 세운 시각 — 이 순서대로 1, 2, 3… 번호가 붙습니다.
+// prev: 바로 앞 모습. 방금 누른 사람이 잠깐 안에 되돌릴 때만 씁니다.
+export type CartSnap = {uses:number;max:number;level?:number;memo?:string;charging?:string;lineup?:string};
+export type Cart = CartSnap & {id:string;no:number;at?:string;by?:string;prev?:CartSnap&{at?:string;by?:string}};
+export type CartStatus = 'ready'|'half'|'empty'|'charging';
+export const CART_COUNT=60,CART_LINEUP_MAX=20,CART_GAUGE=5,CART_UNDO_MS=2*60*1000;
+export const cartStatus=(c:CartSnap):CartStatus=>c.charging?'charging':c.uses>=c.max?'empty':c.uses>0?'half':'ready';
+// 카트를 처음 여는 워크스페이스에는 1–60번을 모두 완충 상태로 세웁니다.
+export const cartList=(state:{carts?:Cart[]}):Cart[]=>state.carts?.length?state.carts:Array.from({length:CART_COUNT},(_,i)=>({id:'cart-'+(i+1),no:i+1,uses:0,max:2}));
+export const cartLineup=(carts:Cart[])=>carts.filter(c=>c.lineup).sort((a,b)=>a.lineup!.localeCompare(b.lineup!)||a.no-b.no);
 export type Decision='pending'|'approved'|'declined';
 // Time off covers a date range; a partial day (allDay false) is a single date with start/end times.
 export type TimeOff = {id:string;employeeId:string;from:string;to:string;allDay:boolean;start?:string;end?:string;reason:string;status:Decision;createdAt:string;decidedAt?:string};
@@ -56,7 +69,7 @@ export type Workplace = {lat:number;lng:number;radius:number};
 // shifts 는 편성하는 사람이 고치는 작업본, publishedShifts 는 마지막으로 공개한 순간의 근무표(공개본)입니다.
 // 직원은 언제나 공개본만 봅니다 — 작업본을 아무리 고쳐도 직원 화면이 비는 일이 없습니다.
 // published 는 '작업본이 공개본과 같다'는 뜻으로, 저장할 때마다 두 근무표를 견주어 다시 적습니다.
-export type State = {workplace?:Workplace;employees:Employee[];shifts:Shift[];swaps:Swap[];attendance:Attendance[];messages:Message[];tasks:Task[];todos?:ShiftTodo[];todoTemplates?:TodoTemplate[];timeOff?:TimeOff[];availability?:Availability[];punches?:Punch[];clockNames?:ClockName[];payHours?:PayHours[];managerPay?:ManagerPay[];ownerSalary?:number;areas?:string[];currency:string;published:boolean;publishedShifts?:Shift[]};
+export type State = {workplace?:Workplace;employees:Employee[];shifts:Shift[];swaps:Swap[];attendance:Attendance[];messages:Message[];tasks:Task[];todos?:ShiftTodo[];todoTemplates?:TodoTemplate[];carts?:Cart[];timeOff?:TimeOff[];availability?:Availability[];punches?:Punch[];clockNames?:ClockName[];payHours?:PayHours[];managerPay?:ManagerPay[];ownerSalary?:number;areas?:string[];currency:string;published:boolean;publishedShifts?:Shift[]};
 // 클럽이 서 있는 자리의 시간대. 화면·서버·알림이 모두 이 한 줄을 봅니다.
 // 온타리오는 뉴욕과 시각이 같아 예전 기록과 어긋나지 않고, 이름만 자리에 맞게 돌아옵니다.
 export const TIME_ZONE='America/Toronto';

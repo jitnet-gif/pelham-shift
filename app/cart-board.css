@@ -1,0 +1,108 @@
+/* 카트 충전 보드. 보드 폭에 따라 핸드폰 5칸 · 아이패드 10칸 · 랩탑 12칸 + 오른쪽 목록으로 바뀝니다. */
+.cartboard{--c-green:#2f9e44;--c-green-soft:#e2f4e5;--c-teal:#087e6d;--c-red:#c8432f;--c-red-soft:#fbe6e1;--c-orange:#e8820c;--c-orange-soft:#fdeed9;--c-blue:#2463d6;--c-blue-soft:#e3ecfc;
+  container-type:inline-size;display:flex;flex-direction:column;gap:14px;padding-bottom:84px}
+
+/* 칸 하나 = 카트 한 대 */
+.cart-cell{position:relative;aspect-ratio:1;width:100%;max-width:84px;border:2px solid #8fa29e;border-radius:12px;background:#fff;padding:0;color:#203332;
+  background-image:linear-gradient(to top right,transparent calc(50% - 1px),#dde6e4 calc(50% - 1px),#dde6e4 calc(50% + 1px),transparent calc(50% + 1px))}
+.cart-cell:disabled{cursor:default;opacity:1}
+.cart-cell:focus-visible{outline:3px solid #22a991;outline-offset:3px}
+.cart-no{position:absolute;top:3px;left:6px;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1;z-index:1}
+.cart-icon{position:absolute;inset:0;margin:auto;width:46%;height:46%}
+.cart-cell.is-ready{border-color:var(--c-green);background:var(--c-green-soft)}
+.cart-cell.is-ready .cart-no{color:var(--c-green)}
+.cart-cell.is-ready .cart-icon{fill:var(--c-green);stroke:var(--c-green)}
+.cart-cell.is-half{border-color:var(--c-teal);background:linear-gradient(to top right,var(--c-teal) 50%,#fff 50%)}
+.cart-cell.is-empty{border-color:var(--c-red);background:var(--c-red);color:#fff}
+.cart-cell.is-empty .cart-icon{stroke:#fff}
+.cart-cell.is-charging{border-color:var(--c-orange);background:var(--c-orange);color:#fff}
+.cart-cell.is-charging .cart-icon{fill:#fff;stroke:#fff}
+/* 완충 안 됨: 녹색 칸 아래 5칸 게이지 */
+.cart-cell.partial{background:#fff}
+.cart-cell.partial .cart-icon{width:38%;height:38%;top:-14%}
+.cart-gauge{position:absolute;left:12%;right:12%;bottom:10%;height:13%;display:flex;gap:6%}
+.cart-gauge i{flex:1;border:1px solid var(--c-green);border-radius:2px;background:#fff}
+.cart-gauge i.on{background:var(--c-green)}
+/* 메모: 엑셀 메모처럼 오른쪽 위 모서리를 접어 둡니다 */
+.cart-cell.has-memo::after{content:"";position:absolute;top:-2px;right:-2px;width:16px;height:16px;border-top-right-radius:10px;background:linear-gradient(225deg,#203332 50%,transparent 50%)}
+/* 라인업: 파란 테두리 + 순서 번호 */
+.cart-cell.in-line{outline:3px solid var(--c-blue);outline-offset:2px}
+.cart-order{position:absolute;right:-8px;bottom:-8px;min-width:22px;height:22px;padding:0 5px;border-radius:99px;background:var(--c-blue);color:#fff;font-size:12px;font-weight:700;display:grid;place-items:center;box-shadow:0 0 0 2px #fff;z-index:2}
+.cart-cell.small{width:40px;max-width:40px;border-radius:8px;flex:none}
+.cart-cell.small .cart-no{font-size:10px;top:1px;left:3px}
+.cart-cell.small.has-memo::after{width:10px;height:10px;border-top-right-radius:7px}
+.cart-cell.small .cart-order{min-width:17px;height:17px;font-size:10px;right:-6px;bottom:-6px}
+.cart-cell.small.in-line{outline-width:2px}
+
+/* 라인업 줄 */
+.cart-line{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 14px;border-radius:10px;background:var(--c-blue-soft);border:1px solid #c9d8f5}
+.cart-line-title{display:flex;align-items:center;gap:6px;color:var(--c-blue);font-size:14px;white-space:nowrap}
+.cart-line-title small{font-weight:600;font-size:12px;font-variant-numeric:tabular-nums;color:#4b6aa6}
+.cart-line-cells{display:flex;gap:14px;overflow-x:auto;padding:6px 10px 10px 2px;flex:1;min-width:0}
+.cart-line-empty{flex:1;min-width:180px;font-size:13px;color:#4b6aa6}
+.cart-linemode{margin-left:auto;border-color:#b8cbf0;color:var(--c-blue)}
+.cart-linemode.on{background:var(--c-blue);border-color:var(--c-blue);color:#fff}
+.cart-hint{margin:-4px 0 0;font-size:13px;color:#4b6aa6}
+
+/* 상태별 대수 · 누르면 그 상태만 */
+.cart-chips{display:flex;gap:8px;flex-wrap:wrap}
+.cart-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:#fff;border-radius:99px;padding:6px 12px;font-size:13px;color:#3d5a4e}
+.cart-chip b{font-variant-numeric:tabular-nums}
+.cart-chip i{width:12px;height:12px;border-radius:3px;border:1.5px solid #8fa29e}
+.cart-chip.c-ready i{border-color:var(--c-green);background:var(--c-green-soft)}
+.cart-chip.c-half i{border-color:var(--c-teal);background:linear-gradient(to top right,var(--c-teal) 50%,#fff 50%)}
+.cart-chip.c-empty i{border-color:var(--c-red);background:var(--c-red)}
+.cart-chip.c-charging i{border-color:var(--c-orange);background:var(--c-orange)}
+.cart-chip.c-partial i{border-color:var(--c-green);background:linear-gradient(to top,var(--c-green) 35%,#fff 35%)}
+.cart-chip.on{background:#203332;border-color:#203332;color:#fff}
+
+/* 칸 판 + 오른쪽 목록 */
+.cart-main{display:flex;flex-direction:column;gap:20px}
+.cart-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;justify-items:center}
+.cart-none{grid-column:1/-1;color:#74857d;font-size:14px;padding:30px 0}
+.cart-side{display:flex;flex-direction:column;gap:6px;background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;min-width:0}
+.cart-side h3{display:flex;justify-content:space-between;margin:10px 0 2px;font-size:13px;font-weight:700;color:#3d5a4e}
+.cart-side h3:first-child{margin-top:0}
+.cart-side h3.t-empty{color:var(--c-red)}.cart-side h3.t-charging{color:var(--c-orange)}.cart-side h3.t-partial{color:var(--c-green)}
+.cart-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #edf2f0;font-size:13px}
+.cart-row>span{display:flex;flex-direction:column;min-width:0}
+.cart-row small{color:#74857d;font-size:12px;overflow-wrap:anywhere}
+.cart-row .tabular{font-variant-numeric:tabular-nums}
+.cart-act{margin-left:auto;border:0;border-radius:6px;padding:6px 10px;font-size:12px;font-weight:700;color:#fff;white-space:nowrap}
+.a-charge{background:var(--c-orange)!important;border-color:var(--c-orange)!important;color:#fff!important}
+.a-done{background:var(--c-green)!important;border-color:var(--c-green)!important;color:#fff!important}
+.cart-log{list-style:none;margin:0;padding:0;font-size:12px;color:#5d716c;display:flex;flex-direction:column;gap:4px}
+.cart-log time{font-variant-numeric:tabular-nums;color:#203332}
+
+/* 되돌리기 알림 */
+.cart-toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom,0px));z-index:40;display:flex;align-items:center;gap:14px;
+  max-width:min(520px,calc(100% - 24px));background:#203332;color:#fff;border-radius:10px;padding:11px 14px;font-size:14px;box-shadow:0 8px 24px rgb(0 0 0 / .18)}
+.cart-toast span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.cart-toast small{color:#c6d6d2;font-size:12px;overflow-wrap:anywhere}
+.cart-toast button{border:0;background:none;color:#7fe0c6;font-weight:700;white-space:nowrap}
+@media(max-width:900px){.cart-toast{bottom:calc(80px + env(safe-area-inset-bottom,0px))}}
+
+/* 충전 시작 · 완료 창 */
+.cart-dialog{display:flex!important;flex-direction:column;gap:14px}
+.cart-pick{display:flex;gap:8px}
+.cart-pick button{flex:1;height:44px;border:1.5px solid var(--c-green);border-radius:8px;background:#fff;color:#203332;font-weight:700}
+.cart-pick button.on{background:var(--c-green);color:#fff}
+.cart-picked{margin:0;font-size:14px;font-weight:600;color:var(--c-green)}
+.cart-picked.partial{color:var(--c-orange)}
+.cart-dialog .field{margin:0}
+.cart-dialog textarea{min-height:72px}
+.cart-go{width:100%;min-height:46px;font-weight:700}
+
+/* 아이패드: 10칸 */
+@container (min-width:560px){
+  .cart-grid{grid-template-columns:repeat(10,minmax(0,1fr))}
+  .cart-side{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:20px}
+  .cart-side h3{grid-column:1/-1}
+}
+/* 랩탑: 12칸 + 오른쪽 목록 */
+@container (min-width:1000px){
+  .cart-main{display:grid;grid-template-columns:minmax(0,1fr) 300px;align-items:start}
+  .cart-grid{grid-template-columns:repeat(12,minmax(0,1fr))}
+  .cart-side{display:flex;position:sticky;top:16px}
+}
+@media (prefers-reduced-motion:no-preference){.cart-cell{transition:background-color .2s,border-color .2s}}

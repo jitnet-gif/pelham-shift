@@ -50,6 +50,7 @@ import {
   Reply,
   CloudSun,
   MessageSquareText,
+  BatteryCharging,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
@@ -131,6 +132,7 @@ import {
   type Shift,
   type State,
   shiftTodos,
+  cartList,
 } from '@/lib/domain';
 import { download } from '@/lib/importer';
 import { notice } from '@/lib/notice';
@@ -154,6 +156,7 @@ import { PunchRoster, PunchPeriodBar } from './punch-roster';
 import { PayrollHours, workHoursData } from './payroll-hours';
 import StaffClock from './staff-clock';
 import ShiftTodos from './shift-todos';
+import CartBoard from './cart-board';
 import { say } from './say';
 import StaffMore, { type MoreItem } from './staff-more';
 import TimePicker from './time-picker';
@@ -177,6 +180,7 @@ const TAB_LABELS: Record<string, string> = {
   team: '팀',
   messages: '메시지',
   attendance: '출근 기록',
+  carts: '카트',
   payroll: '급여 관리',
   help: '도움말',
 };
@@ -263,6 +267,7 @@ function Pick({
 const nav = [
   { key: 'schedule', label: '근무 스케줄', Icon: CalendarDays },
   { key: 'working', label: '근무 현황', Icon: Radar },
+  { key: 'carts', label: '카트', Icon: BatteryCharging },
   { key: 'attendance', label: '출근 기록', Icon: Clock3 },
   { key: 'payroll', label: '급여 관리', Icon: Wallet },
   { key: 'messages', label: '메시지', Icon: MessageSquare },
@@ -281,6 +286,7 @@ const employeeNav = new Set([
   'availability',
   'attendance',
   'messages',
+  'carts',
   'help',
 ]);
 export default function ShiftApp() {
@@ -518,6 +524,12 @@ export default function ShiftApp() {
   useEffect(() => {
     if (auth === 'in') track('schedule', tab);
   }, [auth, tab]);
+  // 카트 보드는 여러 직원이 함께 누르므로, 그 화면을 보는 동안에는 10초마다 새로 불러옵니다.
+  useEffect(() => {
+    if (tab !== 'carts' || auth !== 'in') return;
+    const timer = setInterval(() => void refresh(), 10000);
+    return () => clearInterval(timer);
+  }, [tab, auth]);
   // stay: 할 일 체크·메모처럼 열린 창 안에서 이어 하는 저장. 창을 닫지 않고 저장 상자도 띄우지 않습니다.
   async function command(type: string, payload: any = {}, stay = false) {
     if (setup && type !== 'initialize') {
@@ -1742,6 +1754,20 @@ export default function ShiftApp() {
                   onPunch={(employeeId, kind) => void command(kind, { employeeId })}
                 />
               </div>
+            </TabsContent>
+            <TabsContent value="carts">
+              <div className="pageheading cartheading">
+                <div>
+                  <h2>{t('카트 충전')}</h2>
+                  <p>{t('두 번 나간 카트는 충전합니다. 완충이 안 된 카트는 게이지가 붙고 한 번만 나갑니다.')}</p>
+                </div>
+              </div>
+              <CartBoard
+                carts={cartList(data)}
+                busy={busy}
+                name={(id) => (id === actor.id && actor.admin ? t('관리자') : name(id))}
+                onCommand={(type, payload) => command(type, payload, true)}
+              />
             </TabsContent>
             <TabsContent value="timeoff">
               <div className="panel contentpanel">
@@ -4504,6 +4530,10 @@ export default function ShiftApp() {
       ],
     },
     {
+      label: '카트',
+      items: [{ key: 'carts', label: '카트 충전', Icon: BatteryCharging, onSelect: () => setTab('carts') }],
+    },
+    {
       label: '설정',
       items: [
         { key: 'help', label: '도움말', Icon: CircleQuestionMark, onSelect: () => setTab('help') },
@@ -4639,6 +4669,7 @@ export default function ShiftApp() {
             {actor.admin && navItem('dashboard', '대시보드', LayoutDashboard)}
             {actor.admin && navItem('working', '근무 현황', Radar, { sub: true })}
             {navItem('schedule', '스케줄', CalendarDays)}
+            {navItem('carts', '카트', BatteryCharging)}
             {actor.admin && navItem('team', '팀', Users)}
             <hr />
             <a className="sidenav-item" href={'/tasks' + query()}>
