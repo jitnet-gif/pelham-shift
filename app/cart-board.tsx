@@ -188,6 +188,9 @@ export default function CartBoard({
 
   return (
     <section className="cartboard" aria-label={t('카트')}>
+      {/* 칸 수를 보드 폭으로 정하는 container 는 이 안쪽에만 둡니다. 바깥에 두면 화면 아래에 고정해야 할
+          되돌리기 알림이 보드 기준으로 붙어 버립니다. */}
+      <div className="cart-body">
       <div className="cart-line" aria-label={t('라인업')}>
         <b className="cart-line-title">
           <ListOrdered size={16} aria-hidden="true" />
@@ -314,6 +317,7 @@ export default function CartBoard({
             </>
           )}
         </aside>
+      </div>
       </div>
 
       {toast && (

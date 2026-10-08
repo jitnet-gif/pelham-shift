@@ -1,6 +1,7 @@
 /* 카트 충전 보드. 보드 폭에 따라 핸드폰 5칸 · 아이패드 10칸 · 랩탑 12칸 + 오른쪽 목록으로 바뀝니다. */
 .cartboard{--c-green:#2f9e44;--c-green-soft:#e2f4e5;--c-teal:#087e6d;--c-red:#c8432f;--c-red-soft:#fbe6e1;--c-orange:#e8820c;--c-orange-soft:#fdeed9;--c-blue:#2463d6;--c-blue-soft:#e3ecfc;
-  container-type:inline-size;display:flex;flex-direction:column;gap:14px;padding-bottom:84px}
+  padding-bottom:84px}
+.cart-body{container-type:inline-size;display:flex;flex-direction:column;gap:14px}
 
 /* 칸 하나 = 카트 한 대 */
 .cart-cell{position:relative;aspect-ratio:1;width:100%;max-width:84px;border:2px solid #8fa29e;border-radius:12px;background:#fff;padding:0;color:#203332;

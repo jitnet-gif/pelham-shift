@@ -307,6 +307,9 @@ export default function ShiftApp() {
   // 근무지를 지정해 둔 곳에서는 앱을 여는 동안 위치를 계속 지켜봅니다.
   const gps = useGps();
   const [version, setVersion] = useState(0);
+  // 받은 것 중 가장 새 버전. 저장보다 먼저 나간 불러오기의 답이 저장 뒤에 도착하면,
+  // 그 묵은 답이 방금 저장한 것을 화면에서 되돌려 놓습니다(카트 보드처럼 자주 불러오는 화면에서 잘 보입니다).
+  const newest = useRef(0);
   const [team, setTeam] = useState('');
   const [actor, setActor] = useState({ id: 'admin', admin: true });
   const [setup, setSetup] = useState(true);
@@ -458,6 +461,7 @@ export default function ShiftApp() {
     typeof window === 'undefined' ? '' : window.location.search;
   const ingest = (r: any) => {
     if (r.state) {
+      newest.current = Math.max(newest.current, r.version ?? 0);
       setData(r.state);
       setVersion(r.version);
       setSetup(false);
@@ -476,10 +480,13 @@ export default function ShiftApp() {
       const json = (await r.json()) as { error?: string };
       if (r.status === 401) {
         setAuth('out');
+        newest.current = 0;
         return;
       }
       if (!r.ok) throw Error(json.error);
       setAuth('in');
+      // 저장보다 먼저 나간 불러오기가 늦게 도착했으면 버립니다. 다음 차례가 새 모습을 가져옵니다.
+      if ((json as { version?: number }).version! < newest.current) return;
       ingest(json);
       // 지난번에 띄운 말은 여기서 지웁니다. 그래야 한 번 뜬 띠가 계속 박혀 있지 않습니다.
       setStatus('');
