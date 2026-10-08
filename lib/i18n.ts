@@ -1206,7 +1206,8 @@ const en: Record<string, string> = {
   '{no}번 카트 충전 시작': 'Start charging cart {no}',
   '충전기에 꽂았으면 충전 시작을 누르세요. 충전이 끝날 때까지 이 카트는 잠깁니다.':
     'Plug the cart in, then tap Start charging. The cart stays locked until charging is done.',
-  '{no}번 카트 충전 완료': 'Cart {no} charged',
+  '충전 끝내기': 'Finish charging',
+  '{no}번 카트 충전 완료': 'Finish charging cart {no}',
   '얼마나 찼는지 고르세요. 완충이 아니면 게이지가 표시되고 한 번만 나갑니다.':
     'Pick how full it is. If it is not full, the cart shows a gauge and goes out only once.',
   게이지: 'Gauge',

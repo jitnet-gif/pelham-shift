@@ -277,7 +277,7 @@ export default function CartBoard({
                 <small>{localTime(new Date(c.charging!))}</small>
               </span>
               <button type="button" className="cart-act a-done" disabled={busy} onClick={() => tap(c)}>
-                {t('충전 완료')}
+                {t('충전 끝내기')}
               </button>
             </div>
           ))}
