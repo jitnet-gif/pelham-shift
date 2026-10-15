@@ -351,6 +351,25 @@ export const hasRole=(e:Roled,area:string)=>roleList(e).includes(area);
 // Workshop 근무는 Workshop 업무를 맡은 사람(Hybrid 포함)에게만 넣습니다. 다른 업무는 누구에게나 넣을 수 있습니다.
 export const RESTRICTED_AREAS:readonly string[]=['Workshop'];
 export const canWorkIn=(e:Roled,area:string)=>!RESTRICTED_AREAS.includes(area)||hasRole(e,area);
+// 관리자가 아니어도 자기 구역 직원 전체에게 한 번에 보낼 수 있는 사람. cc 에 적힌 사람은 그 구역이 아니어도 같은 메시지를 함께 받습니다.
+// 직원 기록에는 따로 적지 않고 이름의 첫 단어(대소문자 무시)로 찾습니다.
+export const TEAM_SENDERS:readonly {sender:string;area:string;cc:readonly string[]}[]=[
+  {sender:'Marcel',area:'Workshop',cc:['Francis','Emmeline','Bright']},
+  {sender:'Francis',area:'Proshop',cc:['Emmeline','Bright']},
+  {sender:'Francis',area:'Workshop',cc:['Emmeline','Bright']},
+];
+// 받는 사람 칸에 넣는 값. 서버가 이 값을 그 구역 직원과 cc 로 풀어 한 사람씩 보냅니다.
+export const TEAM_TARGET='team:';
+const firstName=(name:string)=>name.trim().split(/\s+/)[0]?.toLowerCase()??'';
+// 이 사람이 보낼 수 있는 구역 메시지와 실제로 받을 사람 목록. 보내는 사람 본인과 퇴사자는 빠집니다.
+export function teamBroadcasts(employees:{id:string;name:string;role:string;roles?:string[];archived?:boolean}[],me:string):{area:string;ids:string[]}[]{
+  const sender=employees.find(e=>e.id===me);if(!sender)return [];
+  const live=employees.filter(e=>!e.archived&&e.id!==me);
+  return TEAM_SENDERS.filter(r=>firstName(sender.name)===r.sender.toLowerCase()).map(r=>{
+    const cc=r.cc.map(v=>v.toLowerCase());
+    return {area:r.area,ids:live.filter(e=>hasRole(e,r.area)||cc.includes(firstName(e.name))).map(e=>e.id)};
+  });
+}
 // 한 직군만 맡은 사람과 구분해 표시할 때 씁니다.
 export const isMultiRole=(e:Roled)=>roleList(e).length>1;
 // 직원 구분 — Proshop, Workshop, 둘 다 맡는 Hybrid. 이름을 이 구분의 색으로 적어 한눈에 가려 봅니다.

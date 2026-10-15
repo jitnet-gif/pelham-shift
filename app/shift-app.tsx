@@ -114,6 +114,8 @@ import {
   roleTint,
   roleGroup,
   groupByRole,
+  teamBroadcasts,
+  TEAM_TARGET,
   ROLE_GROUP_COLORS,
   type RoleGroup,
   hasRole,
@@ -1344,8 +1346,12 @@ export default function ShiftApp() {
   // 관리자 칸은 공지를 올릴 때와, 관리자 칸의 주인인 관리자 계정('admin') 본인에게서만 빠집니다.
   const msgNotice = actor.admin && form.notice === '1';
   const msgPeople = staff.filter((e) => e.id !== actor.id);
+  // 구역 전체에 보낼 수 있는 직원(TEAM_SENDERS)에게는 그 구역 칸이 드롭다운 맨 위에 더 붙습니다.
+  const msgTeams = actor.admin ? [] : teamBroadcasts(data.employees, actor.id);
+  const msgTeam = msgTeams.find((r) => TEAM_TARGET + r.area === form.to);
   const msgPool = [
     ...(msgNotice || actor.id === 'admin' ? [] : ['admin']),
+    ...msgTeams.map((r) => TEAM_TARGET + r.area),
     ...msgPeople.map((e) => e.id),
   ];
   const msgTargets = (form.to || '').split(',').filter((v) => msgPool.includes(v));
@@ -3761,9 +3767,18 @@ export default function ShiftApp() {
                     onChange={(v) => put('to', v)}
                     options={[
                       { value: 'admin', label: t('관리자') },
+                      ...msgTeams.map((r) => ({
+                        value: TEAM_TARGET + r.area,
+                        label: t('{area} 전체 ({n}명)', { area: r.area, n: r.ids.length }),
+                      })),
                       ...msgPeople.map((e) => ({ value: e.id, label: e.name, group: roleGroup(e) })),
                     ]}
                   />
+                )}
+                {msgTeam && (
+                  <p className="hint">
+                    {t('받는 사람: {names}', { names: msgTeam.ids.map(name).join(', ') })}
+                  </p>
                 )}
                 <label className="field">
                   {t('field::메시지')}
