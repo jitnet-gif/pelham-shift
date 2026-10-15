@@ -408,6 +408,7 @@
 }
 .stmsg-bubble.mine { align-self: flex-end; background: #dcebdd; }
 .stmsg-bubble time { display: block; margin-top: 3px; font-size: 12px; color: var(--sub); }
+.stmsg-bubble .stmsg-from { display: block; margin-bottom: 2px; font-size: 12px; font-weight: 600; }
 .stmsg-reply {
   align-self: flex-end;
   padding: 8px 16px;

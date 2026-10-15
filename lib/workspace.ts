@@ -1,4 +1,4 @@
-import {livePunches,localDate,publicShifts,type Shift,type State} from '@/lib/domain';
+import {livePunches,localDate,publicShifts,sentTo,teamArea,type Shift,type State} from '@/lib/domain';
 import type {Actor} from '@/lib/operations';
 import {getBirthSession} from '@/lib/birth-auth';
 export const json=(value:unknown,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'no-store'}});
@@ -17,5 +17,6 @@ const myShifts=new Set(publicShifts(state).filter(x=>x.employeeId===actor.id).ma
 return {...state,clockNames:[],payHours:[],managerPay:[],ownerSalary:undefined,punches:punchManager?punches.map(r=>r.employeeId===actor.id?r:{...r,spot:undefined,outSpot:undefined}):punches.filter(r=>r.employeeId===actor.id),timeOff:timeOff.filter(r=>r.employeeId===actor.id),availability:availability.filter(r=>r.employeeId===actor.id),tasks:taskManager?tasks:tasks.filter(t=>t.assignedTo===actor.id),todos:taskManager?todos:todos.filter(x=>myShifts.has(x.shiftId)),todoTemplates:taskManager?state.todoTemplates:undefined,employees:state.employees.map(e=>e.id===actor.id?{...e,email:'',birthDate:'',phone:''}:{...e,email:'',birthDate:'',phone:'',punchId:undefined,rate:0,salary:undefined,startRate:undefined}),// 근무를 편성하는 사람은 작업본과 진행 중인 대체근무까지 봐야 합니다 — 그러지 않으면 고칠 것이 화면에 없습니다.
 // 나머지 직원은 마지막으로 공개한 근무표(공개본)를 봅니다. 공개 뒤에 고친 근무는 다음 공개 때까지 고치기 전 모습으로 보입니다.
 shifts:taskManager?state.shifts:publicShifts(state),publishedShifts:taskManager?publicShifts(state):undefined,attendance:punchManager?state.attendance:state.attendance.filter(a=>a.employeeId===actor.id),swaps:taskManager?state.swaps:[],
-// Staff see what was sent to them (directly, to everyone, or to a notice list they are on) and what they sent; other staff's read receipts stay private.
-messages:state.messages.filter(m=>m.sender===actor.id||m.to===actor.id||(m.to==='all'&&(!m.recipients||m.recipients.includes(actor.id)))).map(m=>({...m,recipients:undefined,readBy:m.readBy.filter(id=>id===actor.id||id==='admin')}))}}
+// Staff see what was sent to them (directly, to everyone, to a notice list or a team room they are on) and what they sent; other staff's read receipts stay private.
+// Team-room messages keep their member list so the room can show who is in it.
+messages:state.messages.filter(m=>m.sender===actor.id||sentTo(m,actor.id,false)).map(m=>({...m,recipients:teamArea(m.to)?m.recipients:undefined,readBy:m.readBy.filter(id=>id===actor.id||id==='admin')}))}}

@@ -115,6 +115,9 @@ import {
   roleGroup,
   groupByRole,
   teamBroadcasts,
+  teamRooms,
+  teamArea,
+  sentTo,
   TEAM_TARGET,
   ROLE_GROUP_COLORS,
   type RoleGroup,
@@ -969,11 +972,7 @@ export default function ShiftApp() {
     (m) =>
       m.sender !== actor.id &&
       !m.readBy.includes(actor.id) &&
-      (m.to === 'all'
-        ? !m.recipients || m.recipients.includes(actor.id)
-        : m.to === 'admin'
-          ? actor.admin
-          : m.to === actor.id),
+      sentTo(m, actor.id, actor.admin),
   );
   const unreadKey = unread.map((m) => m.id).join(',');
   // 저장 알림은 4초만 머뭅니다. 다음 저장이 들어오면 앞 타이머는 걷어 냅니다.
@@ -1346,9 +1345,12 @@ export default function ShiftApp() {
   // 관리자 칸은 공지를 올릴 때와, 관리자 칸의 주인인 관리자 계정('admin') 본인에게서만 빠집니다.
   const msgNotice = actor.admin && form.notice === '1';
   const msgPeople = staff.filter((e) => e.id !== actor.id);
-  // 구역 전체에 보낼 수 있는 직원(TEAM_SENDERS)에게는 그 구역 칸이 드롭다운 맨 위에 더 붙습니다.
-  const msgTeams = actor.admin ? [] : teamBroadcasts(data.employees, actor.id);
-  const msgTeam = msgTeams.find((r) => TEAM_TARGET + r.area === form.to);
+  // 그룹 방. 새 그룹 메시지는 TEAM_SENDERS 의 보내는 사람만 드롭다운에서 고르고,
+  // 다른 멤버는 그룹 방의 답장 단추로 들어왔을 때만 그 방이 받는 사람 칸에 섭니다.
+  const msgRooms = actor.admin ? [] : teamRooms(data.employees, actor.id);
+  const msgStarts = teamBroadcasts(data.employees, actor.id).map((r) => r.area);
+  const msgTeam = msgRooms.find((r) => TEAM_TARGET + r.area === form.to);
+  const msgTeams = msgRooms.filter((r) => msgStarts.includes(r.area) || r === msgTeam);
   const msgPool = [
     ...(msgNotice || actor.id === 'admin' ? [] : ['admin']),
     ...msgTeams.map((r) => TEAM_TARGET + r.area),
@@ -1421,12 +1423,15 @@ export default function ShiftApp() {
   );
   // 여럿에게 한 번에 보낸 메시지는 한 사람씩 따로 저장되지만, 목록에서는 한 장으로 묶어 보여 줍니다.
   // 묶음 안에 내가 받은 한 통이 있으면 그 통으로 확인 단추가 움직입니다.
-  const mineTo = (x: Message) => (x.to === 'admin' ? actor.admin : x.to === actor.id);
+  const mineTo = (x: Message) => sentTo(x, actor.id, actor.admin);
   // 관리자 칸으로 온 글은 보낸 사람이 아닌 관리자가 읽어야 확인입니다. 보낸 사람이 관리자일 수도 있습니다.
+  // 그룹 방의 글은 멤버 누구라도 읽으면 확인으로 봅니다.
   const seen = (x: Message) =>
     x.to === 'admin'
       ? x.readBy.some((id) => id !== x.sender && (id === 'admin' || emp(id)?.admin))
-      : x.readBy.includes(x.to);
+      : teamArea(x.to)
+        ? x.readBy.some((id) => id !== x.sender)
+        : x.readBy.includes(x.to);
   const sendBatches = (list: Message[]) => {
     const out: Message[][] = [];
     for (const x of list.slice().reverse()) {
@@ -2679,7 +2684,9 @@ export default function ShiftApp() {
                       )}
                       <span>
                         →{' '}
-                        {batch.length > 1
+                        {teamArea(m.to)
+                          ? t('{area} 그룹', { area: teamArea(m.to) ?? '' })
+                          : batch.length > 1
                           ? batch.map((x) => name(x.to)).join(', ')
                           : m.recipients
                           ? m.recipients.map(name).join(', ')
@@ -2741,11 +2748,7 @@ export default function ShiftApp() {
                       )}
                       {/* 받는 사람만 누를 수 있습니다. 관리자에게 온 메시지는 to 가 'admin' 이라 관리자면 받는 사람입니다. */}
                       {!m.readBy.includes(actor.id) &&
-                        (m.to === 'all'
-                          ? !m.recipients || m.recipients.includes(actor.id)
-                          : m.to === 'admin'
-                            ? actor.admin
-                            : m.to === actor.id) && (
+                        sentTo(m, actor.id, actor.admin) && (
                         <button
                           disabled={busy}
                           className="button"
@@ -2761,9 +2764,10 @@ export default function ShiftApp() {
                           <button
                             disabled={busy}
                             className="button"
+                            // 그룹 방에서 받은 글은 그 방으로 답장합니다.
                             onClick={() =>
                               open('message', {
-                                to: m.sender,
+                                to: teamArea(m.to) && !actor.admin ? m.to : m.sender,
                                 notice: '',
                                 body:
                                   m.to === 'all'
@@ -3769,7 +3773,7 @@ export default function ShiftApp() {
                       { value: 'admin', label: t('관리자') },
                       ...msgTeams.map((r) => ({
                         value: TEAM_TARGET + r.area,
-                        label: t('{area} 전체 ({n}명)', { area: r.area, n: r.ids.length }),
+                        label: t('{area} 그룹 ({n}명)', { area: r.area, n: r.ids.length }),
                       })),
                       ...msgPeople.map((e) => ({ value: e.id, label: e.name, group: roleGroup(e) })),
                     ]}

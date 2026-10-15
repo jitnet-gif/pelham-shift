@@ -1,6 +1,6 @@
 import {after} from 'next/server';
 import {env} from '@/lib/db';
-import {seed,distanceMeters,workplaceOf} from '@/lib/domain';
+import {seed,distanceMeters,workplaceOf,teamArea} from '@/lib/domain';
 import {photoBytes} from '@/lib/punch-photo';
 import {applyCommand,type Command} from '@/lib/operations';
 import {context,visible,json,sameOrigin} from '@/lib/workspace';
@@ -35,7 +35,7 @@ export async function POST(req:Request){try{if(!sameOrigin(req))return json({err
 {const before=c.state,actor=c.actor,type=body.type,payload=body.payload;after(()=>log(req,{workspace:c.team,actor,state:before,kind:'command',action:type,target:commandTarget(payload,before),detail:commandDetail(payload,before,state)}))}
 // 근무표가 바뀐 저장이면, 한 주 44시간을 새로 넘긴 직원이 있는지 보고 관리자에게 알립니다.
 if(JSON.stringify(c.state.shifts)!==JSON.stringify(state.shifts)){const before=c.state;after(()=>overtimeScheduled(c.team,before,state,c.actor.id,new URL(req.url).origin).catch(()=>0))}
-if(body.type==='message'){const fresh=state.messages.slice(c.state.messages.length);const to=[...new Set(fresh.flatMap(m=>m.to==='all'?state.employees.map(e=>e.id):[m.to]))];after(()=>notify(c.team,to.filter(id=>id&&id!==c.actor.id),{title:c.actor.admin?'관리자 메시지':'직원 메시지',body:(c.actor.admin?'':(state.employees.find(e=>e.id===c.actor.id)?.name||'')+': ')+(fresh[0]?.body||''),tag:'message'},new URL(req.url).origin).catch(()=>0))}if(body.type==='notice'){const m=state.messages.at(-1);after(()=>notify(c.team,(m?.recipients??state.employees.filter(e=>!e.archived).map(e=>e.id)).filter(id=>id!==c.actor.id),{title:'관리자 공지',body:m?.body||'',tag:'notice'},new URL(req.url).origin).catch(()=>0))}if(body.type==='rain'){const m=state.messages.at(-1);after(()=>notify(c.team,m?.recipients??state.employees.map(e=>e.id),{title:'우천 근무 종료',body:m?.body||'',tag:'rain'},new URL(req.url).origin).catch(()=>0))}
+if(body.type==='message'){const fresh=state.messages.slice(c.state.messages.length);const to=[...new Set(fresh.flatMap(m=>m.to==='all'?state.employees.map(e=>e.id):teamArea(m.to)?m.recipients??[]:[m.to]))];const room=fresh[0]&&teamArea(fresh[0].to);after(()=>notify(c.team,to.filter(id=>id&&id!==c.actor.id),{title:room?'{area} 그룹':c.actor.admin?'관리자 메시지':'직원 메시지',...(room?{vars:{area:room}}:{}),body:(c.actor.admin?'':(state.employees.find(e=>e.id===c.actor.id)?.name||'')+': ')+(fresh[0]?.body||''),tag:'message'},new URL(req.url).origin).catch(()=>0))}if(body.type==='notice'){const m=state.messages.at(-1);after(()=>notify(c.team,(m?.recipients??state.employees.filter(e=>!e.archived).map(e=>e.id)).filter(id=>id!==c.actor.id),{title:'관리자 공지',body:m?.body||'',tag:'notice'},new URL(req.url).origin).catch(()=>0))}if(body.type==='rain'){const m=state.messages.at(-1);after(()=>notify(c.team,m?.recipients??state.employees.map(e=>e.id),{title:'우천 근무 종료',body:m?.body||'',tag:'rain'},new URL(req.url).origin).catch(()=>0))}
 // 할 일이 생기면 그 근무의 직원에게, 직원이 메모를 남기면 관리자에게 알립니다.
 if(body.type==='todoAdd'){const p=body.payload as {shiftId?:unknown},n=(state.todos?.length??0)-(c.state.todos?.length??0);after(()=>todosAdded(c.team,state,String(p?.shiftId??''),n,c.actor.id,new URL(req.url).origin).catch(()=>0))}
 if(body.type==='todoMemo'){const p=body.payload as {id?:unknown};after(()=>todoMemoLeft(c.team,state,String(p?.id??''),c.actor.id,new URL(req.url).origin).catch(()=>0))}

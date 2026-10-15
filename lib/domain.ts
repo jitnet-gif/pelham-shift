@@ -358,18 +358,30 @@ export const TEAM_SENDERS:readonly {sender:string;area:string;cc:readonly string
   {sender:'Francis',area:'Proshop',cc:['Emmeline','Bright']},
   {sender:'Francis',area:'Workshop',cc:['Emmeline','Bright']},
 ];
-// 받는 사람 칸에 넣는 값. 서버가 이 값을 그 구역 직원과 cc 로 풀어 한 사람씩 보냅니다.
+// 구역마다 그룹 대화방이 하나 있습니다. 메시지의 to 가 'team:Workshop' 이면 그 방의 글이고, recipients 에 보낼 때의 멤버가 남습니다.
 export const TEAM_TARGET='team:';
+export const teamArea=(to:string)=>to.startsWith(TEAM_TARGET)?to.slice(TEAM_TARGET.length):null;
+type Member={id:string;name:string;role:string;roles?:string[];archived?:boolean};
 const firstName=(name:string)=>name.trim().split(/\s+/)[0]?.toLowerCase()??'';
-// 이 사람이 보낼 수 있는 구역 메시지와 실제로 받을 사람 목록. 보내는 사람 본인과 퇴사자는 빠집니다.
-export function teamBroadcasts(employees:{id:string;name:string;role:string;roles?:string[];archived?:boolean}[],me:string):{area:string;ids:string[]}[]{
-  const sender=employees.find(e=>e.id===me);if(!sender)return [];
-  const live=employees.filter(e=>!e.archived&&e.id!==me);
-  return TEAM_SENDERS.filter(r=>firstName(sender.name)===r.sender.toLowerCase()).map(r=>{
-    const cc=r.cc.map(v=>v.toLowerCase());
-    return {area:r.area,ids:live.filter(e=>hasRole(e,r.area)||cc.includes(firstName(e.name))).map(e=>e.id)};
-  });
+// 그룹 방의 멤버: 그 구역 직원(Hybrid 포함)과, 그 구역에 보낼 수 있는 사람·cc 에 적힌 사람. 퇴사자는 빠집니다.
+export function teamMembers(employees:Member[],area:string):string[]{
+  const rules=TEAM_SENDERS.filter(r=>r.area===area);if(!rules.length)return [];
+  const names=rules.flatMap(r=>[r.sender,...r.cc]).map(v=>v.toLowerCase());
+  return employees.filter(e=>!e.archived&&(hasRole(e,area)||names.includes(firstName(e.name)))).map(e=>e.id);
 }
+// 내가 들어 있는 그룹 방들. 이 방에는 멤버 누구나 답장할 수 있습니다.
+export function teamRooms(employees:Member[],me:string):{area:string;ids:string[]}[]{
+  return [...new Set(TEAM_SENDERS.map(r=>r.area))].map(area=>({area,ids:teamMembers(employees,area)})).filter(r=>r.ids.includes(me)).map(r=>({area:r.area,ids:r.ids.filter(id=>id!==me)}));
+}
+// 새 그룹 메시지를 시작할 수 있는 방. TEAM_SENDERS 에 보내는 사람으로 적힌 방만입니다.
+export function teamBroadcasts(employees:Member[],me:string):{area:string;ids:string[]}[]{
+  const sender=employees.find(e=>e.id===me);if(!sender)return [];
+  const areas=TEAM_SENDERS.filter(r=>firstName(sender.name)===r.sender.toLowerCase()).map(r=>r.area);
+  return teamRooms(employees,me).filter(r=>areas.includes(r.area));
+}
+// 이 메시지를 내가 받는 사람으로 받았는지. 서버의 읽음 처리와 화면의 안 읽음 숫자가 같은 판단을 씁니다.
+export const sentTo=(m:{to:string;recipients?:string[]},me:string,admin:boolean)=>
+  m.to==='all'?!m.recipients||m.recipients.includes(me):teamArea(m.to)?!!m.recipients?.includes(me):m.to==='admin'?admin:m.to===me;
 // 한 직군만 맡은 사람과 구분해 표시할 때 씁니다.
 export const isMultiRole=(e:Roled)=>roleList(e).length>1;
 // 직원 구분 — Proshop, Workshop, 둘 다 맡는 Hybrid. 이름을 이 구분의 색으로 적어 한눈에 가려 봅니다.

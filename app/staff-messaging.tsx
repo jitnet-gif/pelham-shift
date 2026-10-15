@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
-import { PartyPopper, SquarePen, UserRound } from 'lucide-react';
-import type { Employee, Message } from '@/lib/domain';
+import { PartyPopper, SquarePen, UserRound, UsersRound } from 'lucide-react';
+import { teamArea, type Employee, type Message } from '@/lib/domain';
 import { useLang } from './use-lang';
 
 // 직원이 보는 메시지함. 주고받은 대화가 위에, 전체 공지는 옆 탭에 있습니다.
@@ -36,12 +36,17 @@ export default function StaffMessaging({
   const announcements = messages
     .filter((m) => m.to === 'all')
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  // 대화는 상대별로 하나씩. 목록에는 가장 최근 한 줄만 미리 보여 줍니다.
+  // 대화는 상대별로 하나씩, 그룹 방은 방마다 하나씩. 목록에는 가장 최근 한 줄만 미리 보여 줍니다.
   const direct = messages.filter((m) => m.to !== 'all');
-  const threads = [...new Set(direct.map((m) => (m.sender === me ? m.to : m.sender)))]
+  const partner = (m: Message) => (teamArea(m.to) ? m.to : m.sender === me ? m.to : m.sender);
+  const title = (who: string) => {
+    const area = teamArea(who);
+    return area ? t('{area} 그룹', { area }) : who === 'admin' ? t('관리자') : name(who);
+  };
+  const threads = [...new Set(direct.map(partner))]
     .map((who) => {
       const rows = direct
-        .filter((m) => (m.sender === me ? m.to : m.sender) === who)
+        .filter((m) => partner(m) === who)
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
       return { who, rows, last: rows[0], unread: rows.filter(unread).map((m) => m.id) };
     })
@@ -99,14 +104,21 @@ export default function StaffMessaging({
                   if (thread.unread.length) onOpen(thread.unread);
                 }}
               >
-                <span className="stmsg-face" style={{ background: color(thread.who) }}>
-                  <UserRound size={19} />
+                <span
+                  className="stmsg-face"
+                  style={{ background: teamArea(thread.who) ? '#628597' : color(thread.who) }}
+                >
+                  {teamArea(thread.who) ? <UsersRound size={19} /> : <UserRound size={19} />}
                 </span>
                 <span className="stmsg-main">
-                  <b>{thread.who === 'admin' ? t('관리자') : name(thread.who)}</b>
+                  <b>{title(thread.who)}</b>
                   {shown !== thread.who && (
                     <small>
-                      {thread.last.sender === me ? t('나: ') : ''}
+                      {thread.last.sender === me
+                        ? t('나: ')
+                        : teamArea(thread.who)
+                          ? name(thread.last.sender) + ': '
+                          : ''}
                       {thread.last.body}
                     </small>
                   )}
@@ -120,6 +132,12 @@ export default function StaffMessaging({
                     .reverse()
                     .map((m) => (
                       <p key={m.id} className={'stmsg-bubble' + (m.sender === me ? ' mine' : '')}>
+                        {/* 그룹 방에서는 누가 쓴 글인지 위에 적습니다. */}
+                        {teamArea(thread.who) && m.sender !== me && (
+                          <b className="stmsg-from" style={{ color: color(m.sender) }}>
+                            {name(m.sender)}
+                          </b>
+                        )}
                         {m.body}
                         <time dateTime={m.createdAt}>{when(m.createdAt)}</time>
                       </p>
