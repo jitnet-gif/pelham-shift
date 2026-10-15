@@ -1343,20 +1343,25 @@ export default function ShiftApp() {
   // 메시지 받는 사람. 전체·구분(그룹)·한 사람씩 골라 한 번에 보냅니다.
   // 직원은 관리자와 동료에게 보냅니다. 관리자 권한을 받은 직원도 관리자 칸으로 다른 관리자와 주고받습니다.
   // 관리자 칸은 공지를 올릴 때와, 관리자 칸의 주인인 관리자 계정('admin') 본인에게서만 빠집니다.
-  const msgNotice = actor.admin && form.notice === '1';
-  const msgPeople = staff.filter((e) => e.id !== actor.id);
-  // 그룹 방. 새 그룹 메시지는 TEAM_SENDERS 의 보내는 사람만 드롭다운에서 고르고,
+  // 그룹 방. 관리자는 모든 방을 받는 사람 맨 위에서 고릅니다. 직원 중에는 TEAM_SENDERS 의 보내는 사람만 드롭다운에서 고르고,
   // 다른 멤버는 그룹 방의 답장 단추로 들어왔을 때만 그 방이 받는 사람 칸에 섭니다.
-  const msgRooms = actor.admin ? [] : teamRooms(data.employees, actor.id);
-  const msgStarts = teamBroadcasts(data.employees, actor.id).map((r) => r.area);
+  const msgRooms = teamRooms(data.employees, actor.id, actor.admin);
+  const msgStarts = actor.admin
+    ? msgRooms.map((r) => r.area)
+    : teamBroadcasts(data.employees, actor.id).map((r) => r.area);
   const msgTeam = msgRooms.find((r) => TEAM_TARGET + r.area === form.to);
   const msgTeams = msgRooms.filter((r) => msgStarts.includes(r.area) || r === msgTeam);
+  // 그룹 방을 고르면 공지로 올리지 않습니다 — 방의 글은 대화로 남습니다.
+  const msgNotice = actor.admin && form.notice === '1' && !msgTeam;
+  const msgPeople = staff.filter((e) => e.id !== actor.id);
   const msgPool = [
     ...(msgNotice || actor.id === 'admin' ? [] : ['admin']),
-    ...msgTeams.map((r) => TEAM_TARGET + r.area),
+    ...(actor.admin ? [] : msgTeams.map((r) => TEAM_TARGET + r.area)),
     ...msgPeople.map((e) => e.id),
   ];
-  const msgTargets = (form.to || '').split(',').filter((v) => msgPool.includes(v));
+  const msgTargets = msgTeam
+    ? [form.to]
+    : (form.to || '').split(',').filter((v) => msgPool.includes(v));
   const msgSet = (ids: string[]) => put('to', msgPool.filter((v) => ids.includes(v)).join(','));
   const msgToggle = (ids: string[], on: boolean) =>
     msgSet(on ? [...msgTargets, ...ids] : msgTargets.filter((v) => !ids.includes(v)));
@@ -1366,8 +1371,30 @@ export default function ShiftApp() {
   const messagePick = () => (
     <fieldset className="recipients msgpick">
       <legend>
-        {t('받는 사람 ({n}/{total}명)', { n: msgTargets.length, total: msgPool.length })}
+        {msgTeam
+          ? t('{area} 그룹 ({n}명)', { area: msgTeam.area, n: msgTeam.ids.length })
+          : t('받는 사람 ({n}/{total}명)', { n: msgTargets.length, total: msgPool.length })}
       </legend>
+      {/* 그룹 방을 고르면 그 방 하나로만 보냅니다. 다시 끄면 개인·묶음 선택으로 돌아갑니다. */}
+      {msgTeams.length > 0 && (
+        <div className="msgpick-groups">
+          {msgTeams.map((r) => (
+            <label className="recipient" key={r.area}>
+              <Checkbox
+                checked={msgTeam === r}
+                onCheckedChange={(on) => put('to', on === true ? TEAM_TARGET + r.area : '')}
+              />
+              {t('{area} 그룹 ({n}명)', { area: r.area, n: r.ids.length })}
+            </label>
+          ))}
+        </div>
+      )}
+      {msgTeam ? (
+        <p className="hint">
+          {t('받는 사람: {names}', { names: msgTeam.ids.map(name).join(', ') })}
+        </p>
+      ) : (
+        <>
       {actor.admin && (
         <label className="recipient all">
           <Checkbox
@@ -1419,6 +1446,8 @@ export default function ShiftApp() {
           )),
         )}
       </div>
+        </>
+      )}
     </fieldset>
   );
   // 여럿에게 한 번에 보낸 메시지는 한 사람씩 따로 저장되지만, 목록에서는 한 장으로 묶어 보여 줍니다.
@@ -2767,7 +2796,7 @@ export default function ShiftApp() {
                             // 그룹 방에서 받은 글은 그 방으로 답장합니다.
                             onClick={() =>
                               open('message', {
-                                to: teamArea(m.to) && !actor.admin ? m.to : m.sender,
+                                to: teamArea(m.to) ? m.to : m.sender,
                                 notice: '',
                                 body:
                                   m.to === 'all'
@@ -3908,7 +3937,7 @@ export default function ShiftApp() {
                         ? msgNotice
                           ? t('{n}명에게 공지 올리기', { n: msgTargets.length })
                           : actor.admin
-                            ? t('{n}명에게 보내기', { n: msgTargets.length })
+                            ? t('{n}명에게 보내기', { n: msgTeam ? msgTeam.ids.length : msgTargets.length })
                             : t('보내기')
                         : t('저장')}
               </button>

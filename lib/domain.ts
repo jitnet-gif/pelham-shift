@@ -369,9 +369,9 @@ export function teamMembers(employees:Member[],area:string):string[]{
   const names=rules.flatMap(r=>[r.sender,...r.cc]).map(v=>v.toLowerCase());
   return employees.filter(e=>!e.archived&&(hasRole(e,area)||names.includes(firstName(e.name)))).map(e=>e.id);
 }
-// 내가 들어 있는 그룹 방들. 이 방에는 멤버 누구나 답장할 수 있습니다.
-export function teamRooms(employees:Member[],me:string):{area:string;ids:string[]}[]{
-  return [...new Set(TEAM_SENDERS.map(r=>r.area))].map(area=>({area,ids:teamMembers(employees,area)})).filter(r=>r.ids.includes(me)).map(r=>({area:r.area,ids:r.ids.filter(id=>id!==me)}));
+// 내가 글을 올릴 수 있는 그룹 방들. 멤버는 자기 방에, 관리자는 모든 방에 올립니다. ids 는 나를 뺀 받는 사람입니다.
+export function teamRooms(employees:Member[],me:string,admin=false):{area:string;ids:string[]}[]{
+  return [...new Set(TEAM_SENDERS.map(r=>r.area))].map(area=>({area,ids:teamMembers(employees,area)})).filter(r=>admin||r.ids.includes(me)).map(r=>({area:r.area,ids:r.ids.filter(id=>id!==me)}));
 }
 // 새 그룹 메시지를 시작할 수 있는 방. TEAM_SENDERS 에 보내는 사람으로 적힌 방만입니다.
 export function teamBroadcasts(employees:Member[],me:string):{area:string;ids:string[]}[]{
