@@ -128,6 +128,7 @@ import {
   HYBRID_ROLE,
   workplaceOf,
   nameKey,
+  groupMessenger,
   dueShifts,
   missedShifts,
   pendingChanges,
@@ -1353,10 +1354,13 @@ export default function ShiftApp() {
   const msgTeams = msgRooms.filter((r) => msgStarts.includes(r.area) || r === msgTeam);
   // 그룹 방을 고르면 공지로 올리지 않습니다 — 방의 글은 대화로 남습니다.
   const msgNotice = actor.admin && form.notice === '1' && !msgTeam;
+  // 관리자와 TEAM_SENDERS 의 보내는 사람(Marcel, Francis)은 직원을 그룹별·여러 명으로 골라 한 번에 보냅니다.
+  const msgMulti = actor.admin || groupMessenger(data.employees, actor.id);
   const msgPeople = staff.filter((e) => e.id !== actor.id);
   const msgPool = [
     ...(msgNotice || actor.id === 'admin' ? [] : ['admin']),
-    ...(actor.admin ? [] : msgTeams.map((r) => TEAM_TARGET + r.area)),
+    // 여러 명을 고르는 화면에서는 그룹 방을 위의 체크박스로만 고릅니다 — 방과 사람을 섞어 보낼 수는 없습니다.
+    ...(msgMulti ? [] : msgTeams.map((r) => TEAM_TARGET + r.area)),
     ...msgPeople.map((e) => e.id),
   ];
   const msgTargets = msgTeam
@@ -1367,7 +1371,7 @@ export default function ShiftApp() {
     msgSet(on ? [...msgTargets, ...ids] : msgTargets.filter((v) => !ids.includes(v)));
   const msgGroups = groupByRole(msgPeople, (e) => roleGroup(e));
   const msgAll = msgPool.length > 0 && msgPool.every((v) => msgTargets.includes(v));
-  // 관리자만 씁니다. 직원은 받는 사람 한 명을 드롭다운에서 고릅니다.
+  // 관리자와 그룹 메시지를 보낼 수 있는 직원만 씁니다. 다른 직원은 받는 사람 한 명을 드롭다운에서 고릅니다.
   const messagePick = () => (
     <fieldset className="recipients msgpick">
       <legend>
@@ -3425,7 +3429,7 @@ export default function ShiftApp() {
                 void command('punchEdit', form);
               } else if (modal === 'message')
                 void command(msgNotice ? 'notice' : 'message', {
-                  to: actor.admin ? msgTargets.join(',') : msgTargets[0],
+                  to: msgMulti ? msgTargets.join(',') : msgTargets[0],
                   body: form.body,
                 });
               else void command(modal, form);
@@ -3790,8 +3794,8 @@ export default function ShiftApp() {
             )}
             {modal === 'message' && (
               <>
-                {/* 여럿·그룹을 골라 보내기는 관리자만 합니다. 직원은 한 사람에게만 보내고, 목록에는 이름만 보입니다. */}
-                {actor.admin ? (
+                {/* 여럿·그룹을 골라 보내기는 관리자와 TEAM_SENDERS 의 보내는 사람만 합니다. 다른 직원은 한 사람에게만 보내고, 목록에는 이름만 보입니다. */}
+                {msgMulti ? (
                   messagePick()
                 ) : (
                   <Pick
@@ -3936,7 +3940,7 @@ export default function ShiftApp() {
                       : modal === 'message'
                         ? msgNotice
                           ? t('{n}명에게 공지 올리기', { n: msgTargets.length })
-                          : actor.admin
+                          : msgMulti
                             ? t('{n}명에게 보내기', { n: msgTeam ? msgTeam.ids.length : msgTargets.length })
                             : t('보내기')
                         : t('저장')}

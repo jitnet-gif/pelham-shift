@@ -379,6 +379,8 @@ export function teamBroadcasts(employees:Member[],me:string):{area:string;ids:st
   const areas=TEAM_SENDERS.filter(r=>firstName(sender.name)===r.sender.toLowerCase()).map(r=>r.area);
   return teamRooms(employees,me).filter(r=>areas.includes(r.area));
 }
+// TEAM_SENDERS 의 보내는 사람은 관리자처럼 직원을 그룹별·여러 명으로 골라 한 번에 보낼 수 있습니다.
+export const groupMessenger=(employees:Member[],me:string)=>{const e=employees.find(x=>x.id===me);return !!e&&!e.archived&&TEAM_SENDERS.some(r=>r.sender.toLowerCase()===firstName(e.name))};
 // 이 메시지를 내가 받는 사람으로 받았는지. 서버의 읽음 처리와 화면의 안 읽음 숫자가 같은 판단을 씁니다.
 export const sentTo=(m:{to:string;recipients?:string[]},me:string,admin:boolean)=>
   m.to==='all'?!m.recipients||m.recipients.includes(me):teamArea(m.to)?!!m.recipients?.includes(me):m.to==='admin'?admin:m.to===me;
