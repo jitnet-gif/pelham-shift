@@ -111,11 +111,11 @@ export function workHoursData(
       ...(hand ? { manual: { hours: hand.hours, wage: hand.wage } } : {}),
     };
   };
-  // 퇴사한 사람은 이 기간에 근무가 있을 때만 세웁니다. 순서는 직원을 등록한 순서입니다.
+  // 이 기간에 일한 시간(출퇴근 기록, 손으로 적은 시간, 공휴일 근무)이 있는 사람만 세웁니다. 순서는 직원을 등록한 순서입니다.
   const hourly = state.employees
     .filter((e) => !e.salary && !OFF_SHEET.includes(e.role.trim().toLowerCase()))
     .map((e) => ({ e, row: rowOf(e) }))
-    .filter((x) => !x.e.archived || x.row.hours > 0 || !!x.row.manual);
+    .filter((x) => x.row.hours > 0 || x.row.holidayHours > 0 || !!x.row.manual);
   const deptOf = (role: string) =>
     DEPARTMENTS.find((d) => d.areas.includes(role.trim().toLowerCase()))
       ?.title ??
