@@ -51,6 +51,7 @@ import {
   CloudSun,
   MessageSquareText,
   BatteryCharging,
+  CopyPlus,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
@@ -162,6 +163,7 @@ import { PunchRoster, PunchPeriodBar } from './punch-roster';
 import { PayrollHours, workHoursData } from './payroll-hours';
 import StaffClock from './staff-clock';
 import ShiftTodos from './shift-todos';
+import CopyWeek from './copy-week';
 import CartBoard from './cart-board';
 import { say } from './say';
 import StaffMore, { type MoreItem } from './staff-more';
@@ -325,6 +327,8 @@ export default function ShiftApp() {
   const [modal, setModal] = useState('');
   const [form, setForm] = useState<Record<string, string>>({});
   const [presets, setPresets] = useState(false);
+  // 한 주를 다음 주로 복사하는 미리보기 창.
+  const [copyOpen, setCopyOpen] = useState(false);
   // 생년월일 달력. 열림 여부와 보고 있는 달은 모달을 열 때마다 초기화합니다.
   const [birthOpen, setBirthOpen] = useState(false);
   const [birthMonth, setBirthMonth] = useState<Date | undefined>();
@@ -3375,6 +3379,18 @@ export default function ShiftApp() {
           )}
         </div>
       )}
+      {canSchedule && copyOpen && (
+        <CopyWeek
+          // 주간은 보고 있는 두 주의 첫 주를, 다른 보기는 고른 날이 든 주를 복사합니다.
+          from={phone || view === 'week' ? week : weekStart(view === 'month' ? day : timelineDate)}
+          data={data}
+          staff={staff}
+          areas={areas}
+          busy={busy}
+          onClose={() => setCopyOpen(false)}
+          onCommand={(type, payload) => command(type, payload)}
+        />
+      )}
       <Dialog
         open={!!modal}
         onOpenChange={(o) => {
@@ -4636,6 +4652,15 @@ export default function ShiftApp() {
     });
   const schedActionsNode = canSchedule ? (
                     <div className="sched-actions">
+                      <button
+                        className="button"
+                        disabled={busy || setup}
+                        onClick={() => setCopyOpen(true)}
+                        title={t('다음 주로 복사')}
+                      >
+                        <CopyPlus size={16} />
+                        {t('다음 주로 복사')}
+                      </button>
                       <button
                         className="button publish"
                         disabled={busy || setup || data.published}

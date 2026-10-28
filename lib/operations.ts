@@ -51,7 +51,7 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
  const punchManager=actor.admin||!!s.employees.find(e=>e.id===actor.id)?.punchManager;
  const punchEditor=()=>{if(!punchManager)fail('출퇴근 수정 권한이 필요합니다.')};
  const PUNCH_EDITS=['punchAdd','punchEdit','punchRemove'];
- const MANAGED=['taskCreate','taskRemove','areaAdd','shift','shiftUpdate','shiftRemove','publish','todoAdd','todoRemove','todoTemplate','todoTemplateRemove'];
+ const MANAGED=['taskCreate','taskRemove','areaAdd','shift','shiftCopy','shiftUpdate','shiftRemove','publish','todoAdd','todoRemove','todoTemplate','todoTemplateRemove'];
  if(!actor.admin&&!['taskUpdate','todoCheck','todoMemo','cartUse','cartCharge','cartDone','cartLineup','cartUndo','message','read','timeOffRequest','timeOffDecision','availabilitySet','availabilityDecision','punchIn','punchOut','punchBreak','punchReview','punchApproveAll'].includes(command.type)&&!(MANAGED.includes(command.type)&&taskManager)&&!(PUNCH_EDITS.includes(command.type)&&punchManager))fail('직원 계정은 전체 일정, 본인 근태 및 급여를 읽기 전용으로만 볼 수 있습니다.');
  // 근무의 할 일. 넣고 빼는 것은 근무를 편성하는 사람의 몫이고, 체크와 메모는 그 근무의 직원이 합니다(편성하는 사람도 대신 할 수 있습니다).
  // 직원은 공개본의 근무를 보고 있으므로, 작업본에서 빠졌어도 공개본에 남은 근무는 찾아 줍니다.
@@ -93,6 +93,13 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
   if(e.birthDate&&live.some(x=>x.birthDate===e.birthDate))fail('같은 생년월일이 이미 등록되어 있습니다.');
   s.employees=s.employees.map(x=>x.id===e.id?{...x,archived:undefined}:x);break;}
  case 'shift': {scheduler();const who=employee(p.employeeId);const shift:Shift={id:id(),employeeId:p.employeeId,date:date(p.date),start:time(p.start,true),end:time(p.end,true),area:text(p.area,60),note:p.note?text(p.note,250):undefined,breakMinutes:p.breakMinutes?number(p.breakMinutes,720):undefined,draft:true};if(!canWorkIn(who,shift.area))fail('Workshop 근무는 Workshop 업무를 맡은 직원에게만 넣을 수 있습니다.');if(!duration(shift.start,shift.end))fail('출근과 퇴근 시간이 같습니다.');if((shift.breakMinutes??0)>=duration(shift.start,shift.end)*60)fail('휴게시간이 근무시간보다 깁니다.');if(s.shifts.some(x=>x.employeeId===shift.employeeId&&overlap(x,shift)))fail('해당 직원의 근무시간이 겹칩니다.');const before=[...s.shifts];s.shifts.push(shift);withinOvertime(before,shift.employeeId,[shift.date]);break;}
+ // 한 주를 다음 주로 옮겨 적기. 화면이 미리보기에서 빼고 더한 결과만 받아, 근무 추가와 같은 규칙으로 한 번에 넣습니다.
+ // 하나라도 걸리면 아무것도 넣지 않습니다 — 반쯤 들어간 주는 어디까지 들어갔는지 헷갈립니다.
+ case 'shiftCopy': {scheduler();const rows=Array.isArray(p.shifts)?p.shifts:[];if(!rows.length)fail('복사할 근무가 없습니다.');if(rows.length>500)fail('한 번에 최대 500개 근무를 복사할 수 있습니다.');const before=[...s.shifts];const touched=new Map<string,string[]>();
+  for(const row of rows){const who=employee(row.employeeId);if(who.archived)fail('퇴사한 직원에게는 근무를 넣을 수 없습니다.');const shift:Shift={id:id(),employeeId:who.id,date:date(row.date),start:time(row.start,true),end:time(row.end,true),area:text(row.area,60),note:row.note?text(row.note,250):undefined,breakMinutes:row.breakMinutes?number(row.breakMinutes,720):undefined,draft:true};
+   if(!canWorkIn(who,shift.area))fail(`${who.name}: Workshop 근무는 Workshop 업무를 맡은 직원에게만 넣을 수 있습니다.`);if(!duration(shift.start,shift.end))fail(`${shift.date}: 출근과 퇴근 시간이 같습니다.`);if((shift.breakMinutes??0)>=duration(shift.start,shift.end)*60)fail('휴게시간이 근무시간보다 깁니다.');if(s.shifts.some(x=>x.employeeId===shift.employeeId&&overlap(x,shift)))fail(`${shift.date} ${who.name}: 근무시간이 겹칩니다.`);
+   s.shifts.push(shift);touched.set(who.id,[...(touched.get(who.id)??[]),shift.date]);}
+  for(const [who,dates] of touched)withinOvertime(before,who,dates);break;}
  case 'shiftUpdate': {scheduler();const ids=[...new Set(String(p.ids||'').split(',').filter(Boolean))];if(!ids.length)fail('수정할 근무를 선택하세요.');if(ids.length>1000)fail('한 번에 최대 1,000개 근무를 수정할 수 있습니다.');const single=ids.length===1;const start=p.start?time(p.start,true):'',end=p.end?time(p.end,true):'',area=p.area?text(p.area,60):'',day=single&&p.date?date(p.date):'',note=single&&p.note!==undefined?String(p.note).trim().slice(0,250):null,rest=single&&p.breakMinutes!==undefined?number(p.breakMinutes,720):null;if(!start&&!end&&!area&&!day&&note===null&&rest===null)fail('변경할 내용을 입력하세요.');const targets=ids.map(v=>s.shifts.find(x=>x.id===v)??fail('근무를 찾을 수 없습니다. 새로고침 후 다시 시도하세요.'));
   // 고치기 전 모습. 아래에서 targets 를 제자리에서 손대므로, 견줄 값은 지금 떠 두어야 합니다.
   const before=s.shifts.map(x=>({...x}));

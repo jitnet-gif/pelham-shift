@@ -1,0 +1,37 @@
+.copyweek{max-width:560px!important}
+.copyweek-range{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:8px 6px;border:1px solid var(--border);border-radius:9px;background:#fafcfb}
+.copyweek-range span{display:flex;align-items:center;flex-wrap:wrap;justify-content:center;gap:6px;font-size:13px;color:#4c645a;text-align:center}
+.copyweek-range b{font-weight:600;font-variant-numeric:tabular-nums}
+.copyweek-range b.to{color:#087e6d}
+.copyweek-summary{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}
+.copyweek-summary span{font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;background:#e1f2ea;color:#1f7a4d;font-variant-numeric:tabular-nums}
+.copyweek-summary span.muted{background:#eef1f0;color:#6f7f7b}
+.copyweek-list{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
+.copyweek-list h4{margin:0 0 4px;font-size:12px;letter-spacing:.4px;color:#7a8b81;font-weight:700;text-transform:uppercase}
+.copyweek-row{display:grid;grid-template-columns:10px 1fr auto;align-items:center;gap:10px;padding:8px 6px 8px 10px;border:1px solid #e8eeeb;border-radius:8px;margin-top:6px;background:#fff}
+.copyweek-row>i{width:10px;height:10px;border-radius:2px}
+.copyweek-row>div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.copyweek-row b{font-size:14px;font-weight:600;color:#203332;overflow-wrap:anywhere}
+.copyweek-row small{font-size:12px;color:#77867e;font-variant-numeric:tabular-nums}
+.copyweek-row em{font-style:normal;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:4px}
+.copyweek-row em.warn{color:#9a5c0c}
+.copyweek-row em.new{color:#087e6d}
+.copyweek-row.added{border-color:#bfe3d6;background:#f3fbf8}
+.copyweek-row.is-off{opacity:.55;background:#f6f7f6}
+.copyweek-row.is-off b,.copyweek-row.is-off small{text-decoration:line-through}
+.copyweek-row .iconbutton{border-radius:6px;color:#7b8b87;padding:7px}
+.copyweek-row .iconbutton:hover:not(:disabled){background:#eef5f2;color:#087e6d}
+.copyweek-more{margin-top:12px;width:100%}
+.copyweek-add{display:grid;grid-template-columns:1fr 1fr;column-gap:12px;margin-top:14px;padding:14px;border:1px dashed #b6cfc2;border-radius:9px;background:#f6faf8}
+.copyweek-add .field{margin:0 0 12px}
+.copyweek-add .wide{grid-column:1/-1}
+.copyweek-add .formerror{margin:0 0 12px}
+.copyweek-addbar{display:flex;justify-content:flex-end;gap:8px}
+.copyweek-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
+/* 폰에서는 창이 화면 전체 시트가 됩니다(phone-dialog.css). 본문만 구르고 저장 줄은 바닥에 남습니다. */
+@media(max-width:700px){
+  .copyweek-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:2px 16px 12px}
+  .copyweek-foot{flex:none;margin:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:#fff}
+  .copyweek-foot .button{flex:1;min-height:46px}
+}
+@media(max-width:480px){.copyweek-add{grid-template-columns:1fr}}
