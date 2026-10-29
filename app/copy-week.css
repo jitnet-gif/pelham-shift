@@ -19,7 +19,27 @@
 .copyweek-row.added{border-color:#bfe3d6;background:#f3fbf8}
 .copyweek-row.is-off{opacity:.55;background:#f6f7f6}
 .copyweek-row.is-off b,.copyweek-row.is-off small{text-decoration:line-through}
+.copyweek-row.is-open{border-color:#9fd2c2;border-bottom-left-radius:0;border-bottom-right-radius:0}
+.copyweek-flags{display:flex;flex-wrap:wrap;gap:4px 10px}
+.copyweek-flags:empty{display:none}
+.copyweek-row em.todo{color:#56706a}
+.copyweek-tools{display:flex;gap:2px}
 .copyweek-row .iconbutton{border-radius:6px;color:#7b8b87;padding:7px}
+/* 줄 바로 밑에 붙는 고치기 칸: 시간 둘, 할 일 목록 */
+.copyweek-edit{display:grid;grid-template-columns:1fr 1fr;column-gap:12px;padding:14px;border:1px solid #9fd2c2;border-top:0;border-radius:0 0 8px 8px;background:#f6faf8}
+.copyweek-edit .field{margin:0 0 12px}
+.copyweek-edit .wide{grid-column:1/-1}
+.copyweek-edit .hint{margin:0 0 10px;font-size:12px}
+.copyweek-edit .formerror{margin:0 0 12px}
+.copyweek-todos{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;padding:12px;border:1px solid var(--border);border-radius:8px;background:#fff}
+.copyweek-todos header{display:flex;align-items:center;gap:6px;color:#2f4744}
+.copyweek-todos header b{font-size:14px;font-weight:650}
+.copyweek-todos header span{margin-left:auto;font-size:11px;color:#8b9a96;font-variant-numeric:tabular-nums}
+.copyweek-todos ul{list-style:none;margin:0;padding:0}
+.copyweek-todos li{display:flex;align-items:center;gap:6px;padding:5px 0;border-top:1px solid #edf2f0;font-size:14px;color:#203332}
+.copyweek-todos li:first-child{border-top:0}
+.copyweek-todos li span{flex:1;min-width:0;overflow-wrap:anywhere}
+.copyweek-todos .hint{margin:0}
 .copyweek-row .iconbutton:hover:not(:disabled){background:#eef5f2;color:#087e6d}
 .copyweek-more{margin-top:12px;width:100%}
 .copyweek-add{display:grid;grid-template-columns:1fr 1fr;column-gap:12px;margin-top:14px;padding:14px;border:1px dashed #b6cfc2;border-radius:9px;background:#f6faf8}
@@ -34,4 +54,4 @@
   .copyweek-foot{flex:none;margin:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:#fff}
   .copyweek-foot .button{flex:1;min-height:46px}
 }
-@media(max-width:480px){.copyweek-add{grid-template-columns:1fr}}
+@media(max-width:480px){.copyweek-add,.copyweek-edit{grid-template-columns:1fr}}
