@@ -367,7 +367,7 @@ const en: Record<string, string> = {
   '시급 수정': 'Edit hourly rate',
   '퇴근이 출근보다 이르면 다음 날 퇴근으로 계산합니다. 고친 기록은 직원이 다시 확인하도록 확인 대기로 돌아갑니다.':
     'If check-out is earlier than check-in, it counts as the next day. The edited record goes back to pending so the employee confirms it again.',
-  '아직 퇴근하지 않은 근무는 고칠 수 없습니다.': 'A shift that has not checked out yet cannot be edited.',
+  '아직 지나지 않은 시각은 퇴근으로 적을 수 없습니다.': 'Check-out cannot be later than the current time.',
   '출근기계에서 가져온 기록': 'Imported from the time clock',
   '아직 찍힌 출퇴근 기록이 없습니다.': 'No check-ins have been recorded yet.',
   // 'Awaiting review' 는 메시지의 '확인 대기'(Not read yet)와 뜻이 달라 앞가지로 갈라 둡니다.

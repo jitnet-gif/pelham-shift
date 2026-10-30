@@ -129,6 +129,7 @@ import {
   HYBRID_ROLE,
   workplaceOf,
   nameKey,
+  editsPunches,
   groupMessenger,
   dueShifts,
   missedShifts,
@@ -396,7 +397,7 @@ export default function ShiftApp() {
   const staffReadOnly = !canSchedule;
   // 출퇴근 수정 권한은 출근 기록 탭에서 관리자처럼 직원별 출근부를 열고 출퇴근을 넣고 고치고 지웁니다.
   const canEditPunch =
-    actor.admin || !!data.employees.find((e) => e.id === actor.id)?.punchManager;
+    actor.admin || editsPunches(data.employees.find((e) => e.id === actor.id));
   // 시급은 관리자에게만 내려오므로, 다른 사람에게는 0 원이 아니라 아예 보이지 않게 합니다.
   const showCost = actor.admin;
   // 폰으로 보는 직원. 스케줄·메시지·출퇴근이 전용 화면으로 갈립니다.

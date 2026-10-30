@@ -1,4 +1,4 @@
-import {MAX_AREAS,MIN_WORKPLACE_RADIUS,MAX_WORKPLACE_RADIUS,OT_PERIOD_HOURS,type State,type Shift,type Attendance,type Punch,areaList,canSwap,publicShifts,settlePublished,canWorkIn,leadDate,localDate,localTime,minutes,nameKey,groupMessenger,overlap,overtimeOver,duration,payPeriodStart,payPeriodEnd,periodOpen,livePunches,missingOut,shiftTodos,MAX_SHIFT_TODOS,MAX_TODO_TEMPLATES,type ShiftTodo,type Cart,type CartSnap,cartList,cartStatus,cartLineup,CART_LINEUP_MAX,CART_GAUGE,CART_UNDO_MS,TEAM_TARGET,teamArea,teamRooms,sentTo} from './domain';
+import {MAX_AREAS,MIN_WORKPLACE_RADIUS,MAX_WORKPLACE_RADIUS,OT_PERIOD_HOURS,type State,type Shift,type Attendance,type Punch,areaList,canSwap,publicShifts,settlePublished,canWorkIn,leadDate,localDate,localTime,minutes,nameKey,groupMessenger,editsPunches,overlap,overtimeOver,duration,payPeriodStart,payPeriodEnd,periodOpen,livePunches,shiftTodos,MAX_SHIFT_TODOS,MAX_TODO_TEMPLATES,type ShiftTodo,type Cart,type CartSnap,cartList,cartStatus,cartLineup,CART_LINEUP_MAX,CART_GAUGE,CART_UNDO_MS,TEAM_TARGET,teamArea,teamRooms,sentTo} from './domain';
 export type Actor={id:string;admin:boolean};
 export type Command={type:string;payload:any};
 const fail=(message:string):never=>{throw new Error(message)};
@@ -48,7 +48,7 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
   }
  };
  // 출퇴근 수정 권한은 직원별 출근부에서 출퇴근을 넣고 고치고 지우는 자리만 엽니다.
- const punchManager=actor.admin||!!s.employees.find(e=>e.id===actor.id)?.punchManager;
+ const punchManager=actor.admin||editsPunches(s.employees.find(e=>e.id===actor.id));
  const punchEditor=()=>{if(!punchManager)fail('출퇴근 수정 권한이 필요합니다.')};
  const PUNCH_EDITS=['punchAdd','punchEdit','punchRemove'];
  const MANAGED=['taskCreate','taskRemove','areaAdd','shift','shiftCopy','shiftUpdate','shiftRemove','publish','todoAdd','todoRemove','todoTemplate','todoTemplateRemove'];
@@ -176,8 +176,8 @@ export function applyCommand(current:State,command:Command,actor:Actor,now=new D
   const day=date(p.date);if(day>localDate(now))fail('아직 오지 않은 날짜에는 출퇴근을 넣을 수 없습니다.');
   const span=(d:string,start:string,end:string)=>({date:d,start,end} as Shift);
   const punch=livePunches(s).find(x=>x.id===key);
-  // 퇴근을 찍지 않고 날이 바뀐 기록(퇴근 미기록)은 여기서 퇴근을 적어 닫습니다. 오늘 근무 중인 기록은 아직 막습니다.
-  if(punch){if(!punch.out&&!missingOut(punch,localDate(now)))fail('아직 퇴근하지 않은 근무는 고칠 수 없습니다.');
+  // 퇴근을 찍지 않은 기록은 날이 바뀌었든 오늘이든 여기서 퇴근을 적어 닫습니다. 오늘 기록은 지금보다 늦은 퇴근을 받지 않습니다 — 일하지 않은 시간이 급여에 들어갑니다.
+  if(punch){if(!punch.out&&day===localDate(now)&&(out<at||out>localTime(now)))fail('아직 지나지 않은 시각은 퇴근으로 적을 수 없습니다.');
    if(livePunches(s).some(x=>x.id!==key&&x.employeeId===punch.employeeId&&overlap(span(x.date,x.in,x.out??x.in),span(day,at,out))))fail('이 시간에 이미 찍힌 출퇴근이 있습니다.');
    Object.assign(punch,{date:day,in:at,out,status:'pending',disputeNote:undefined,reviewedAt:undefined,editedBy:actor.id});break;}
   const a=s.attendance.find(x=>x.id===key)??fail('근무 기록을 찾을 수 없습니다.');const rest=number(p.breakMinutes??a.breakMinutes,1440);

@@ -1,4 +1,4 @@
-import {livePunches,localDate,publicShifts,sentTo,teamArea,type Shift,type State} from '@/lib/domain';
+import {editsPunches,livePunches,localDate,publicShifts,sentTo,teamArea,type Shift,type State} from '@/lib/domain';
 import type {Actor} from '@/lib/operations';
 import {getBirthSession} from '@/lib/birth-auth';
 export const json=(value:unknown,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'no-store'}});
@@ -11,7 +11,7 @@ function hideRemoved(state:State):State{const gone=new Set(state.employees.filte
  return {...state,shifts:state.shifts.filter(shown),...(state.publishedShifts?{publishedShifts:state.publishedShifts.filter(shown)}:{}),tasks:(state.tasks??[]).filter(t=>!t.removedAt&&!gone.has(t.assignedTo)),messages:state.messages.filter(m=>!m.removedAt),punches:livePunches(state)}}
 export function visible(full:State,actor:Actor){const state=hideRemoved(full);const tasks=state.tasks??[],timeOff=state.timeOff??[],availability=state.availability??[],punches=state.punches??[],clockNames=state.clockNames??[];if(actor.admin)return {...state,publishedShifts:publicShifts(state),tasks,timeOff,availability,punches,clockNames};const me=state.employees.find(e=>e.id===actor.id),taskManager=!!me?.taskManager;
 // 출퇴근 수정 권한은 모든 직원의 출퇴근을 봐야 고칠 수 있습니다. 남의 기록에서 찍은 자리(GPS)는 빼고 보냅니다.
-const punchManager=!!me?.punchManager;
+const punchManager=editsPunches(me);
 // 할 일은 자기 근무에 붙은 것만 봅니다. 다른 직원의 메모가 함께 내려가지 않게 합니다. 템플릿은 근무를 편성하는 사람만 씁니다.
 const myShifts=new Set(publicShifts(state).filter(x=>x.employeeId===actor.id).map(x=>x.id)),todos=state.todos??[];
 return {...state,clockNames:[],payHours:[],managerPay:[],ownerSalary:undefined,punches:punchManager?punches.map(r=>r.employeeId===actor.id?r:{...r,spot:undefined,outSpot:undefined}):punches.filter(r=>r.employeeId===actor.id),timeOff:timeOff.filter(r=>r.employeeId===actor.id),availability:availability.filter(r=>r.employeeId===actor.id),tasks:taskManager?tasks:tasks.filter(t=>t.assignedTo===actor.id),todos:taskManager?todos:todos.filter(x=>myShifts.has(x.shiftId)),todoTemplates:taskManager?state.todoTemplates:undefined,employees:state.employees.map(e=>e.id===actor.id?{...e,email:'',birthDate:'',phone:''}:{...e,email:'',birthDate:'',phone:'',punchId:undefined,rate:0,salary:undefined,startRate:undefined}),// 근무를 편성하는 사람은 작업본과 진행 중인 대체근무까지 봐야 합니다 — 그러지 않으면 고칠 것이 화면에 없습니다.

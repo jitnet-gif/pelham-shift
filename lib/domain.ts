@@ -363,6 +363,9 @@ export const TEAM_TARGET='team:';
 export const teamArea=(to:string)=>to.startsWith(TEAM_TARGET)?to.slice(TEAM_TARGET.length):null;
 type Member={id:string;name:string;role:string;roles?:string[];archived?:boolean};
 const firstName=(name:string)=>name.trim().split(/\s+/)[0]?.toLowerCase()??'';
+// 직원 정보의 '출퇴근 수정' 체크와 상관없이 다른 직원의 출퇴근을 넣고 고치고 지우는 사람. TEAM_SENDERS 처럼 이름의 첫 단어로 찾습니다.
+export const PUNCH_EDITORS:readonly string[]=['Francis','Emmeline'];
+export const editsPunches=(e?:{name:string;punchManager?:boolean;archived?:boolean})=>!!e&&(!!e.punchManager||(!e.archived&&PUNCH_EDITORS.some(n=>n.toLowerCase()===firstName(e.name))));
 // 그룹 방의 멤버: 그 구역 직원(Hybrid 포함)과, 그 구역에 보낼 수 있는 사람·cc 에 적힌 사람. 퇴사자는 빠집니다.
 export function teamMembers(employees:Member[],area:string):string[]{
   const rules=TEAM_SENDERS.filter(r=>r.area===area);if(!rules.length)return [];
